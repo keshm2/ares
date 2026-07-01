@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "job-scraper",
+  "instructions": [
+    "AGENTS.md",
+    "config/targets.json",
+    "data/applied_jobs.json"
+  ],
+  "permission": {
+    "edit": "allow",
+    "bash": { "*": "allow" },
+    "external_directory": { "*": "ask" }
+  },
+  "model": "opencode-go/qwen3.7-plus",
+  "agent": {
+    "job-scraper": {  
+      "model": "opencode-go/qwen3.7-plus"
+    }
+  },
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "@playwright/mcp@latest"],
+      "enabled": true
+    }
+  }
+}

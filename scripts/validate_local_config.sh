@@ -1,0 +1,213 @@
+#!/bin/bash
+# validate_local_config.sh — startup config validation for the job agent.
+#
+# Validates the live local config files (config/targets.json and
+# config/discord_config.json) that the current single-user deployment relies
+# on. Fails fast and clearly when required files or fields are missing or
+# invalid. Warns — but does not fail — when Ashby/Lever slug config still
+# holds placeholder values, so a partially-configured run can proceed for
+# the other boards.
+#
+# Usage:
+#   validate_local_config.sh [project_root]
+#   (project_root defaults to the parent of this script's directory)
+#
+# Exit codes:
+#   0  config valid (may include warnings)
+#   1  required config missing, invalid JSON, or missing required fields
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${1:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+TARGETS="$PROJECT_ROOT/config/targets.json"
+DISCORD="$PROJECT_ROOT/config/discord_config.json"
+
+warn() { echo "validate_local_config: WARNING: $*" >&2; }
+fail() { echo "validate_local_config: ERROR: $*" >&2; exit 1; }
+
+# --- Existence + JSON validity ---------------------------------------------
+
+[ -f "$TARGETS" ] || fail "missing required config file: $TARGETS"
+[ -f "$DISCORD" ] || fail "missing required config file: $DISCORD"
+
+jq -e . "$TARGETS" >/dev/null 2>&1 || fail "invalid JSON in $TARGETS"
+jq -e . "$DISCORD" >/dev/null 2>&1 || fail "invalid JSON in $DISCORD"
+
+# --- targets.json field validation -----------------------------------------
+
+check_array_nonempty() {
+  local file="$1" key="$2"
+  jq -e --arg k "$key" '.[$k] | type == "array" and length > 0' "$file" >/dev/null 2>&1 \
+    || fail "$file: field '$key' must be a non-empty array"
+}
+
+check_array() {
+  local file="$1" key="$2"
+  jq -e --arg k "$key" '.[$k] | type == "array"' "$file" >/dev/null 2>&1 \
+    || fail "$file: field '$key' must be an array"
+}
+
+# Like check_array, but a missing key is tolerated (treated as unconfigured
+# board state downstream) rather than failing the run.
+check_array_or_absent() {
+  local file="$1" key="$2"
+  jq -e --arg k "$key" '.[$k] | (type == "array" or type == "null")' "$file" >/dev/null 2>&1 \
+    || fail "$file: field '$key' must be an array if present"
+}
+
+check_string_nonempty() {
+  local file="$1" key="$2"
+  jq -e --arg k "$key" '.[$k] | type == "string" and length > 0' "$file" >/dev/null 2>&1 \
+    || fail "$file: field '$key' must be a non-empty string"
+}
+
+check_object() {
+  local file="$1" key="$2"
+  jq -e --arg k "$key" '.[$k] | type == "object"' "$file" >/dev/null 2>&1 \
+    || fail "$file: field '$key' must be an object"
+}
+
+check_safe_field() {
+  local file="$1" key="$2"
+  jq -e --arg k "$key" \
+    '.safe_fields | type == "object" and (.[$k] | type == "string" and length > 0)' \
+    "$file" >/dev/null 2>&1 \
+    || fail "$file: safe_fields.$key must be a non-empty string"
+}
+
+check_array_nonempty "$TARGETS" role_keywords
+check_array_nonempty "$TARGETS" level_keywords
+check_array         "$TARGETS" preferred_locations
+check_string_nonempty "$TARGETS" fallback_scope
+check_array_nonempty "$TARGETS" boards
+check_array_or_absent "$TARGETS" ashby_company_slugs
+check_array_or_absent "$TARGETS" lever_company_slugs
+check_object        "$TARGETS" safe_fields
+
+# Required safe_fields keys for form filling.
+SAFE_KEYS=(
+  first_name last_name email phone linkedin_url github_url
+  graduation_date gpa authorized_to_work require_sponsorship
+  citizenship_status currently_enrolled
+)
+for k in "${SAFE_KEYS[@]}"; do
+  check_safe_field "$TARGETS" "$k"
+done
+
+# --- discord_config.json field validation ----------------------------------
+# Phase 2: per-outcome webhook routing. Routes live under a `webhooks` object.
+# success, needs_review, and failed are required per-outcome routes.
+# summary is optional and falls back to success at runtime.
+# The legacy top-level `webhook_url` field is no longer read.
+
+check_object "$DISCORD" webhooks
+
+# Discord webhook URL shape: https://discord.com/api/webhooks/<numeric_id>/<token>
+WEBHOOK_RE='^https://(discord\.com|discordapp\.com)/api/webhooks/[0-9]+/.+$'
+
+# Required route — hard-fail when missing/placeholder/invalid.
+check_webhook_route_required() {
+  local file="$1" route="$2" val
+  val="$(jq -r --arg r "$route" '.webhooks[$r] // empty' "$file")"
+  [ -n "$val" ] || fail "$file: webhooks.$route is missing or empty"
+  [ "$val" != "REPLACE_ME" ] || fail "$file: webhooks.$route is still the REPLACE_ME placeholder"
+  printf '%s' "$val" | grep -Eq "$WEBHOOK_RE" \
+    || fail "$file: webhooks.$route does not look like a Discord webhook URL"
+}
+
+check_webhook_route_required "$DISCORD" success
+check_webhook_route_required "$DISCORD" needs_review
+check_webhook_route_required "$DISCORD" failed
+
+# summary is optional and falls back to success at runtime. Only warn if it is
+# present but clearly invalid; absence is expected and silent.
+SUMMARY_URL="$(jq -r '.webhooks.summary // empty' "$DISCORD")"
+if [ -n "$SUMMARY_URL" ] && [ "$SUMMARY_URL" != "REPLACE_ME" ]; then
+  printf '%s' "$SUMMARY_URL" | grep -Eq "$WEBHOOK_RE" \
+    || warn "$DISCORD: webhooks.summary does not look like a Discord webhook URL — summary will fall back to the success webhook at runtime"
+fi
+
+# --- Placeholder slug warnings (non-fatal) ---------------------------------
+
+placeholder_slugs() {
+  local file="$1" key="$2"
+  jq -r --arg k "$key" \
+    '.[$k] | map(select(. == "REPLACE_ME" or . == "")) | join(",")' \
+    "$file" 2>/dev/null || true
+}
+
+key_absent() {
+  local file="$1" key="$2"
+  jq -e --arg k "$key" 'has($k) | not' "$file" >/dev/null 2>&1
+}
+
+ASHBY_PLACEHOLDER="$(placeholder_slugs "$TARGETS" ashby_company_slugs)"
+LEVER_PLACEHOLDER="$(placeholder_slugs "$TARGETS" lever_company_slugs)"
+
+if key_absent "$TARGETS" ashby_company_slugs; then
+  warn "ashby_company_slugs is not configured — Ashby board will be skipped this run"
+elif [ -n "$ASHBY_PLACEHOLDER" ]; then
+  warn "ashby_company_slugs contains placeholder value(s): $ASHBY_PLACEHOLDER — Ashby board will be skipped this run"
+fi
+if key_absent "$TARGETS" lever_company_slugs; then
+  warn "lever_company_slugs is not configured — Lever board will be skipped this run"
+elif [ -n "$LEVER_PLACEHOLDER" ]; then
+  warn "lever_company_slugs contains placeholder value(s): $LEVER_PLACEHOLDER — Lever board will be skipped this run"
+fi
+
+# --- Phase 3: Google Sheets sync config (optional) -------------------------
+# The Sheets sync config is optional. If absent, warn and continue — job-board
+# runs must not break when Sheets sync is not yet configured. If present and
+# enabled, validate required fields and the service-account key path shape.
+# All findings here are WARNINGs only; none raise the exit code.
+
+SHEETS="$PROJECT_ROOT/config/google_sheets_config.json"
+
+if [ ! -f "$SHEETS" ]; then
+  warn "Google Sheets sync config not found ($SHEETS) — Sheets sync will be skipped. See SETUP.md section 4."
+else
+  if ! jq -e . "$SHEETS" >/dev/null 2>&1; then
+    warn "$SHEETS: invalid JSON — Sheets sync will be skipped."
+  else
+    SHEETS_ENABLED="$(jq -r '.enabled // true' "$SHEETS" 2>/dev/null)"
+    if [ "$SHEETS_ENABLED" = "false" ]; then
+      warn "Google Sheets sync is disabled (enabled=false in $SHEETS)."
+    elif [ "$SHEETS_ENABLED" != "true" ]; then
+      warn "$SHEETS: 'enabled' is not a boolean — Sheets sync will be skipped."
+    else
+      # enabled (or enabled absent, defaulting to true) — validate fields.
+      SHEETS_ID="$(jq -r '.spreadsheet_id // empty' "$SHEETS")"
+      SHEETS_TAB="$(jq -r '.worksheet_title // empty' "$SHEETS")"
+      SHEETS_KEY="$(jq -r '.service_account_key_path // empty' "$SHEETS")"
+
+      if [ -z "$SHEETS_ID" ] || [ "$SHEETS_ID" = "REPLACE_ME" ]; then
+        warn "$SHEETS: spreadsheet_id is missing or placeholder — Sheets sync will be skipped."
+      fi
+      if [ -z "$SHEETS_TAB" ]; then
+        warn "$SHEETS: worksheet_title is missing — Sheets sync will be skipped."
+      fi
+      if [ -z "$SHEETS_KEY" ] || [ "$SHEETS_KEY" = "REPLACE_ME" ]; then
+        warn "$SHEETS: service_account_key_path is missing or placeholder — Sheets sync will be skipped."
+      else
+        # Key path shape: should end with .json.
+        case "$SHEETS_KEY" in
+          *.json) ;;
+          *) warn "$SHEETS: service_account_key_path should end with .json — got: $SHEETS_KEY" ;;
+        esac
+        # Resolve relative to project root and check existence (warn only).
+        KEY_ABS="$SHEETS_KEY"
+        case "$KEY_ABS" in
+          /*) ;;
+          *) KEY_ABS="$PROJECT_ROOT/$KEY_ABS" ;;
+        esac
+        if [ ! -f "$KEY_ABS" ]; then
+          warn "$SHEETS: service-account key file not found at $SHEETS_KEY — Sheets sync will be skipped until the key is placed. See SETUP.md section 4.3."
+        fi
+      fi
+    fi
+  fi
+fi
+
+echo "validate_local_config: OK"

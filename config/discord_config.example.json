@@ -1,0 +1,8 @@
+{
+  "webhooks": {
+    "success": "REPLACE_ME",
+    "needs_review": "REPLACE_ME",
+    "failed": "REPLACE_ME",
+    "summary": "REPLACE_ME"
+  }
+}

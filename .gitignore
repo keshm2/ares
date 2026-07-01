@@ -1,0 +1,39 @@
+# Live config — contains secrets/PII. Copy the *.example.json files to start.
+/config/targets.json
+/config/discord_config.json
+
+# Phase 3: Google Sheets sync — live config + service-account key (secrets).
+/config/google_sheets_config.json
+/config/service-account-key.json
+
+# Runtime state
+/data/applied_jobs.json
+/data/review_queue.json
+/data/job_registry.json
+/data/job_events.jsonl
+
+# Personal PII — resumes
+/data/resumes/
+
+# Playwright MCP browser session artifacts (logs, page snapshots)
+/.playwright-mcp/
+
+# Logs
+*.log
+/logs/
+
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor swap/backup files
+*.swp
+*.swo
+*~
+
+# Python bytecode
+__pycache__/
+*.pyc

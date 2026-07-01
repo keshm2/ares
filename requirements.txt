@@ -1,0 +1,6 @@
+# Phase 3: Google Sheets sync — minimal official Google packages for
+# service-account Sheets writes. Install with:
+#   pip3 install -r requirements.txt
+google-api-python-client>=2.0.0
+google-auth>=2.0.0
+google-auth-httplib2>=0.1.0
