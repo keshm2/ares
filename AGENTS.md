@@ -27,9 +27,26 @@
   decision.
 - ALWAYS upsert each canonical record into data/job_registry.json via the
   canonical helper — never hand-write the registry.
+- ALWAYS run the deterministic JD fit gate on every canonical job after
+  role filtering and before tailoring:
+  `python3 scripts/evaluate_job_fit.py '<canonical-job-json>'`
+  The helper returns fit_status of skipped_unfit, needs_review, or
+  candidate (plus fit_score, reasoning, fit_reasons,
+  matched_role_keyword, matched_level_keyword, matched_level_source,
+  years_required, decision_version). Only candidate jobs proceed to
+  @resume-tailor. skipped_unfit is local-only (record via record-event,
+  never Discord/applied_jobs.json/sheet). needs_review from the fit gate
+  is a user-visible manual-review outcome before application: append to
+  data/applied_jobs.json and data/review_queue.json, record a
+  needs_review event, and send the needs_review Discord notification. Do
+  not tailor skipped_unfit or needs_review jobs.
 - ALWAYS re-check can-apply via the canonical helper immediately before
   any application attempt, even if the job passed earlier filtering. If
   can-apply refuses, skip the job and record a skipped_unfit event.
+- ALWAYS re-run the deterministic fit gate immediately before applying
+  (pre-apply fit confirmation). If the fit gate no longer yields
+  candidate, do not apply — handle skipped_unfit/needs_review the same
+  way as the pre-tailoring gate.
 - skipped_unfit events are local-only: record them via the canonical
   helper's record-event, but never route them to Discord or
   data/applied_jobs.json.
@@ -76,9 +93,10 @@
 - If a title matches role_keywords but NONE of level_keywords, check the JD
   body text for level_keywords terms before rejecting — some postings put
   seniority only in the description, not the title.
-- Reject any match where the JD explicitly states "3+ years" or higher,
-  even if level_keywords matched, unless the JD also explicitly says it
-  welcomes new grads/career changers.
+- Hard rejects (3+ years required with no new-grad language, out of US
+  scope) are enforced deterministically by the fit gate — see
+  "Deterministic JD fit gate" below. Role filtering only does the
+  keyword screen; it does not manual-heuristic reject.
 - SEASON IS NOT A FILTER. Internships and co-ops in ANY season (summer,
   fall, spring, winter, off-cycle, year-round) are in scope. Do not skip
   or deprioritize a posting because it says "Fall 2026 Intern" or
@@ -89,6 +107,47 @@
   as the role/level keyword match passes.
 - For new-grad (non-internship) roles, ignore season language entirely —
   it doesn't apply to full-time postings.
+
+## Deterministic JD fit gate
+- After role filtering and before tailoring, run the deterministic fit
+  helper on every canonical job:
+  `python3 scripts/evaluate_job_fit.py '<canonical-job-json>'`
+  Pass the canonical job JSON (the same object upserted into the
+  registry). The helper returns a JSON object with at least fit_status,
+  fit_score, reasoning, fit_reasons, matched_role_keyword,
+  matched_level_keyword, matched_level_source, years_required, and
+  decision_version.
+- The fit gate makes the status choice deterministically: use
+  skipped_unfit for explicit hard rejects or clearly too-low fit,
+  needs_review for borderline or ambiguous-but-promising jobs, and
+  candidate otherwise.
+- If the fit helper exits non-zero, returns invalid JSON, or returns an
+  unexpected fit_status, treat the job as needs_review: append to
+  data/applied_jobs.json and data/review_queue.json, record a
+  needs_review event, and send the needs_review Discord notification.
+  Do not proceed to tailoring or application when the helper result is
+  unusable.
+- Handle the helper output:
+  - skipped_unfit — the job is clearly unfit (the helper's deterministic
+    hard reject, e.g. 3+ years required, out of US scope). Record a
+    local-only skipped_unfit event via record-event using the helper's
+    reasoning. Do not send to Discord, do not append to
+    data/applied_jobs.json, do not sync to the Google Sheet, and do not
+    tailor. This replaces the manual 3+ years / out of US hard-reject
+    check — the fit helper is the deterministic gate.
+  - needs_review — the job is ambiguous and needs manual review before
+    application. This is a user-visible manual-review outcome that
+    occurs before any application submission. Do not tailor. Append a
+    needs_review entry to data/applied_jobs.json (File write discipline
+    schema; reasoning from the helper), append to
+    data/review_queue.json, record a needs_review event via
+    record-event, and invoke @discord-reporter with the needs_review
+    route.
+  - candidate — the job passes the fit gate. Proceed to @resume-tailor.
+- The fit gate runs BEFORE resume-tailoring. Never send a skipped_unfit
+  or needs_review job into tailoring — the fit gate is the deterministic
+  cutoff that keeps low-quality candidates out of the review queue and
+  out of tailoring.
 
 ## Handshake-specific handling
 - Handshake requires a student login session. If Playwright cannot
@@ -139,16 +198,20 @@
   `python3 scripts/job_state.py record-event '<event-json>'`
   Status values and when to use them:
     - skipped_unfit — a hard reject during filtering (3+ years, out of US
-      scope, etc.) or a can-apply refusal right before applying.
-      Local-only: never route to Discord or data/applied_jobs.json.
+      scope, etc.), a skipped_unfit from the deterministic fit gate
+      (pre-tailoring or pre-apply), or a can-apply refusal right before
+      applying. Local-only: never route to Discord or
+      data/applied_jobs.json.
     - applied — application submitted successfully.
     - needs_review — application could not be completed (CAPTCHA, missing
-      form fields, ATS score too low, etc.). Every user-visible
-      needs_review outcome — including ones that occur before a real
-      application submission, such as an ATS score below threshold during
-      tailoring — must also be appended to data/applied_jobs.json so
-      future runs do not re-tailor the same job forever. skipped_unfit is
-      local-only and never written to applied_jobs.json.
+      form fields, ATS score too low, etc.), or a needs_review from the
+      deterministic fit gate (ambiguous job, pre-tailoring or pre-apply).
+      Every user-visible needs_review outcome — including ones that occur
+      before a real application submission, such as an ATS score below
+      threshold during tailoring or a needs_review from the fit gate —
+      must also be appended to data/applied_jobs.json so future runs do
+      not re-tailor the same job forever. skipped_unfit is local-only and
+      never written to applied_jobs.json.
     - failed — application submitted but errored or was rejected by the
       form.
   The event JSON must include: job_key and status (applied, needs_review,
@@ -208,13 +271,20 @@
 - Invoke the helper with a single JSON payload describing one successful
   application:
   `python3 scripts/sync_internship_tracker.py '<row-json>'`
-  The payload carries the visible tracker row fields:
-    - Company — the applied job's company.
-    - Title — the applied job's title.
-    - Internship Term — derived per the rules below.
-    - Date Applied — the actual application date (see below).
-    - Source — the board the job came from.
-    - URL — the job posting/application URL.
+  The payload carries the visible tracker row fields (JSON keys match
+  the helper's accepted payload fields):
+    - company (required) — the applied job's company.
+    - title (required) — the applied job's title.
+    - date_applied (optional) — the actual application date (see
+      below). Defaults to today if omitted.
+    - internship_term (optional) — derived per the rules below.
+    - notes (optional, user-facing only) — a short note for the Notes
+      column. Leave blank unless there is something specific worth
+      surfacing to the human reader; never put internal reasoning here.
+  The helper auto-fills the remaining visible columns (Status, Response
+  Received, Date of Response) — do not send those. Source and URL are
+  not visible tracker columns and the helper does not read them; do not
+  include them in the payload.
 - Internship Term population (in priority order):
     1. Use the canonical job record's `internship_term` if it is
        non-empty.
@@ -230,11 +300,12 @@
   date). Never use the sync timestamp in place of the real application
   date.
 - If the helper reports that sync is disabled or unconfigured (e.g.
-  missing credentials or sheet id), log a single warning to the session
-  output and continue. The application run is still successful — do not
-  treat a disabled/unconfigured sync as a failed outcome, and do not
+  missing credentials or sheet id), or exits non-zero for any reason,
+  log a single warning to the session output and continue. The
+  application run is still successful — do not treat a disabled,
+  unconfigured, or non-zero-exit sync as a failed outcome, and do not
   retry in a loop.
 - Out of scope (do not add): reverse sync (sheet → agent), extra machine
-  or internal tabs, notes or status backfill into the sheet, or any
-  future-phase behavior beyond appending one row per successful
+  or internal tabs, backfilling Notes or Status into existing rows, or
+  any future-phase behavior beyond appending one row per successful
   application.

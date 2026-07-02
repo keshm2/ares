@@ -171,7 +171,11 @@ else
   if ! jq -e . "$SHEETS" >/dev/null 2>&1; then
     warn "$SHEETS: invalid JSON — Sheets sync will be skipped."
   else
-    SHEETS_ENABLED="$(jq -r '.enabled // true' "$SHEETS" 2>/dev/null)"
+    # Use an explicit null-check instead of `//`: jq's alternative operator
+    # treats `false` as falsy, so `.enabled // true` would turn an explicit
+    # `enabled: false` into `true` and fall through to the validation branch.
+    # Default to true only when the key is absent (null); preserve `false`.
+    SHEETS_ENABLED="$(jq -r 'if .enabled == null then true else .enabled end' "$SHEETS" 2>/dev/null)"
     if [ "$SHEETS_ENABLED" = "false" ]; then
       warn "Google Sheets sync is disabled (enabled=false in $SHEETS)."
     elif [ "$SHEETS_ENABLED" != "true" ]; then

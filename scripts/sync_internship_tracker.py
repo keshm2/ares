@@ -158,7 +158,7 @@ def append_row(cfg, row):
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
     except ImportError as exc:
-        die(
+        skip(
             "Google Python libraries not installed — run "
             "`pip3 install -r requirements.txt` to enable Sheets sync",
             missing_dependency=str(exc),
@@ -166,7 +166,7 @@ def append_row(cfg, row):
 
     key_path = cfg["service_account_key_path"]
     if not os.path.exists(key_path):
-        die(
+        skip(
             f"service-account key file not found: {key_path} — "
             "place the key file locally (see SETUP.md)",
         )
@@ -185,11 +185,17 @@ def append_row(cfg, row):
 
     spreadsheet_id = cfg["spreadsheet_id"]
     worksheet_title = cfg["worksheet_title"]
+    # Optional append knobs with sensible defaults so a minimal config
+    # (enabled/spreadsheet_id/worksheet_title/service_account_key_path)
+    # still works without these fields.
+    header_range = cfg.get("header_range", "A1:H")
+    value_input_option = cfg.get("value_input_option", "USER_ENTERED")
+    insert_data_option = cfg.get("insert_data_option", "INSERT_ROWS")
     # Escape single quotes in the sheet title for the A1 range literal.
     safe_title = worksheet_title.replace("'", "''")
     # Append range covers the 8 visible columns (A–H). The API finds the
     # first empty row after existing data in this range and inserts there.
-    append_range = f"'{safe_title}'!A1:H"
+    append_range = f"'{safe_title}'!{header_range}"
 
     body = {"values": [row]}
     try:
@@ -199,8 +205,8 @@ def append_row(cfg, row):
             .append(
                 spreadsheetId=spreadsheet_id,
                 range=append_range,
-                valueInputOption="USER_ENTERED",
-                insertDataOption="INSERT_ROWS",
+                valueInputOption=value_input_option,
+                insertDataOption=insert_data_option,
                 body=body,
             )
             .execute()

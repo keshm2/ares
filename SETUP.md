@@ -79,6 +79,10 @@ and the path to the service-account key. Edit it:
 - `service_account_key_path` — local path to the service-account JSON
   key (default `config/service-account-key.json`).
 - `enabled` — set to `false` to turn sync off without deleting the file.
+- `header_range`, `value_input_option`, `insert_data_option` — optional
+  append parameters with sensible defaults (`A1:H`, `USER_ENTERED`,
+  `INSERT_ROWS`). Leave them as-is unless the sheet needs different
+  settings.
 
 ### 4.2 Install the Python dependencies
 

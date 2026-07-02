@@ -58,11 +58,51 @@ never guess — if you're unsure about a form field, you skip and log it.
    a title matches role_keywords but not level_keywords, check the JD
    body before rejecting.
 7. Season is not a filter — internships/co-ops in any season are in scope.
-8. Reject only if explicitly requiring 3+ years with no new-grad language,
-   or explicitly located outside the United States with no remote-US
-   option. For each hard reject, record a local-only skipped_unfit event:
-   `python3 scripts/job_state.py record-event '{"status":"skipped_unfit","job_key":"...","company":"...","title":"...","url":"...","reasoning":"..."}'`
-   Do not route skipped_unfit to Discord or data/applied_jobs.json.
+8. Run the deterministic JD fit gate on every role-filtered candidate
+    before tailoring:
+    `python3 scripts/evaluate_job_fit.py '<canonical-job-json>'`
+    Pass the canonical job JSON (the same object upserted into the
+    registry). The helper returns a JSON object with at least fit_status,
+    fit_score, reasoning, fit_reasons, matched_role_keyword,
+    matched_level_keyword, matched_level_source, years_required, and
+    decision_version. The helper makes the decision deterministically:
+    skipped_unfit for explicit hard rejects or clearly too-low fit,
+    needs_review for borderline or ambiguous-but-promising jobs, and
+    candidate otherwise. If the helper exits non-zero, returns invalid
+    JSON, or returns an unexpected fit_status, treat the job as
+    needs_review and do not proceed to tailoring or application. Handle
+    the output:
+    - skipped_unfit — the job is clearly unfit (the helper's
+      deterministic hard reject, e.g. 3+ years required, out of US
+      scope). Record a local-only skipped_unfit event via record-event
+      using the helper's reasoning:
+      `python3 scripts/job_state.py record-event '{"status":"skipped_unfit","job_key":"...","company":"...","title":"...","url":"...","reasoning":"<helper reasoning>"}'`
+      Do not route to Discord, data/applied_jobs.json, the Google Sheet,
+      or @resume-tailor. This replaces the manual 3+ years / out of US
+      hard-reject check — the fit helper is the deterministic gate.
+    - needs_review — the job is ambiguous and needs manual review before
+      application. This is a user-visible manual-review outcome that
+      occurs before any application submission. Do not tailor. Do not
+      apply. Do all of the following:
+      a. Append a needs_review entry to data/applied_jobs.json via the
+         state helper:
+         `bash scripts/append_state_entry.sh data/applied_jobs.json '<entry-json>'`
+         Follow the File write discipline schema (job_id, company, title,
+         url, date_applied, status="needs_review", role_type, source,
+         resume_used="general", ats_score=0, location_tier,
+         cover_letter_used=false, reasoning from the helper). role_type,
+         source, and location_tier come from the canonical job record /
+         scrape_batch entry.
+      b. Append to data/review_queue.json via the state helper:
+         `bash scripts/append_state_entry.sh data/review_queue.json '<entry-json>'`
+      c. Record a needs_review event via record-event.
+      d. Invoke @discord-reporter with the needs_review outcome (company,
+         title, url, source, reasoning) so it routes to the needs_review
+         webhook.
+    - candidate — the job passes the fit gate. Keep it in the batch for
+      Phase 2 tailoring.
+    Only candidate jobs proceed to scrape_batch.json and Phase 2. Never
+    send a skipped_unfit or needs_review job into tailoring.
 9. Write the filtered batch to data/scrape_batch.json (temp file), built
    from unique canonical candidates rather than raw duplicates. Tag each
    entry with:
@@ -107,13 +147,25 @@ For each job in scrape_batch.json:
 
 ### Phase 3 — Apply
 For each job with ats_score >= 60:
-1. Re-check eligibility immediately before applying:
-   `python3 scripts/job_state.py can-apply '<canonical-job-json>'`
-   This is the dedupe recheck against the registry and applied history.
-   If the helper refuses (returns non-zero or prints "no"), skip the job
-   and record a skipped_unfit event via record-event. Do not attempt the
-   application. This recheck is mandatory even if the job passed earlier
-   filtering — another run may have applied in the meantime.
+1. Re-check fit and eligibility immediately before applying:
+   a. Re-run the deterministic fit gate (pre-apply fit confirmation):
+      `python3 scripts/evaluate_job_fit.py '<canonical-job-json>'`
+      If the helper exits non-zero, returns invalid JSON, or returns an
+      unexpected fit_status, treat the job as needs_review and do not
+      apply. If fit_status is not candidate, do not apply. Handle
+      skipped_unfit and needs_review exactly as in Phase 1 step 8
+      (skipped_unfit: local-only record-event; needs_review: append to
+      applied_jobs.json + review_queue.json, record-event,
+      @discord-reporter needs_review route). Then skip the job — do not
+      tailor further and do not attempt the application.
+   b. Re-check eligibility via can-apply:
+      `python3 scripts/job_state.py can-apply '<canonical-job-json>'`
+      This is the dedupe recheck against the registry and applied
+      history. If the helper refuses (returns non-zero or prints "no"),
+      skip the job and record a skipped_unfit event via record-event. Do
+      not attempt the application. This recheck is mandatory even if the
+      job passed earlier filtering — another run may have applied in the
+      meantime.
 2. Use Playwright MCP to open the application URL (skip this step for
    jobs sourced via Ashby/Lever API if no browser apply step is needed —
    use the applyUrl field directly).
@@ -138,27 +190,34 @@ For each job with ats_score >= 60:
    normalized_apply_url, ats_system, ats_score, resume_used,
    location_tier, cover_letter_used, reasoning, sources, first_seen_at,
    last_seen_at, latest_status, role_type). The row fields:
-   - Company — the applied job's company.
-   - Title — the applied job's title.
-   - Internship Term — populate in priority order:
+   - company (required) — the applied job's company.
+   - title (required) — the applied job's title.
+   - internship_term (optional) — populate in priority order:
      1. the canonical job record's `internship_term` if non-empty;
      2. otherwise, infer from the title and JD text ONLY when a clear
         term is present (e.g. "Summer 2026", "Fall 2026 Intern",
         "Spring Co-op") — use config/targets.json "season_keywords"
         as the reference set; do not guess;
      3. otherwise, leave it blank.
-   - Date Applied — the actual application submission date (the
-     `date_applied` value written to the applied_jobs.json entry),
-     formatted as YYYY-MM-DD. Never substitute the sync timestamp.
-   - Source — the board the job came from.
-   - URL — the job posting/application URL.
-   Call the helper exactly once per successful application. If the helper
-   reports that sync is disabled or unconfigured (e.g. missing
-   credentials or sheet id), log a single warning to the session output
-   and continue — the application is still successful; do not treat a
-   disabled/unconfigured sync as a failed outcome and do not retry in a
-   loop. Do NOT sync needs_review, failed, or skipped_unfit outcomes to
-   the sheet — those never reach the Sheets helper.
+   - date_applied (optional) — the actual application submission date
+     (the `date_applied` value written to the applied_jobs.json entry),
+     formatted as YYYY-MM-DD. Defaults to today if omitted. Never
+     substitute the sync timestamp.
+   - notes (optional, user-facing only) — a short note for the Notes
+     column. Leave blank unless there is something specific worth
+     surfacing to the human reader; never put internal reasoning here.
+   The helper auto-fills the remaining visible columns (Status, Response
+   Received, Date of Response) — do not send those. Source and URL are
+   not visible tracker columns and the helper does not read them; do not
+   include them in the payload.
+    Call the helper exactly once per successful application. If the helper
+    reports that sync is disabled or unconfigured (e.g. missing
+    credentials or sheet id), or exits non-zero for any reason, log a
+    single warning to the session output and continue — the application
+    is still successful; do not treat a disabled, unconfigured, or
+    non-zero-exit sync as a failed outcome and do not retry in a loop.
+    Do NOT sync needs_review, failed, or skipped_unfit outcomes to the
+    sheet — those never reach the Sheets helper.
 10. Invoke @discord-reporter with the per-outcome notification for this
     job:
     - status "applied" → success route (company, title, url, source,
@@ -209,9 +268,19 @@ After all applications:
 - ALWAYS canonicalize every scraped raw job via the canonical helper and
   upsert into data/job_registry.json before any dedup or filtering
   decision.
+- ALWAYS run the deterministic JD fit gate
+  (scripts/evaluate_job_fit.py) on every canonical job after role
+  filtering and before tailoring. Only candidate jobs proceed to
+  @resume-tailor. skipped_unfit is local-only; needs_review from the
+  fit gate is a user-visible manual-review outcome (append to
+  applied_jobs.json + review_queue.json, record-event, Discord
+  needs_review route). Do not tailor skipped_unfit or needs_review jobs.
 - ALWAYS re-check can-apply via the canonical helper immediately before
   any application attempt. If it refuses, skip and record a skipped_unfit
   event.
+- ALWAYS re-run the deterministic fit gate immediately before applying
+  (pre-apply fit confirmation). If the fit gate no longer yields
+  candidate, do not apply.
 - skipped_unfit events are local-only — never route them to Discord or
   data/applied_jobs.json.
 - ALWAYS invoke @discord-reporter for every applied, needs_review, and
@@ -225,11 +294,11 @@ After all applications:
   Sheet internship tracker via scripts/sync_internship_tracker.py —
   exactly one row per successful application, after the applied_jobs.json
   entry and internal event are recorded. Pass only the user-facing
-  tracker fields (Company, Title, Internship Term, Date Applied, Source,
-  URL); never send internal-only fields. needs_review, failed, and
+  tracker fields (company, title, date_applied, internship_term, notes);
+  never send internal-only fields. needs_review, failed, and
   skipped_unfit must never reach the Sheets helper. If sync is
-  disabled/unconfigured, log one warning and continue — the application
-  is still successful.
+  disabled/unconfigured or exits non-zero, log one warning and continue
+  — the application is still successful.
 
 ## File write discipline
 - applied_jobs.json entries must include: job_id, company, title, url,
