@@ -37,3 +37,6 @@ Thumbs.db
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Plan / handoff documents (lives at repo root but is not committed)
+PLAN.md

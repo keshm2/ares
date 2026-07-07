@@ -290,7 +290,7 @@ def explicit_non_us_location(location: str, location_tier: str) -> bool:
         return False
     if REMOTE_GENERIC_RE.search(loc) and not FOREIGN_LOCATION_RE.search(loc):
         return False
-    if any(token in loc for token in US_STATE_TOKENS):
+    if any(contains_token(loc, token) for token in US_STATE_TOKENS):
         return False
     return bool(FOREIGN_LOCATION_RE.search(loc))
 
@@ -305,7 +305,7 @@ def infer_location_signal(location: str, location_tier: str) -> Tuple[int, str]:
         return 12, "remote-US role"
     if REMOTE_GENERIC_RE.search(loc):
         return 9, "remote role"
-    if any(token in loc for token in US_STATE_TOKENS):
+    if any(contains_token(loc, token) for token in US_STATE_TOKENS):
         return 6, "US-based location"
     return 0, "location ambiguous"
 
@@ -471,8 +471,6 @@ def evaluate_fit(job: dict, targets: dict) -> dict:
     elif welcoming or role_type or internship_term:
         score += 6
         fit_reasons.append("Intern/new-grad intent is implied, but not stated with a configured level keyword.")
-    else:
-        fit_reasons.append("No strong internship/new-grad level keyword match was found.")
 
     location_points, location_reason = infer_location_signal(location, location_tier)
     score += location_points

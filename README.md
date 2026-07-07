@@ -1,16 +1,320 @@
-# 🔱 Ares Job Applicant Agent
+# Ares
 
-## 🚀 Setup
+> An automated, single-user job-application agent for internship and
+> new-grad roles. Scrapes public boards, deduplicates against local
+> history, tailors a resume and cover letter, applies on your behalf,
+> routes per-outcome updates to Discord, and appends one row per
+> success to a Google Sheet tracker.
 
-**TODO**
+Ares is built on [OpenCode](https://opencode.ai/). The agent
+**orchestrates**; deterministic helper scripts **own the state**. That
+split keeps every state-mutating step auditable and means the agent
+itself never hand-writes runtime state. Each run is capped at **25
+applications** to stay polite to upstream boards and rate limits.
 
-## ⚡️ Tech Stack
-All relevant tech stack materials can be found in this repo. However, a few are listed below. 
-    - <h3> MCPs <h3>:
-        - Playwright MCP (THANK YOU MICROSOFT DEVS 🤞)
-        - Composio 
-    - <h3> Coding Agents <h3>
-        - All code and setup was done using OpenCode, automation is 🔥
+> **Status** — Phases 0–4 of a 10-phase build are implemented and
+> described under [What ships today](#what-ships-today). Phases 5–9
+> are planned. A hybrid browser-extension / autofill idea is a
+> separate, future extension and is **not** part of the numbered
+> phases.
 
+## At a glance
 
-## More info to come soon!
+| | |
+| --- | --- |
+| **Mode** | Single user, local-first, cron-friendly |
+| **Boards (today)** | Ashby, Lever (public JSON APIs); LinkedIn, Indeed, Handshake, Greenhouse, Wellfound (Playwright) |
+| **Boards (planned)** | SimplifyJobs, Workday |
+| **Runtime** | OpenCode orchestrator + stdlib-only Python helpers |
+| **Notifications** | Discord webhooks routed by outcome (`success` / `needs_review` / `failed` / `summary`) |
+| **Tracker** | Google Sheet — one append-only row per successful application |
+| **State** | Local JSON + JSONL under `data/` (gitignored) |
+| **Caps** | 25 applications per session |
+
+## How a run works
+
+For each run, Ares:
+
+1. **Scrapes** postings from supported boards.
+2. **Canonicalizes** every raw posting into one internal record.
+3. **Deduplicates** against the local registry and the application log.
+4. **Fit-gates** each canonical job with a deterministic helper
+   (role/level keywords, years of experience, location).
+5. **Tailors** a resume and cover letter for jobs that pass the gate.
+6. **Submits** applications via a Playwright-controlled browser, or
+   directly against the public Ashby and Lever JSON APIs.
+7. **Records** the outcome locally, fires the right Discord webhook,
+   and (for successful applications only) appends one row to the
+   Google Sheet tracker.
+
+> **Design principle** — the agent orchestrates, scripts do the work.
+> Every state-mutating step — canonicalization, dedup, fit gate,
+> applied log, registry, event log, Sheets sync — goes through a
+> dedicated helper. That keeps the rules auditable, the agent's job
+> small, and the state recoverable.
+
+## What ships today
+
+Phases 0–4 of the project roadmap are implemented:
+
+- **State and config hardening (phase 0).** `.gitignore` excludes all
+  live configs, runtime state, PII, browser artifacts, logs, and Python
+  bytecode. `*.example.json` files are the safe templates.
+  `scripts/run_job_agent.sh` is a cron-friendly entry point with
+  portable lock handling and startup config validation.
+- **Canonical job registry and event model (phase 1).** Every scraped
+  job is canonicalized and merged into `data/job_registry.json` via
+  `scripts/job_state.py`. An append-only `data/job_events.jsonl` audit
+  log records every outcome. A pre-apply `can-apply` recheck prevents
+  re-applying to the same job.
+- **Discord outcome routing (phase 2).** Notifications route by
+  outcome — `success`, `needs_review`, `failed`, and an end-of-batch
+  `summary` (with `success` as the fallback). The reporter is
+  best-effort: a missing or placeholder webhook is logged and skipped,
+  never blocks the run.
+- **Google Sheets sync for successful applications (phase 3).**
+  Exactly one row is appended to a user-facing Google Sheet per
+  successful application. `needs_review`, `failed`, and
+  `skipped_unfit` outcomes are never written to the sheet.
+- **Deterministic JD fit gate (phase 4).** A stdlib-only Python
+  helper (`scripts/evaluate_job_fit.py`) classifies each canonical
+  job as `candidate`, `needs_review`, or `skipped_unfit` before
+  tailoring, and again immediately before applying.
+
+## Pipeline
+
+A typical run moves a job through the following stages, in order:
+
+```
+   scrape              canonicalize           dedupe
+[ board ]  --->  [ job_state.py ]  --->  [ registry + applied log ]
+                                              |
+                                              v
+                              [ evaluate_job_fit.py ]  (phase 4 gate)
+                                           |
+             +---------------+-------------+-------------+
+             | skipped_unfit | needs_review            | candidate
+             | (local-only)  | (user-visible)          |
+             v               v                        v
+        record-event   record-event +         [ @resume-tailor ]
+        (no Discord,    applied_jobs.json +          |
+         no applied     review_queue.json +          v
+         log)           needs_review Discord   [ re-run fit gate ]
+                                              (pre-apply confirm)
+                                                      |
+                                                      v
+                                              [ can-apply recheck ]
+                                                      |
+                                                      v
+                                              [ submit application ]
+                                                      |
+                                                      v
+                                       record-event + applied_jobs.json
+                                       + @discord-reporter (success)
+                                       + sync_internship_tracker.py
+```
+
+### Outcome routing at a glance
+
+> Each outcome has exactly one path. The agent never sends the same
+> fact to two user-facing surfaces, and never leaks a `skipped_unfit`
+> to the user.
+
+- **`applied`** — recorded, written to `data/applied_jobs.json`,
+  Discord `success` route, one row appended to the Google Sheet.
+- **`needs_review`** — recorded, written to `data/applied_jobs.json`
+  and `data/review_queue.json`, Discord `needs_review` route. Never
+  tailored; never written to the sheet.
+- **`failed`** — recorded, written to `data/applied_jobs.json`,
+  Discord `failed` route. Never written to the sheet.
+- **`skipped_unfit`** — recorded only as a local event. Never routed
+  to Discord, never written to `data/applied_jobs.json`, never synced
+  to the sheet.
+
+## Repo layout
+
+Key files and entry points:
+
+**Behavior and planning**
+
+- `AGENTS.md` — canonical behavioral rules for the agent (fetch
+  methods, role/level filtering, fit gate, registry, file write
+  discipline, Sheets sync). Any agent that mutates state follows this
+  file.
+- `PLAN.md` — durable, in-repo planning and handoff document.
+  Gitignored. **Read this first** if you are picking the project up.
+- `SETUP.md` — copy → edit → validate walkthrough for the local
+  configs, plus the optional Google Sheets sync section.
+- `opencode.jsonc` — OpenCode configuration. The default agent is
+  `job-scraper`; loads `AGENTS.md`, `config/targets.json`, and
+  `data/applied_jobs.json` as instructions; enables the Playwright MCP
+  server.
+
+**OpenCode agents** (`.opencode/agents/`)
+
+- `job-scraper.md` — the orchestrator. Scrapes, canonicalizes, runs
+  the fit gate, calls `@resume-tailor`, runs the apply loop, fires
+  per-outcome Discord notifications, and fires the batch summary.
+- `resume-tailor.md` — subagent. Selects a base resume
+  (`base_resume_general.md` or `base_resume_cyber.md`), rewrites
+  bullets, writes a cover letter, returns an `ats_score`.
+- `discord-reporter.md` — subagent. Reads the per-outcome webhook
+  routes, JSON-escapes every payload, POSTs with
+  `allowed_mentions: parse=[]`. Skips `skipped_unfit`.
+
+**Helper scripts** (`scripts/`)
+
+- `run_job_agent.sh` — cron-friendly driver. Validates config,
+  bootstraps state files, then runs the orchestrator.
+- `validate_local_config.sh` — startup validator. Fails on missing or
+  invalid required config; warns (does not fail) on placeholder
+  Ashby/Lever slugs and on an unconfigured or disabled Sheets sync.
+- `append_state_entry.sh` — atomic JSON-array appender with a `job_id`
+  dedup guard. Used for `data/applied_jobs.json` and
+  `data/review_queue.json`.
+- `job_state.py` — phase 1 canonical helper. Subcommands:
+  `ensure-files`, `canonicalize`, `upsert-job`, `can-apply`,
+  `record-event`. Stdlib-only.
+- `evaluate_job_fit.py` — phase 4 deterministic fit gate. Stdlib-only.
+  Returns `candidate` / `needs_review` / `skipped_unfit` with
+  `fit_score`, `fit_reasons`, and `decision_version`.
+- `sync_internship_tracker.py` — phase 3 Sheets helper. Maps a payload
+  to the visible columns and appends one row. Skips cleanly when sync
+  is disabled or unconfigured; never turns a successful application
+  into a failure.
+
+**Config templates** (`config/`)
+
+- `targets.example.json` — role/level/season keywords, preferred
+  locations, fallback scope, Ashby/Lever slug arrays, and the
+  `safe_fields` map the agent uses to fill form fields.
+- `discord_config.example.json` —
+  `webhooks.{success, needs_review, failed, summary}` template.
+- `google_sheets_config.example.json` — Sheets sync template with
+  `enabled`, `spreadsheet_id`, `worksheet_title`, and
+  `service_account_key_path`.
+
+> The live versions of these configs (`config/targets.json`,
+> `config/discord_config.json`, `config/google_sheets_config.json`,
+> `config/service-account-key.json`) are gitignored. Start from the
+> shipped examples — see `SETUP.md`.
+
+**Runtime state** (`data/`, all gitignored)
+
+- `applied_jobs.json` — one entry per `applied` / `failed` /
+  `needs_review` outcome. Required fields are documented in
+  `AGENTS.md`. `skipped_unfit` is never written here.
+- `review_queue.json` — items that need a human to look at (form
+  fields we couldn't fill, ambiguous-fit jobs, etc.).
+- `job_registry.json` — array of canonical records, one per ever-seen
+  job. Merged by `job_key` via `job_state.py upsert-job`. Multiple
+  `sources[]` per record are preserved.
+- `job_events.jsonl` — append-only JSONL event log. One line per
+  `record-event` call. The registry is the structured view; the JSONL
+  is the audit trail.
+- `resumes/` — `base_resume_general.md` and `base_resume_cyber.md`
+  (with `.pdf` companions). The `@resume-tailor` subagent selects
+  between them.
+
+## Quick start
+
+See [`SETUP.md`](./SETUP.md) for the full copy → edit → validate
+walkthrough. The short version:
+
+```bash
+cp config/targets.example.json          config/targets.json
+cp config/discord_config.example.json   config/discord_config.json
+# Edit placeholders in both. Ashby/Lever slug arrays may be left as
+# ["REPLACE_ME"] — those boards are skipped for the run with a warning.
+bash scripts/validate_local_config.sh   # prints "validate_local_config: OK"
+bash scripts/run_job_agent.sh           # cron entry point
+```
+
+The Google Sheets sync is **optional**. To enable it: copy
+`config/google_sheets_config.example.json`, fill in the sheet id,
+install the dependencies (`pip3 install -r requirements.txt`), drop a
+service-account JSON key at `config/service-account-key.json`, share
+the sheet with the service-account email, and validate again. Full
+steps are in `SETUP.md` §4.
+
+## Roadmap
+
+Ares is a 10-phase build-out. **Phases 0–4 are implemented** and
+described under [What ships today](#what-ships-today). **Phases 5–9
+are planned, not yet implemented**.
+
+| Phase | Status | Scope |
+| --- | --- | --- |
+| 0 — State and config hardening | Shipped | `.gitignore`, examples, cron entry point, config validator |
+| 1 — Canonical registry + event model | Shipped | `job_state.py`, `data/job_registry.json`, `data/job_events.jsonl`, `can-apply` |
+| 2 — Discord outcome routing | Shipped | per-outcome webhooks + best-effort summary |
+| 3 — Google Sheets sync | Shipped | one append-only row per successful application |
+| 4 — Deterministic JD fit gate | Shipped | `evaluate_job_fit.py`, pre-tailoring and pre-apply |
+| 5 — SimplifyJobs ingestion | Planned | plus repo structure cleanup |
+| 6 — Vetted Ashby/Lever slug auto-seeding | Planned | populate `config/targets.json` from a project-owned vetted list |
+| 7 | Planned | scope TBD after 5 and 6 |
+| 8 | Planned | reserved |
+| 9 | Planned | reserved |
+| Workday | Planned | phase-1 support, not implemented |
+| Browser-extension / autofill | Future | hybrid-mode idea; piggybacks on phase 1 + phase 4. **No implementation work authorized.** |
+
+> Phase-by-phase acceptance criteria, current state, and what to avoid
+> are tracked in [`PLAN.md`](./PLAN.md). **Read `PLAN.md` first** if
+> you are picking the project up.
+
+### Board support today
+
+| Board | Method | Notes |
+| --- | --- | --- |
+| Ashby | Public JSON API | Direct `curl`, no auth. Skipped (with a warning) if the slug array is empty or still `REPLACE_ME`. |
+| Lever | Public JSON API | Direct `curl`, no auth. Same skip-on-placeholder behavior. |
+| LinkedIn | Playwright MCP | Browser-based scraping. |
+| Indeed | Playwright MCP | Browser-based scraping. |
+| Handshake | Playwright MCP | Requires a student login. If Playwright can't authenticate, the board is skipped and a single `handshake_auth_needed` entry is appended to `data/review_queue.json`. |
+| Greenhouse | Playwright MCP | Browser-based scraping. |
+| Wellfound | Playwright MCP | Browser-based scraping. |
+
+## Safety & operational notes
+
+These are not suggestions — they are how the agent is wired. They
+exist so a misconfigured run does not silently produce noise, and a
+borderline job does not get auto-submitted.
+
+- **`skipped_unfit` is local-only.** Recorded via
+  `scripts/job_state.py record-event` so the registry and event log
+  reflect the hard reject, but it is **never** routed to Discord,
+  never written to `data/applied_jobs.json`, and never synced to the
+  Google Sheet. There is no way to opt in to seeing `skipped_unfit`
+  in user-facing surfaces.
+- **`needs_review` is user-visible.** Appended to
+  `data/applied_jobs.json` and `data/review_queue.json`, recorded as
+  a `needs_review` event, and routed to the `needs_review` Discord
+  webhook. This is how the agent surfaces ambiguous-fit jobs, ATS
+  scores below threshold, missing form fields, and similar
+  conditions that need a human decision before the next run.
+- **Only `applied` syncs to the Google Sheet.** The Sheets helper is
+  invoked exactly once per successful application, and only after the
+  `applied_jobs.json` entry and the internal `applied` event have
+  been recorded. If Sheets sync is disabled, unconfigured, or exits
+  non-zero, the helper logs a single warning and the application run
+  continues. **A successful application is never converted into a
+  failure by a sync problem.**
+- **Live configs are gitignored.** `config/targets.json`,
+  `config/discord_config.json`, `config/google_sheets_config.json`,
+  and `config/service-account-key.json` are intentionally not
+  tracked. The `*.example.json` files in `config/` are the templates.
+  Runtime state under `data/`, browser artifacts under
+  `.playwright-mcp/`, and logs under `logs/` are also gitignored.
+  `PLAN.md` is gitignored by design.
+- **PII discipline.** The agent fills form fields only from
+  `config/targets.json "safe_fields"`. It never stores passwords,
+  SSNs, or payment info. If a form requests a field that is not in
+  `safe_fields`, the job is skipped, logged to
+  `data/review_queue.json`, and recorded as `needs_review`.
+- **Integrations are best-effort.** A missing or placeholder
+  Ashby/Lever slug array, an unconfigured Discord webhook, or a
+  disabled Google Sheets sync is a **warning, not a hard error**. The
+  driver script validates required config (targets, Discord
+  webhooks) at startup and refuses to run if any required piece is
+  missing or malformed; everything else is logged and the affected
+  board or integration is skipped.
