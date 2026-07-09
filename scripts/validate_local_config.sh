@@ -4,9 +4,9 @@
 # Validates the live local config files (config/targets.json and
 # config/discord_config.json) that the current single-user deployment relies
 # on. Fails fast and clearly when required files or fields are missing or
-# invalid. Warns — but does not fail — when Ashby/Lever slug config still
-# holds placeholder values, so a partially-configured run can proceed for
-# the other boards.
+# invalid. Warns — but does not fail — when Ashby/Lever slug config or the
+# SimplifyJobs feed config still holds placeholder values, so a
+# partially-configured run can proceed for the other boards.
 #
 # Usage:
 #   validate_local_config.sh [project_root]
@@ -84,6 +84,7 @@ check_string_nonempty "$TARGETS" fallback_scope
 check_array_nonempty "$TARGETS" boards
 check_array_or_absent "$TARGETS" ashby_company_slugs
 check_array_or_absent "$TARGETS" lever_company_slugs
+check_array_or_absent "$TARGETS" simplify_feeds
 check_object        "$TARGETS" safe_fields
 
 # Required safe_fields keys for form filling.
@@ -157,6 +158,16 @@ elif [ -n "$LEVER_PLACEHOLDER" ]; then
   warn "lever_company_slugs contains placeholder value(s): $LEVER_PLACEHOLDER — Lever board will be skipped this run"
 fi
 
+# SimplifyJobs feeds (phase 5): same warn-and-skip contract as the slug
+# arrays. Known feed names are owned by scripts/fetch_simplify_listings.py;
+# unknown names are warned about there at fetch time, not here.
+SIMPLIFY_PLACEHOLDER="$(placeholder_slugs "$TARGETS" simplify_feeds)"
+if key_absent "$TARGETS" simplify_feeds; then
+  warn "simplify_feeds is not configured — SimplifyJobs board will be skipped this run"
+elif [ -n "$SIMPLIFY_PLACEHOLDER" ]; then
+  warn "simplify_feeds contains placeholder value(s): $SIMPLIFY_PLACEHOLDER — SimplifyJobs board will be skipped this run"
+fi
+
 # --- Phase 3: Google Sheets sync config (optional) -------------------------
 # The Sheets sync config is optional. If absent, warn and continue — job-board
 # runs must not break when Sheets sync is not yet configured. If present and
@@ -166,7 +177,7 @@ fi
 SHEETS="$PROJECT_ROOT/config/google_sheets_config.json"
 
 if [ ! -f "$SHEETS" ]; then
-  warn "Google Sheets sync config not found ($SHEETS) — Sheets sync will be skipped. See SETUP.md section 4."
+  warn "Google Sheets sync config not found ($SHEETS) — Sheets sync will be skipped. See docs/SETUP.md section 4."
 else
   if ! jq -e . "$SHEETS" >/dev/null 2>&1; then
     warn "$SHEETS: invalid JSON — Sheets sync will be skipped."
@@ -207,7 +218,7 @@ else
           *) KEY_ABS="$PROJECT_ROOT/$KEY_ABS" ;;
         esac
         if [ ! -f "$KEY_ABS" ]; then
-          warn "$SHEETS: service-account key file not found at $SHEETS_KEY — Sheets sync will be skipped until the key is placed. See SETUP.md section 4.3."
+          warn "$SHEETS: service-account key file not found at $SHEETS_KEY — Sheets sync will be skipped until the key is placed. See docs/SETUP.md section 4.3."
         fi
       fi
     fi

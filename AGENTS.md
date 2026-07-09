@@ -83,6 +83,28 @@
   "REPLACE_ME"), skip that board for this run and log a single warning to
   the session output — do not abort the run. Other boards continue
   normally.
+- SimplifyJobs: use the deterministic fetch helper — never scrape GitHub
+  with Playwright:
+  `python3 scripts/fetch_simplify_listings.py`
+  The helper reads config/targets.json "simplify_feeds" (known feeds:
+  "summer_internships", "new_grad"), fetches the project-owned
+  SimplifyJobs listings JSON from raw.githubusercontent.com, filters to
+  active + visible postings, and prints one raw-job JSON object per line
+  on stdout (source "simplify"), ready for canonicalize.
+  - If "simplify_feeds" is missing, empty, or placeholder-only
+    ("REPLACE_ME"), the helper warns on stderr, prints nothing, and
+    exits 0 — skip the board for this run and continue with the other
+    boards. A non-zero exit means every configured feed failed to
+    fetch: log one warning, skip the board, continue the run.
+  - SimplifyJobs listings carry NO JD text. After role filtering and
+    BEFORE running the fit gate, fetch the JD body from the listing's
+    `url`: if the URL is an Ashby/Lever posting use those public JSON
+    APIs, otherwise open the URL with Playwright and extract the JD
+    text. Re-canonicalize/upsert the record with the fetched jd_text.
+    Never run the fit gate on a SimplifyJobs job with empty jd_text —
+    an empty JD skips every deterministic hard-reject check.
+  - The helper's `sponsorship` field is informational/audit-only. Do
+    not filter on it — the phase 4 fit gate is the only classifier.
 - LinkedIn, Indeed, Handshake, Greenhouse, Wellfound: use Playwright MCP for
   browser-based scraping.
 
@@ -227,7 +249,7 @@
 - applied_jobs.json entries must include: job_id, company, title, url,
   date_applied, status (applied|failed|needs_review), role_type
   (internship|new_grad), source (linkedin|indeed|greenhouse|lever|
-  wellfound|handshake|ashbyhq), resume_used (general|cyber),
+  wellfound|handshake|ashbyhq|simplify), resume_used (general|cyber),
   ats_score (number), location_tier (preferred|fallback),
   cover_letter_used (bool). When status is "failed" or "needs_review",
   a "reasoning" field is also required — a specific, one-sentence

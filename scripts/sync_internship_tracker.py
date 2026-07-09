@@ -168,7 +168,7 @@ def append_row(cfg, row):
     if not os.path.exists(key_path):
         skip(
             f"service-account key file not found: {key_path} — "
-            "place the key file locally (see SETUP.md)",
+            "place the key file locally (see docs/SETUP.md)",
         )
 
     try:

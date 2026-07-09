@@ -26,6 +26,12 @@ In `config/targets.json`:
   - `currently_enrolled` — set to `Yes` or `No` as appropriate
 - `ashby_company_slugs`, `lever_company_slugs` — replace `REPLACE_ME` with
   real company slugs, or leave as `REPLACE_ME` to skip those boards.
+- `simplify_feeds` — replace `REPLACE_ME` with one or both of the known
+  feed names `summer_internships` and `new_grad`, or leave as
+  `REPLACE_ME` to skip the SimplifyJobs board. The feeds are the
+  community-maintained SimplifyJobs listing files fetched read-only from
+  GitHub (`SimplifyJobs/Summer2026-Internships` and
+  `SimplifyJobs/New-Grad-Positions`) — no account or API key is needed.
 - `preferred_locations`, `fallback_scope`, `graduation_date` — review and
   personalize.
 

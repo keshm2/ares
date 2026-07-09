@@ -12,19 +12,19 @@ split keeps every state-mutating step auditable and means the agent
 itself never hand-writes runtime state. Each run is capped at **25
 applications** to stay polite to upstream boards and rate limits.
 
-> **Status** — Phases 0–4 of a 10-phase build are implemented and
-> described under [What ships today](#what-ships-today). Phases 5–9
-> are planned. A hybrid browser-extension / autofill idea is a
-> separate, future extension and is **not** part of the numbered
-> phases.
+> **Status** — Phases 0–5 of the phased build are implemented and
+> described under [What ships today](#what-ships-today). Phases 6–9
+> are planned. Later productization ideas (browser extension, hosted
+> accounts, TUI/web apps) are tracked in the planning document and are
+> **not** implemented.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | **Mode** | Single user, local-first, cron-friendly |
-| **Boards (today)** | Ashby, Lever (public JSON APIs); LinkedIn, Indeed, Handshake, Greenhouse, Wellfound (Playwright) |
-| **Boards (planned)** | SimplifyJobs, Workday |
+| **Boards (today)** | Ashby, Lever (public JSON APIs); SimplifyJobs (public GitHub JSON feeds); LinkedIn, Indeed, Handshake, Greenhouse, Wellfound (Playwright) |
+| **Boards (planned)** | Workday |
 | **Runtime** | OpenCode orchestrator + stdlib-only Python helpers |
 | **Notifications** | Discord webhooks routed by outcome (`success` / `needs_review` / `failed` / `summary`) |
 | **Tracker** | Google Sheet — one append-only row per successful application |
@@ -55,7 +55,7 @@ For each run, Ares:
 
 ## What ships today
 
-Phases 0–4 of the project roadmap are implemented:
+Phases 0–5 of the project roadmap are implemented:
 
 - **State and config hardening (phase 0).** `.gitignore` excludes all
   live configs, runtime state, PII, browser artifacts, logs, and Python
@@ -80,6 +80,14 @@ Phases 0–4 of the project roadmap are implemented:
   helper (`scripts/evaluate_job_fit.py`) classifies each canonical
   job as `candidate`, `needs_review`, or `skipped_unfit` before
   tailoring, and again immediately before applying.
+- **SimplifyJobs ingestion (phase 5).** A stdlib-only fetch helper
+  (`scripts/fetch_simplify_listings.py`) pulls the community-maintained
+  SimplifyJobs internship and new-grad listing feeds from GitHub
+  (read-only, no auth), filters to active + visible postings, and
+  emits canonicalize-ready records. The feeds carry no JD text, so the
+  orchestrator fetches each surviving candidate's JD from its listing
+  URL before the fit gate runs. A missing or placeholder
+  `simplify_feeds` config skips the board with a warning.
 
 ## Pipeline
 
@@ -141,9 +149,9 @@ Key files and entry points:
   methods, role/level filtering, fit gate, registry, file write
   discipline, Sheets sync). Any agent that mutates state follows this
   file.
-- `PLAN.md` — durable, in-repo planning and handoff document.
+- `docs/PLAN.md` — durable, in-repo planning and handoff document.
   Gitignored. **Read this first** if you are picking the project up.
-- `SETUP.md` — copy → edit → validate walkthrough for the local
+- `docs/SETUP.md` — copy → edit → validate walkthrough for the local
   configs, plus the optional Google Sheets sync section.
 - `opencode.jsonc` — OpenCode configuration. The default agent is
   `job-scraper`; loads `AGENTS.md`, `config/targets.json`, and
@@ -168,7 +176,8 @@ Key files and entry points:
   bootstraps state files, then runs the orchestrator.
 - `validate_local_config.sh` — startup validator. Fails on missing or
   invalid required config; warns (does not fail) on placeholder
-  Ashby/Lever slugs and on an unconfigured or disabled Sheets sync.
+  Ashby/Lever slugs, placeholder SimplifyJobs feeds, and on an
+  unconfigured or disabled Sheets sync.
 - `append_state_entry.sh` — atomic JSON-array appender with a `job_id`
   dedup guard. Used for `data/applied_jobs.json` and
   `data/review_queue.json`.
@@ -178,6 +187,11 @@ Key files and entry points:
 - `evaluate_job_fit.py` — phase 4 deterministic fit gate. Stdlib-only.
   Returns `candidate` / `needs_review` / `skipped_unfit` with
   `fit_score`, `fit_reasons`, and `decision_version`.
+- `fetch_simplify_listings.py` — phase 5 SimplifyJobs fetcher.
+  Stdlib-only. Reads `simplify_feeds` from `config/targets.json`,
+  fetches the public GitHub listing feeds, and emits one
+  canonicalize-ready raw-job JSON object per line. Skips cleanly
+  (exit 0, warning only) when the feeds are unconfigured.
 - `sync_internship_tracker.py` — phase 3 Sheets helper. Maps a payload
   to the visible columns and appends one row. Skips cleanly when sync
   is disabled or unconfigured; never turns a successful application
@@ -197,7 +211,7 @@ Key files and entry points:
 > The live versions of these configs (`config/targets.json`,
 > `config/discord_config.json`, `config/google_sheets_config.json`,
 > `config/service-account-key.json`) are gitignored. Start from the
-> shipped examples — see `SETUP.md`.
+> shipped examples — see `docs/SETUP.md`.
 
 **Runtime state** (`data/`, all gitignored)
 
@@ -218,7 +232,7 @@ Key files and entry points:
 
 ## Quick start
 
-See [`SETUP.md`](./SETUP.md) for the full copy → edit → validate
+See [`docs/SETUP.md`](./docs/SETUP.md) for the full copy → edit → validate
 walkthrough. The short version:
 
 ```bash
@@ -235,12 +249,12 @@ The Google Sheets sync is **optional**. To enable it: copy
 install the dependencies (`pip3 install -r requirements.txt`), drop a
 service-account JSON key at `config/service-account-key.json`, share
 the sheet with the service-account email, and validate again. Full
-steps are in `SETUP.md` §4.
+steps are in `docs/SETUP.md` §4.
 
 ## Roadmap
 
-Ares is a 10-phase build-out. **Phases 0–4 are implemented** and
-described under [What ships today](#what-ships-today). **Phases 5–9
+Ares is a phased build-out. **Phases 0–5 are implemented** and
+described under [What ships today](#what-ships-today). **Phases 6–9
 are planned, not yet implemented**.
 
 | Phase | Status | Scope |
@@ -250,17 +264,16 @@ are planned, not yet implemented**.
 | 2 — Discord outcome routing | Shipped | per-outcome webhooks + best-effort summary |
 | 3 — Google Sheets sync | Shipped | one append-only row per successful application |
 | 4 — Deterministic JD fit gate | Shipped | `evaluate_job_fit.py`, pre-tailoring and pre-apply |
-| 5 — SimplifyJobs ingestion | Planned | plus repo structure cleanup |
+| 5 — SimplifyJobs ingestion | Shipped | `fetch_simplify_listings.py` + JD enrichment before the fit gate; docs cleanup |
 | 6 — Vetted Ashby/Lever slug auto-seeding | Planned | populate `config/targets.json` from a project-owned vetted list |
-| 7 | Planned | scope TBD after 5 and 6 |
-| 8 | Planned | reserved |
-| 9 | Planned | reserved |
-| Workday | Planned | phase-1 support, not implemented |
-| Browser-extension / autofill | Future | hybrid-mode idea; piggybacks on phase 1 + phase 4. **No implementation work authorized.** |
+| 7 — Workday review-only support | Planned | Playwright scrape + fit gate; promising jobs routed to `needs_review`, no auto-apply |
+| 8 — Scheduler upgrade | Planned | 30-minute 24/7 cadence with overlap protection and heartbeat |
+| 9 — Migration-friendliness review | Planned | document per-user vs. project-owned seams; stays single-user |
+| Productization (extension, accounts, TUI, web) | Future | tracked in the planning document. **No implementation work authorized.** |
 
 > Phase-by-phase acceptance criteria, current state, and what to avoid
-> are tracked in [`PLAN.md`](./PLAN.md). **Read `PLAN.md` first** if
-> you are picking the project up.
+> are tracked in [`docs/PLAN.md`](./docs/PLAN.md). **Read
+> `docs/PLAN.md` first** if you are picking the project up.
 
 ### Board support today
 
@@ -268,6 +281,7 @@ are planned, not yet implemented**.
 | --- | --- | --- |
 | Ashby | Public JSON API | Direct `curl`, no auth. Skipped (with a warning) if the slug array is empty or still `REPLACE_ME`. |
 | Lever | Public JSON API | Direct `curl`, no auth. Same skip-on-placeholder behavior. |
+| SimplifyJobs | Public GitHub JSON feeds | `scripts/fetch_simplify_listings.py`, no auth. Skipped (with a warning) if `simplify_feeds` is empty or still `REPLACE_ME`. JD text is fetched from each listing's URL before the fit gate. |
 | LinkedIn | Playwright MCP | Browser-based scraping. |
 | Indeed | Playwright MCP | Browser-based scraping. |
 | Handshake | Playwright MCP | Requires a student login. If Playwright can't authenticate, the board is skipped and a single `handshake_auth_needed` entry is appended to `data/review_queue.json`. |
@@ -305,7 +319,7 @@ borderline job does not get auto-submitted.
   tracked. The `*.example.json` files in `config/` are the templates.
   Runtime state under `data/`, browser artifacts under
   `.playwright-mcp/`, and logs under `logs/` are also gitignored.
-  `PLAN.md` is gitignored by design.
+  `docs/PLAN.md` is gitignored by design.
 - **PII discipline.** The agent fills form fields only from
   `config/targets.json "safe_fields"`. It never stores passwords,
   SSNs, or payment info. If a form requests a field that is not in

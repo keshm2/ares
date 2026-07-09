@@ -25,15 +25,33 @@ never guess — if you're unsure about a form field, you skip and log it.
      or contains only placeholder values (e.g. "REPLACE_ME"), skip that
      board for this run and log a single warning to the session output —
      do not abort the run. Continue with the remaining boards normally.
-2. For LinkedIn, Indeed, Handshake, Greenhouse, Wellfound: use Playwright
+2. For SimplifyJobs: run the deterministic fetch helper — never scrape
+   GitHub with Playwright:
+   `python3 scripts/fetch_simplify_listings.py`
+   It reads config/targets.json "simplify_feeds" and prints one raw-job
+   JSON object per line (source "simplify") for active + visible
+   postings.
+   - If "simplify_feeds" is missing, empty, or placeholder-only, the
+     helper warns and exits 0 with no output — skip the board and
+     continue. On a non-zero exit (all feeds failed to fetch), log one
+     warning, skip the board, continue the run.
+   - SimplifyJobs listings carry NO JD text. After role filtering
+     (step 7) and BEFORE the fit gate (step 9), fetch the JD body from
+     each surviving candidate's `url`: Ashby/Lever URLs via their
+     public JSON APIs, everything else via Playwright. Re-canonicalize
+     and upsert the record with the fetched jd_text. Never run the fit
+     gate on a SimplifyJobs job with empty jd_text.
+   - The `sponsorship` field is informational only — do not filter on
+     it; the fit gate is the only classifier.
+3. For LinkedIn, Indeed, Handshake, Greenhouse, Wellfound: use Playwright
    MCP to navigate to the board with role/location filters and scrape job
    listings, full JD text, and application URLs.
-3. Canonicalize each scraped raw job into one internal record:
+4. Canonicalize each scraped raw job into one internal record:
    `python3 scripts/job_state.py canonicalize '<raw-job-json>'`
    Pass the raw job (company, title, url, source, jd_text, location, etc.)
    as a single JSON object string. The helper returns a canonical job JSON
    with a stable job_key (the canonical identity) and a job_id.
-4. Upsert each canonical record into the registry:
+5. Upsert each canonical record into the registry:
    `python3 scripts/job_state.py upsert-job '<canonical-job-json>'`
    The helper merges by job_key — duplicates collapse into one record
    and source listings are merged into the record's sources array. This
@@ -42,7 +60,7 @@ never guess — if you're unsure about a form field, you skip and log it.
    the registry — the registry tracks every job ever seen, applied or
    not, and a fresh record carries latest_status "new" (not a blocking
    status).
-5. Build a unique canonical scrape batch by collapsing candidates by
+6. Build a unique canonical scrape batch by collapsing candidates by
    job_key (the canonical identity) — the same job listed by multiple
    sources merges into one batch entry, preserving source information
    from the registry record's sources array where possible. Then drop
@@ -52,13 +70,13 @@ never guess — if you're unsure about a form field, you skip and log it.
    Phase 3, which blocks only on blocking statuses (applied,
    needs_review, failed, skipped_unfit), not on mere registry
    membership.
-6. Apply role filtering: a job title is a candidate if it contains at
+7. Apply role filtering: a job title is a candidate if it contains at
    least one term from config/targets.json "role_keywords" AND at least
    one term from "level_keywords" (case-insensitive substring match). If
    a title matches role_keywords but not level_keywords, check the JD
    body before rejecting.
-7. Season is not a filter — internships/co-ops in any season are in scope.
-8. Run the deterministic JD fit gate on every role-filtered candidate
+8. Season is not a filter — internships/co-ops in any season are in scope.
+9. Run the deterministic JD fit gate on every role-filtered candidate
     before tailoring:
     `python3 scripts/evaluate_job_fit.py '<canonical-job-json>'`
     Pass the canonical job JSON (the same object upserted into the
@@ -103,7 +121,7 @@ never guess — if you're unsure about a form field, you skip and log it.
       Phase 2 tailoring.
     Only candidate jobs proceed to scrape_batch.json and Phase 2. Never
     send a skipped_unfit or needs_review job into tailoring.
-9. Write the filtered batch to data/scrape_batch.json (temp file), built
+10. Write the filtered batch to data/scrape_batch.json (temp file), built
    from unique canonical candidates rather than raw duplicates. Tag each
    entry with:
    - matched_category: the specific term from config/targets.json
@@ -115,7 +133,7 @@ never guess — if you're unsure about a form field, you skip and log it.
    - location_tier: "preferred" if the job's location matched a
      config/targets.json "preferred_locations" entry, or "fallback" if
      it was accepted under the US-wide fallback scope.
-10. Process preferred_locations matches first; continue into fallback_scope
+11. Process preferred_locations matches first; continue into fallback_scope
     matches after — do not stop early.
 
 ### Phase 2 — Tailor
@@ -153,7 +171,7 @@ For each job with ats_score >= 60:
       If the helper exits non-zero, returns invalid JSON, or returns an
       unexpected fit_status, treat the job as needs_review and do not
       apply. If fit_status is not candidate, do not apply. Handle
-      skipped_unfit and needs_review exactly as in Phase 1 step 8
+      skipped_unfit and needs_review exactly as in Phase 1 step 9
       (skipped_unfit: local-only record-event; needs_review: append to
       applied_jobs.json + review_queue.json, record-event,
       @discord-reporter needs_review route). Then skip the job — do not
@@ -304,7 +322,7 @@ After all applications:
 - applied_jobs.json entries must include: job_id, company, title, url,
   date_applied, status (applied|failed|needs_review), role_type
   (internship|new_grad), source (linkedin|indeed|greenhouse|lever|
-  wellfound|handshake|ashbyhq), resume_used (general|cyber),
+  wellfound|handshake|ashbyhq|simplify), resume_used (general|cyber),
   ats_score (number), location_tier (preferred|fallback),
   cover_letter_used (bool). When status is "failed" or "needs_review",
   a "reasoning" field is also required — a specific, one-sentence
