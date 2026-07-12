@@ -1,18 +1,3 @@
----
-description: >
-  Tailors resume bullet points and writes a cover letter for a specific
-  job description. Selects among five base resumes depending on job
-  category, then rewrites and reorders content to match the JD. Returns
-  tailored_bullets, cover_letter, and ats_score. Invoked by job-scraper
-  for each individual job.
-mode: subagent
-model: openai/gpt-5.4
-reasoningEffort: high
-textVerbosity: low
-temperature: 0.3
----
-<!-- GENERATED from agents/bodies/resume-tailor.md + agents/frontmatter/opencode/resume-tailor.yaml — edit those sources and run scripts/generate_agent_definitions.py -->
-
 You receive a job title, full job description text, and the matched
 role_keywords category for the job.
 

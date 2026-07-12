@@ -61,19 +61,65 @@ bash scripts/append_state_entry.sh ensure data/review_queue.json \
 python3 scripts/job_state.py ensure-files \
   || { echo "[$(date)] ABORTED: failed to ensure canonical registry/event files. Run manually to fix." >> "$RUN_LOG"; exit 1; }
 
+# --- Agent-definition drift check (Phase 15) --------------------------------
+# The per-harness definitions are generated from agents/. A stale generated
+# file means the harnesses have diverged — warn loudly but do not block.
+python3 scripts/generate_agent_definitions.py --check \
+  || echo "[$(date)] WARNING: generated agent definitions are stale — run scripts/generate_agent_definitions.py" >> "$RUN_LOG"
+
+# --- Harness selection (Phase 15) -------------------------------------------
+# Priority: $ARES_HARNESS > config/harness.json > auto-detect (opencode,
+# then claude). The harness only supplies LLM orchestration; every board
+# fetch, helper, and state write is identical downstream.
+HARNESS="${ARES_HARNESS:-}"
+if [ -z "$HARNESS" ] && [ -f "config/harness.json" ]; then
+  HARNESS="$(jq -r '.harness // empty' config/harness.json 2>/dev/null || true)"
+fi
+if [ -z "$HARNESS" ]; then
+  if command -v opencode >/dev/null 2>&1; then
+    HARNESS="opencode"
+  elif command -v claude >/dev/null 2>&1; then
+    HARNESS="claude"
+  fi
+fi
+case "$HARNESS" in
+  opencode|claude) ;;
+  "")
+    echo "[$(date)] ABORTED: no supported harness found (opencode or claude). Install one or set config/harness.json." >> "$RUN_LOG"
+    exit 1
+    ;;
+  *)
+    echo "[$(date)] ABORTED: unsupported harness '$HARNESS' (supported: opencode, claude)." >> "$RUN_LOG"
+    exit 1
+    ;;
+esac
+
 # --- Run the agent ---------------------------------------------------------
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 SESSION_LOG="logs/session_${TIMESTAMP}.log"
 
-RUN_RC=0
-opencode run \
-  --agent job-scraper \
-  --print \
-  "Start a new job application run. Read AGENTS.md, load data/applied_jobs.json
+RUN_PROMPT="Start a new job application run. Read AGENTS.md, load data/applied_jobs.json
    and config/targets.json, scrape all configured job boards, deduplicate,
    tailor and apply to matching roles within the session cap, and send a
-   Discord summary when complete." \
-  >> "$SESSION_LOG" 2>&1 || RUN_RC=$?
+   Discord summary when complete."
+
+echo "[$(date)] Starting run via harness: $HARNESS" >> "$RUN_LOG"
+
+RUN_RC=0
+if [ "$HARNESS" = "opencode" ]; then
+  opencode run \
+    --agent job-scraper \
+    --print \
+    "$RUN_PROMPT" \
+    >> "$SESSION_LOG" 2>&1 || RUN_RC=$?
+else
+  # Claude Code headless: CLAUDE.md (canonical rules pointer) and the
+  # .claude/agents/ subagents load automatically; the orchestrator body is
+  # the shared source read explicitly since -p mode has no --agent flag.
+  claude -p \
+    "You are the job-scraper orchestrator. Read agents/bodies/job-scraper.md and execute it exactly as your instructions. $RUN_PROMPT" \
+    >> "$SESSION_LOG" 2>&1 || RUN_RC=$?
+fi
 
 if [ "$RUN_RC" -ne 0 ]; then
   echo "[$(date)] FAILED: opencode run exited non-zero (rc=$RUN_RC). Log: $SESSION_LOG" >> "$RUN_LOG"

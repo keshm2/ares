@@ -1,15 +1,3 @@
----
-description: >
-  Sends formatted Discord webhook notifications for job application outcomes.
-  Invoked by @job-scraper per-outcome (applied, needs_review, failed) and for
-  the end-of-batch summary. Reads per-route webhook URLs from
-  config/discord_config.json. skipped_unfit is never routed here.
-mode: subagent
-model: opencode-go/deepseek-v4-flash
-temperature: 0
----
-<!-- GENERATED from agents/bodies/discord-reporter.md + agents/frontmatter/opencode/discord-reporter.yaml — edit those sources and run scripts/generate_agent_definitions.py -->
-
 You send Discord webhook messages. Read config/discord_config.json and parse
 the `webhooks` object for per-route webhook URLs:
 

@@ -1,0 +1,8 @@
+description: >
+  Orchestrates automated job application runs. Scrapes job boards,
+  deduplicates against history, delegates tailoring to @resume-tailor,
+  submits applications via Playwright, and delegates reporting to
+  @discord-reporter. Use this agent for any job search automation task.
+model: opencode-go/qwen3.7-plus
+temperature: 0
+max_turns: 80

@@ -4,6 +4,34 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
+## 0. Universal install (recommended)
+
+One command from a fresh clone handles sections 1 and 3, detects your
+coding agent, and builds the optional TUI:
+
+```bash
+bash scripts/install.sh
+```
+
+Ares runs under either **opencode** or **Claude Code** (phase 15) — the
+installer detects what you have and writes `config/harness.json`
+(override any time by editing it, or per-run with `ARES_HARNESS=opencode|claude`).
+Then fill in the placeholders (section 2, or `ares setup`) and start a
+run with `bash scripts/run_job_agent.sh`.
+
+Per-harness notes:
+
+- **opencode** — agents load from `.opencode/agents/`; models come from
+  `opencode.jsonc`.
+- **Claude Code** — agents load from `.claude/agents/` (`model:
+  inherit`, so runs use your session's model); Playwright MCP comes
+  from `.mcp.json`. Headless runs need pre-approved permissions in
+  `.claude/settings.json` — the installer offers to create it and asks
+  first, because it grants Claude broad repo-local tool access.
+- Agent definitions for both harnesses are generated from `agents/`
+  (see `agents/README.md`) — edit sources there, never the generated
+  files.
+
 ## 1. Copy the example configs
 
 ```bash
