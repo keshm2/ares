@@ -37,7 +37,11 @@
   auto-update (2026-07-13 — root `VERSION` + `scripts/update.sh`,
   auto-hooked into runs and TUI launches with APPLYR_AUTO_UPDATE=0
   opt-out, installer writes the `applyr` wrapper to ~/.local/bin;
-  releases must bump root `VERSION` to trigger client updates).
+  releases must bump root `VERSION` to trigger client updates);
+  release 0.7.9a (2026-07-13 — dedicated uninstaller
+  scripts/uninstall.sh + `applyr uninstall`; README trimmed to
+  install/updates/uninstall/usage/safety, phase content moved to
+  docs; first auto-update rollout).
 - **Implement next:** phase 12 — multi-agent cost tiering
   (docs/PLAN.md §3.13), the second beta build item. Phase 13 remains
   partial (npm publish pending `npm login`; provider-setup and

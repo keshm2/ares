@@ -7,7 +7,11 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
-## [Unreleased] — on `main`
+## [0.7.9a] — 2026-07-13
+
+npm package: `@keshm2/applyr` version `0.7.9-alpha.0` (alpha tag).
+This is the first build clients receive via **automatic update** —
+pushing the `VERSION` bump to `main` rolls it out.
 
 ### Added
 
@@ -36,6 +40,22 @@ but trimmed to fit a small in-repo doc.
   assumption, per-user vs project-owned file table, and future
   multi-user seams documented in `AGENTS.md`; two-users-per-machine
   note in `docs/SETUP.md` §3.7.
+- **Dedicated uninstall.** `scripts/uninstall.sh` (also `applyr
+  uninstall`): removes the launchd schedule and the `applyr` PATH
+  wrapper (only applyr's own, only if it points at this install),
+  then deletes the install directory after an explicit confirmation —
+  it holds config/data/resumes PII. `--keep-data` keeps the
+  directory; `--yes` skips the prompt; non-interactive without
+  `--yes` never deletes data. npm installs additionally run
+  `npm uninstall -g @keshm2/applyr`.
+
+### Changed
+
+- **README cut to a quarter of its length.** Phase planning, roadmap
+  tables, phase-status blurbs, and per-build inventories moved out of
+  the README (they live in `docs/CHANGELOG.md`, `docs/RELEASE.md`,
+  and the gitignored plan); what remains is install, updates,
+  uninstall, usage, safety, and pointers.
 
 ## [0.7.8a] — 2026-07-12
 

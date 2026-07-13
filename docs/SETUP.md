@@ -4,7 +4,7 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
-> **Build:** this document ships with release `0.7.8a`. The
+> **Build:** this document ships with release `0.7.9a`. The
 > full release notes are in [`RELEASE.md`](./RELEASE.md); the
 > project changelog is in [`CHANGELOG.md`](./CHANGELOG.md).
 
@@ -47,27 +47,33 @@ GitHub repository for this release is still `keshm2/ares`:
 
 ```bash
 # zip
-curl -L -o applyr-0.7.8a.zip https://github.com/keshm2/ares/archive/refs/tags/0.7.8a.zip
-unzip applyr-0.7.8a.zip && cd ares-0.7.8a
+curl -L -o applyr-0.7.9a.zip https://github.com/keshm2/ares/archive/refs/tags/0.7.9a.zip
+unzip applyr-0.7.9a.zip && cd ares-0.7.9a
 
 # or tarball
-curl -L -o applyr-0.7.8a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.7.8a.tar.gz
-tar -xzf applyr-0.7.8a.tar.gz && cd ares-0.7.8a
+curl -L -o applyr-0.7.9a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.7.9a.tar.gz
+tar -xzf applyr-0.7.9a.tar.gz && cd ares-0.7.9a
 ```
 
 The release page also exposes the standard
 "Source code (zip)" / "Source code (tar.gz)" assets directly — pick
 whichever works behind your network.
 
-applyr runs under your choice of coding agent. Supported today:
-**opencode** and **Claude Code** (phase 15); **Codex** and **GitHub
-Copilot** support is planned (phase 16), with other coding agents to
-follow. The installer detects what you have installed — and when more
-than one supported agent is found, it **asks which one you'd prefer**
-— then writes the choice to `config/harness.json` (change it any time
-by editing that file, re-running the installer, or per-run with
-`APPLYR_HARNESS=opencode|claude`). Then fill in the placeholders
-(section 2, or `applyr setup`) and start a run with
+**Uninstall.** `applyr uninstall` (or `bash scripts/uninstall.sh`)
+removes the launchd schedule and the `applyr` command, then asks
+before deleting the install directory (it holds your config, data,
+and resumes). `--keep-data` keeps the directory; `--yes` skips the
+prompt. npm installs also run `npm uninstall -g @keshm2/applyr`.
+
+applyr runs under your choice of coding agent — all four majors are
+supported: **opencode**, **Claude Code** (full capability), **Codex
+CLI**, and **GitHub Copilot CLI** (degraded path — see §3.8). The
+installer detects what you have installed — and when more than one
+supported agent is found, it **asks which one you'd prefer** — then
+writes the choice to `config/harness.json` (change it any time by
+editing that file, re-running the installer, or per-run with
+`APPLYR_HARNESS=opencode|claude|codex|copilot`). Then fill in the
+placeholders (section 2, or `applyr setup`) and start a run with
 `bash scripts/run_job_agent.sh`.
 
 Per-harness notes:

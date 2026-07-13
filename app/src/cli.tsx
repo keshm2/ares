@@ -23,6 +23,7 @@ Usage: applyr [command]
   run               trigger a run in the current terminal (no app shell)
   setup [--check]   interactive config wizard; --check only validates
   update            check upstream and self-update now
+  uninstall         remove the schedule, command, and (after confirming) the install
   help              show this help
 
 Updates auto-install on every app launch and scheduled run
@@ -185,6 +186,10 @@ async function main(): Promise<number> {
       break;
     case "update": {
       const r = spawnSync("bash", ["scripts/update.sh"], { cwd: root, stdio: "inherit" });
+      return r.status ?? 1;
+    }
+    case "uninstall": {
+      const r = spawnSync("bash", ["scripts/uninstall.sh", ...rest], { cwd: root, stdio: "inherit" });
       return r.status ?? 1;
     }
   }
