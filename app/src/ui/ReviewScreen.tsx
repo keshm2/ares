@@ -4,6 +4,7 @@ import { loadState, isResolved, isDismissed, registryByJobId, hasAppliedOrFailed
 import type { ApplyrState, QueueEntry, AppliedJob } from "../state.js";
 import { appendAppliedJob, recordEvent, syncInternshipTracker, openUrl, helperError } from "../helpers.js";
 import { theme, statusGlyph, SELECT_MARKER } from "../theme.js";
+import { DetailPane, PaneRow, PaneRule, paneLayout } from "./Pane.js";
 
 interface Props {
   root: string;
@@ -17,6 +18,8 @@ interface Props {
   onStateChange?: () => void;
   /** Rows the shell hands this screen — the list grows/shrinks with it. */
   contentRows?: number;
+  /** Columns of the content band — a detail pane opens when it fits. */
+  columns?: number;
 }
 
 /**
@@ -24,14 +27,17 @@ interface Props {
  * outcomes through the helpers (applied_jobs append + registry event) and
  * derives "resolved" instead of deleting entries.
  */
-export function ReviewScreen({ root, active, refreshNonce, onStateChange, contentRows = 20 }: Props) {
+export function ReviewScreen({ root, active, refreshNonce, onStateChange, contentRows = 20, columns = 0 }: Props) {
   const [state, setState] = useState<ApplyrState>(() => loadState(root));
   const [cursor, setCursor] = useState(0);
   const [offset, setOffset] = useState(0);
   const [showResolved, setShowResolved] = useState(false);
   const [message, setMessage] = useState("");
-  // Screen-internal chrome: title, selection details, message, pagination.
-  const visible = Math.max(3, Math.min(30, contentRows - 8));
+  // With the detail pane the selection details move off the list column,
+  // so the list keeps most of the rows; stacked (narrow) reserves rows
+  // for the inline details below.
+  const pane = paneLayout(columns);
+  const visible = Math.max(3, Math.min(30, contentRows - (pane.show ? 5 : 8)));
 
   const entries = useMemo(
     () => state.queue.filter((e) => showResolved || !isResolved(state, e)),
@@ -211,36 +217,72 @@ export function ReviewScreen({ root, active, refreshNonce, onStateChange, conten
         </Text>
       </Text>
 
-      <Box flexDirection="column" marginTop={1}>
-        {empty ? (
-          <Box flexDirection="column">
-            <Text dimColor>{statusGlyph.applied} Nothing to review.</Text>
-            <Text dimColor>Queue is empty{showResolved ? "" : " — new items appear as the agent runs"}.</Text>
-          </Box>
-        ) : (
-          page.map((entry, i) => {
-            const idx = offset + i;
-            const resolved = isResolved(state, entry);
-            const marker = idx === cursor ? SELECT_MARKER : " ";
-            const glyph = resolved ? statusGlyph.applied : "•";
-            const ats =
-              typeof entry.ats_score === "number" ? `  ats ${entry.ats_score}` : "";
-            const tail = resolved ? "  [resolved]" : "";
-            const label = `${glyph} ${entry.company} — ${entry.title}${ats}${tail}`;
-            return idx === cursor ? (
-              <Text key={`${entry.job_id}-${idx}`} color={theme.accent} inverse wrap="truncate-end">
-                {`${marker} ${label}`}
-              </Text>
+      <Box marginTop={1} flexDirection="row" minHeight={pane.show ? visible : undefined}>
+        <Box flexDirection="column" flexGrow={1}>
+          {empty ? (
+            <Box flexDirection="column">
+              <Text dimColor>{statusGlyph.applied} Nothing to review.</Text>
+              <Text dimColor>Queue is empty{showResolved ? "" : " — new items appear as the agent runs"}.</Text>
+            </Box>
+          ) : (
+            page.map((entry, i) => {
+              const idx = offset + i;
+              const resolved = isResolved(state, entry);
+              const marker = idx === cursor ? SELECT_MARKER : " ";
+              const glyph = resolved ? statusGlyph.applied : "•";
+              const ats =
+                typeof entry.ats_score === "number" ? `  ats ${entry.ats_score}` : "";
+              const tail = resolved ? "  [resolved]" : "";
+              const label = `${glyph} ${entry.company} — ${entry.title}${ats}${tail}`;
+              return idx === cursor ? (
+                <Text key={`${entry.job_id}-${idx}`} color={theme.accent} inverse wrap="truncate-end">
+                  {`${marker} ${label}`}
+                </Text>
+              ) : (
+                <Text key={`${entry.job_id}-${idx}`} wrap="truncate-end">
+                  {`${marker} ${label}`}
+                </Text>
+              );
+            })
+          )}
+        </Box>
+        {pane.show ? (
+          <DetailPane width={pane.width}>
+            {selected ? (
+              <>
+                <Text bold color={theme.accent} wrap="truncate-end">
+                  {selected.company} — {selected.title}
+                </Text>
+                <PaneRow
+                  label="state"
+                  value={isResolved(state, selected) ? "resolved" : "pending"}
+                  color={isResolved(state, selected) ? theme.good : theme.warn}
+                />
+                {typeof selected.ats_score === "number" ? (
+                  <PaneRow label="ats" value={`${selected.ats_score} · ${selected.source ?? "?"}`} />
+                ) : null}
+                {selected.resume_used ? <PaneRow label="resume" value={selected.resume_used} /> : null}
+                <PaneRow label="url" value={selected.url} wrap="wrap" />
+                {selected.reasoning ? (
+                  <>
+                    <PaneRule title="why" />
+                    <Text wrap="wrap">{selected.reasoning}</Text>
+                  </>
+                ) : null}
+                <PaneRule title="actions" />
+                <Text dimColor wrap="wrap">enter/o open · a mark applied · d dismiss</Text>
+              </>
             ) : (
-              <Text key={`${entry.job_id}-${idx}`} wrap="truncate-end">
-                {`${marker} ${label}`}
-              </Text>
-            );
-          })
-        )}
+              <>
+                <Text dimColor>No selection</Text>
+                <Text dimColor wrap="wrap">Items land here when the agent (or a manual save) flags a posting for review.</Text>
+              </>
+            )}
+          </DetailPane>
+        ) : null}
       </Box>
 
-      {selected ? (
+      {!pane.show && selected ? (
         <Box marginTop={1} flexDirection="column">
           <Text dimColor>url  {selected.url}</Text>
           {selected.reasoning ? <Text dimColor>why  {selected.reasoning}</Text> : null}

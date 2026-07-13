@@ -2,19 +2,21 @@ import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
-import { latestSessionLog } from "../state.js";
+import { latestSessionLog, readHeartbeat } from "../state.js";
 import { theme, statusGlyph, capTier } from "../theme.js";
 import { RainbowText } from "./KeyHints.js";
 import {
   InlineTextInput,
   deleteBackward,
-  deleteForward,
   insertAtCursor,
   moveCursorLeft,
   moveCursorRight,
 } from "./TextInput.js";
 
-const TAIL = 12;
+// Keep a deep buffer; how many lines actually render is derived from the
+// live terminal height so the log fills the content region.
+const TAIL_BUFFER = 200;
+const GAUGE_WIDTH = 14;
 const PROMPT_MAX = 500;
 
 type Phase = "idle" | "running" | "done";
@@ -34,11 +36,14 @@ export function RunScreen({
   active,
   onInputActiveChange,
   onRunningChange,
+  contentRows = 20,
 }: {
   root: string;
   active: boolean;
   onInputActiveChange: (active: boolean) => void;
   onRunningChange: (running: boolean) => void;
+  /** Rows the shell hands this screen — the log tail fills them. */
+  contentRows?: number;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [countInput, setCountInput] = useState("");
@@ -53,8 +58,17 @@ export function RunScreen({
   const [inputMessage, setInputMessage] = useState("Press e to set this cycle's application cap (1–25).");
   const [exitCode, setExitCode] = useState<number | null>(null);
   const [lines, setLines] = useState<string[]>([]);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const child = useRef<ChildProcess | null>(null);
   const logBefore = useRef<string | undefined>(undefined);
+
+  // Elapsed-run clock — ticks only while a run is live.
+  useEffect(() => {
+    if (phase !== "running" || startedAt === null) return;
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [phase, startedAt]);
 
   const editing = editingCount || editingPrompt;
 
@@ -93,6 +107,8 @@ export function RunScreen({
     logBefore.current = latestSessionLog(root);
     setLines([]);
     setExitCode(null);
+    setStartedAt(Date.now());
+    setElapsed(0);
     setPhase("running");
     const extraPrompt = promptInput.trim();
     const proc = spawn("bash", ["scripts/run_job_agent.sh"], {
@@ -109,7 +125,7 @@ export function RunScreen({
     });
     child.current = proc;
     const push = (chunk: Buffer) =>
-      setLines((prev) => [...prev, ...chunk.toString().split("\n").filter(Boolean)].slice(-TAIL));
+      setLines((prev) => [...prev, ...chunk.toString().split("\n").filter(Boolean)].slice(-TAIL_BUFFER));
     proc.stdout?.on("data", push);
     proc.stderr?.on("data", push);
     proc.on("error", (err) => {
@@ -132,7 +148,7 @@ export function RunScreen({
       if (current && current !== logBefore.current && fs.existsSync(current)) {
         try {
           const content = fs.readFileSync(current, "utf8").trimEnd().split("\n");
-          setLines(content.slice(-TAIL));
+          setLines(content.slice(-TAIL_BUFFER));
         } catch {
           /* transient read race — next tick */
         }
@@ -161,13 +177,10 @@ export function RunScreen({
         } else if (key.rightArrow) {
           const next = moveCursorRight({ value: countInput, cursor: countCursor });
           setCountCursor(next.cursor);
-        } else if (key.backspace) {
+        } else if (key.backspace || key.delete) {
+          // macOS Backspace arrives as DEL (0x7f) → key.delete in Ink;
+          // both erase backward (see SearchScreen).
           const next = deleteBackward({ value: countInput, cursor: countCursor });
-          setCountInput(next.value);
-          setCountCursor(next.cursor);
-          setSessionCap(null);
-        } else if (key.delete) {
-          const next = deleteForward({ value: countInput, cursor: countCursor });
           setCountInput(next.value);
           setCountCursor(next.cursor);
           setSessionCap(null);
@@ -197,12 +210,8 @@ export function RunScreen({
         } else if (key.rightArrow) {
           const next = moveCursorRight({ value: promptInput, cursor: promptCursor });
           setPromptCursor(next.cursor);
-        } else if (key.backspace) {
+        } else if (key.backspace || key.delete) {
           const next = deleteBackward({ value: promptInput, cursor: promptCursor });
-          setPromptInput(next.value);
-          setPromptCursor(next.cursor);
-        } else if (key.delete) {
-          const next = deleteForward({ value: promptInput, cursor: promptCursor });
           setPromptInput(next.value);
           setPromptCursor(next.cursor);
         } else if (!key.ctrl && !key.meta && input && !/\p{C}/u.test(input)) {
@@ -246,15 +255,30 @@ export function RunScreen({
     : sessionCap;
   const tier = displayCap !== null && Number.isFinite(displayCap) ? capTier(displayCap) : null;
 
+  // Cockpit gauge + outcome counters. The heartbeat is the honest source
+  // for per-run counts (the runner writes it after every run); while a
+  // run is live we show the elapsed clock instead of guessing from the
+  // log tail. Re-read each render — renders are keypress/phase driven.
+  const gaugeFill =
+    displayCap !== null && Number.isFinite(displayCap)
+      ? Math.max(1, Math.round((displayCap / 25) * GAUGE_WIDTH))
+      : 0;
+  const gauge = "█".repeat(gaugeFill) + "░".repeat(GAUGE_WIDTH - gaugeFill);
+  const heartbeat = readHeartbeat(root);
+  const runClock = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
+  // Cockpit chrome: title, gauge, prompt, counters, message, log header,
+  // margins. What's left belongs to the log tail.
+  const tailRows = Math.max(5, contentRows - (displayCap === 25 ? 10 : 9));
+
   return (
     <Box flexDirection="column">
       <Text bold color={theme.accent}>
         Jobs <Text dimColor>automatic run</Text>{" "}
         {phase === "running" ? (
-          <Text color={theme.accent}>● running…</Text>
+          <Text color={theme.accent}>● running {runClock}</Text>
         ) : phase === "done" ? (
           exitCode === 0 ? (
-            <Text color={theme.good}>{statusGlyph.applied} complete</Text>
+            <Text color={theme.good}>{statusGlyph.applied} complete in {runClock}</Text>
           ) : (
             <Text color={theme.danger}>
               {statusGlyph.failed} exited {exitCode} — see logs/run_job_agent.log
@@ -266,15 +290,23 @@ export function RunScreen({
       </Text>
 
       <Box marginTop={1}>
-        <Text dimColor>cycle cap    </Text>
+        <Text dimColor>cap     </Text>
+        {displayCap === 25 ? (
+          // MAX: the gauge itself goes rainbow, matching the warning line.
+          <RainbowText>{gauge}</RainbowText>
+        ) : (
+          <Text color={tier?.color}>{gauge}</Text>
+        )}
+        <Text>{"  "}</Text>
         <InlineTextInput
           value={countInput}
           cursor={countCursor}
           active={editingCount}
           placeholder="1–25"
         />
+        <Text dimColor>/25</Text>
         {tier ? (
-          <Text color={tier.color}>
+          <Text bold color={tier.color}>
             {"  "}{tier.name}
           </Text>
         ) : null}
@@ -287,7 +319,7 @@ export function RunScreen({
       ) : null}
 
       <Box>
-        <Text dimColor>extra prompt </Text>
+        <Text dimColor>prompt  </Text>
         <InlineTextInput
           value={promptInput}
           cursor={promptCursor}
@@ -295,6 +327,25 @@ export function RunScreen({
           placeholder="(none — standard workflow)"
           wrap="truncate-end"
         />
+      </Box>
+
+      {/* Outcome counters — heartbeat counts (last completed run) plus
+          the live clock while running. */}
+      <Box>
+        <Text dimColor>{phase === "done" ? "run     " : "last    "}</Text>
+        {heartbeat ? (
+          <>
+            <Text bold color={theme.good}>{heartbeat.last_run_counts?.applied ?? 0}</Text>
+            <Text dimColor> applied  </Text>
+            <Text bold color={theme.warn}>{heartbeat.last_run_counts?.needs_review ?? 0}</Text>
+            <Text dimColor> review  </Text>
+            <Text bold color={theme.danger}>{heartbeat.last_run_counts?.failed ?? 0}</Text>
+            <Text dimColor> failed  </Text>
+            <Text dimColor>{heartbeat.last_run_counts?.skipped_unfit ?? 0} unfit</Text>
+          </>
+        ) : (
+          <Text dimColor>no runs recorded yet</Text>
+        )}
       </Box>
 
       <Box marginTop={1}>
@@ -320,14 +371,12 @@ export function RunScreen({
           <Text dimColor>waiting for session log…</Text>
         ) : (
           <Box flexDirection="column">
-            <Text dimColor>session log (last {lines.length} lines)</Text>
-            <Box flexDirection="column" marginTop={1}>
-              {lines.map((line, i) => (
-                <Text key={i} dimColor wrap="truncate-end">
-                  {line}
-                </Text>
-              ))}
-            </Box>
+            <Text dimColor>session log</Text>
+            {lines.slice(-tailRows).map((line, i) => (
+              <Text key={i} dimColor wrap="truncate-end">
+                {line}
+              </Text>
+            ))}
           </Box>
         )}
       </Box>
@@ -336,4 +385,4 @@ export function RunScreen({
 }
 
 export const RUN_HINTS = "e cap · p prompt · s start";
-export const RUN_EDIT_HINTS = "type · ←→ move · backspace/delete · enter set · esc done";
+export const RUN_EDIT_HINTS = "type · ←→ move · backspace erase · enter set · esc done";

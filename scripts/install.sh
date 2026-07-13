@@ -4,28 +4,65 @@
 # One command from a fresh GitHub clone to a validated, harness-configured
 # setup. Non-destructive: existing live configs are never overwritten.
 #
-#   bash scripts/install.sh
+#   bash scripts/install.sh                                      # from a clone/unpacked release
+#   curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh | bash
 #
 # Steps:
+#   0. Bootstrap: when piped (curl | bash) or run outside the repo,
+#      download and unpack the source tarball, then re-run from inside it.
 #   1. Check prerequisites (jq, python3; node optional for the TUI).
 #   2. Copy config/*.example.json to live configs where missing.
 #   3. Detect installed coding agents (opencode, claude) and write
 #      config/harness.json (only if missing).
-#   4. Offer to create .claude/settings.json (headless permission
+#   4. Ask for the user's profile (safe_fields) — kept locally only —
+#      and create resumes/ for the user's PDF resumes.
+#   5. Offer to create .claude/settings.json (headless permission
 #      pre-approval) when Claude Code is the harness — asks first.
-#   5. Regenerate per-harness agent definitions from agents/.
-#   6. Run the config validator (which also auto-seeds vetted slugs).
-#   7. Optionally build the TUI (app/) when node is available.
+#   6. Regenerate per-harness agent definitions from agents/.
+#   7. Run the config validator (which also auto-seeds vetted slugs).
+#   8. Optionally build the TUI (app/) when node is available.
 
 set -euo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$PROJECT_ROOT"
 
 say()  { echo "install: $*"; }
 warn() { echo "install: WARNING: $*" >&2; }
 fail() { echo "install: ERROR: $*" >&2; exit 1; }
+
+# Colors only on a TTY; the privacy notice must stand out.
+if [ -t 1 ]; then
+  C_NOTICE=$'\033[1;36m'; C_RESET=$'\033[0m'
+else
+  C_NOTICE=""; C_RESET=""
+fi
+
+# --- 0. Bootstrap (curl | bash, or run outside the repo) ----------------------
+# When the script is piped, BASH_SOURCE is empty and there is no repo around
+# it. Download the source tarball, unpack, and re-exec from inside it.
+SELF="${BASH_SOURCE[0]:-}"
+if [ -n "$SELF" ] && [ -f "$(dirname "$SELF")/../AGENTS.md" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+  PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+  command -v curl >/dev/null 2>&1 || fail "curl is required for the one-line install"
+  command -v tar  >/dev/null 2>&1 || fail "tar is required for the one-line install"
+  TARGET_DIR="${APPLYR_HOME:-$HOME/applyr}"
+  if [ -f "$TARGET_DIR/AGENTS.md" ]; then
+    say "existing install found at $TARGET_DIR — re-running its installer."
+  else
+    say "downloading applyr into $TARGET_DIR …"
+    mkdir -p "$TARGET_DIR"
+    curl -fsSL "https://codeload.github.com/keshm2/ares/tar.gz/refs/heads/main" \
+      | tar -xz --strip-components=1 -C "$TARGET_DIR"
+  fi
+  # Re-attach stdin to the terminal so the interactive prompts below work
+  # even though the script itself arrived on stdin.
+  if [ -e /dev/tty ]; then
+    exec bash "$TARGET_DIR/scripts/install.sh" </dev/tty
+  else
+    exec bash "$TARGET_DIR/scripts/install.sh"
+  fi
+fi
+cd "$PROJECT_ROOT"
 
 # --- 1. Prerequisites --------------------------------------------------------
 command -v jq >/dev/null 2>&1 || fail "jq is required (brew install jq / apt install jq)"
@@ -83,7 +120,69 @@ else
   fi
 fi
 
-# --- 4. Claude Code headless permissions (opt-in, asks first) ----------------
+# --- 4. User profile (safe_fields) + resumes folder ---------------------------
+# Asked only when the live config still holds placeholders, and only on a
+# real terminal. Every value lands in gitignored local config — nothing
+# leaves this machine.
+profile_placeholder() {
+  local v
+  v="$(jq -r ".safe_fields.$1 // \"\"" config/targets.json 2>/dev/null || echo "")"
+  [ -z "$v" ] || [ "$v" = "REPLACE_ME" ]
+}
+
+if [ -t 0 ] && profile_placeholder "first_name"; then
+  echo
+  echo "${C_NOTICE}🔒  Privacy: everything you enter below is kept LOCALLY ONLY.${C_RESET}"
+  echo "${C_NOTICE}    It is written to gitignored files on this machine (config/, resumes/)${C_RESET}"
+  echo "${C_NOTICE}    and is never committed, uploaded, or shared.${C_RESET}"
+  echo
+  echo "Your profile — used only to fill application forms (press enter to skip a field):"
+  # bash 3.2 (macOS default) + set -u: expanding an empty array errors, so
+  # collect the jq assignments as a filter string + parallel --arg list,
+  # tracking the count in a plain counter.
+  JQ_FILTER="."
+  N=0
+  for field in \
+    "first_name:First name" \
+    "last_name:Last name" \
+    "email:Email" \
+    "phone:Phone" \
+    "linkedin_url:LinkedIn URL" \
+    "github_url:GitHub URL" \
+    "graduation_date:Graduation date (Month Year)"; do
+    key="${field%%:*}"; label="${field#*:}"
+    printf "  %s: " "$label"
+    read -r VALUE || VALUE=""
+    if [ -n "$VALUE" ]; then
+      JQ_FILTER="$JQ_FILTER | .safe_fields.$key = \$v$N"
+      eval "JQ_V$N=\$VALUE"
+      N=$((N + 1))
+    fi
+  done
+  if [ "$N" -gt 0 ]; then
+    TMP="$(mktemp)"
+    set --
+    i=0
+    while [ $i -lt "$N" ]; do
+      eval "set -- \"\$@\" --arg \"v$i\" \"\$JQ_V$i\""
+      i=$((i + 1))
+    done
+    jq "$@" "$JQ_FILTER" config/targets.json > "$TMP" && mv "$TMP" config/targets.json
+    say "profile written to config/targets.json (gitignored — run 'applyr setup' to edit the rest)."
+  else
+    say "profile skipped — run 'applyr setup' any time to fill it in."
+  fi
+fi
+
+mkdir -p resumes
+echo
+echo "${C_NOTICE}📄  Resumes: drop ALL your resumes as PDFs into${C_RESET}"
+echo "${C_NOTICE}    $PROJECT_ROOT/resumes/${C_RESET}"
+echo "${C_NOTICE}    applyr scans them and converts each to markdown so it can tailor${C_RESET}"
+echo "${C_NOTICE}    the best-matching resume per job. This folder is gitignored — local only.${C_RESET}"
+echo
+
+# --- 5. Claude Code headless permissions (opt-in, asks first) ----------------
 # Headless runs need pre-approved tools; this file grants Claude Code broad
 # repo-local permissions, so it is only created with explicit consent.
 if [ "$HAVE_CLAUDE" -eq 1 ] && [ ! -f ".claude/settings.json" ]; then
@@ -114,10 +213,10 @@ JSON
   fi
 fi
 
-# --- 5. Agent definitions ------------------------------------------------------
+# --- 6. Agent definitions ------------------------------------------------------
 python3 scripts/generate_agent_definitions.py
 
-# --- 6. Validate (also auto-seeds vetted Ashby/Lever slugs) --------------------
+# --- 7. Validate (also auto-seeds vetted Ashby/Lever slugs) --------------------
 if bash scripts/validate_local_config.sh; then
   say "config valid."
 else
@@ -125,7 +224,7 @@ else
   warn "  bash scripts/validate_local_config.sh"
 fi
 
-# --- 7. TUI (optional) ---------------------------------------------------------
+# --- 8. TUI (optional) ---------------------------------------------------------
 if command -v npm >/dev/null 2>&1; then
   if [ ! -d "app/node_modules" ]; then
     say "building the TUI (app/) …"

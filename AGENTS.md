@@ -15,7 +15,21 @@
   fix + TUI resize invariant + large-terminal fill (2026-07-12);
   fetch-efficiency rules (2026-07-12 — see "Fetch efficiency" under
   Critical rules); installer coding-agent choice (2026-07-12 —
-  Codex/Copilot planned in phase 16).
+  Codex/Copilot planned in phase 16); easier setup + TUI polish
+  (2026-07-12 — installer curl|bash bootstrap and profile prompts
+  with a local-only privacy notice, root `resumes/` PDF drop-folder
+  (gitignored), README bash/cURL/npm install options, welcome-menu
+  row tiers + MIN_COLUMNS 44 resize fixes, esc-to-menu navigation,
+  sidebar first-name greeting + status rows, 12-hour local clock
+  with time zone); TUI density redesign + input fixes (2026-07-12 —
+  two-pane rules+columns layouts via ui/Pane.tsx on Jobs/Review/
+  History/Status, AUTO cockpit with cap gauge + heartbeat counters +
+  full-height log tail, randomized per-launch sidebar greeting,
+  backspace fix: DEL 0x7f now erases backward in all text editors);
+  release 0.7.8a (2026-07-12 — npm package is **@keshm2/applyr**
+  0.7.8-alpha.0, the unscoped `applyr` npm name is owned by an
+  unrelated package; README banner + agent artwork in docs/assets/;
+  npm publish pending `npm login`).
 - **Implement next:** phase 9 — migration-friendliness review
   (docs/PLAN.md §3.10, documentation-only). Phase 13 remains partial
   for its deferred publication, provider-setup, and hosted-storage

@@ -28,7 +28,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
  *  the sectioned reference (an overflowing frame corrupts Ink's repaint). */
 function CompactHelp() {
   const lines: Array<[string, string]> = [
-    ["Everywhere", "1-4/←→/tab screens · m mode · R reload · w welcome · q quit"],
+    ["Everywhere", "1-4/←→/tab screens · esc/w menu · m mode · R reload · q quit"],
     ["Jobs MANUAL", "/ query · ↑↓ select · enter/o open · f fit · s save"],
     ["Jobs AUTO", "e cap (25=MAX) · p prompt · s start"],
     ["Review", "↑↓ · enter/o open · a applied · d dismiss · x resolved"],
@@ -65,7 +65,7 @@ export function HelpOverlay({ contentRows = 40 }: { contentRows?: number }) {
           <Key k="1-4 / tab / ←→" desc="switch screen (Status · Jobs · Review · History)" />
           <Key k="m" desc="toggle MANUAL / AUTO mode (changes the Jobs screen)" />
           <Key k="R" desc="reload state from disk" />
-          <Key k="w" desc="reopen the welcome / quick-start page" />
+          <Key k="esc / w" desc="back to the welcome menu (esc never quits; locked mid-run)" />
           <Key k="?" desc="open / close this help" />
           <Key k="q" desc="quit (asks to confirm while a run is active)" />
         </Section>

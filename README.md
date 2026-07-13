@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/applyr-banner.png" alt="applyr" width="600" />
+</p>
+
 # applyr
 
 > An automated, single-user job-application agent for internship and
@@ -6,7 +10,7 @@
 > routes per-outcome updates to Discord, and appends one row per
 > success to a Google Sheet tracker.
 >
-> **Build 0.5.5a** — first tagged release. See
+> **Build 0.7.8a** — see
 > [Release notes](docs/RELEASE.md) and [Changelog](docs/CHANGELOG.md).
 > The build marker is also shown in the TUI side-panel footer.
 
@@ -17,11 +21,25 @@ keeps every state-mutating step auditable and means the harness itself
 never hand-writes runtime state. Each run is capped at **25
 applications** to stay polite to upstream boards and rate limits.
 
+## You need a coding agent
+
+**applyr requires at least one of [Claude Code](https://claude.com/claude-code)
+or [opencode](https://opencode.ai) installed** — it drives whichever one
+you have to run the application workflow. The installer detects what is
+installed and asks when both are present. Without one of them, applyr
+cannot run.
+
+<p align="center">
+  <a href="https://opencode.ai"><img src="docs/assets/opencode.png" alt="opencode — the open source AI coding agent" width="360" /></a>
+  &nbsp;&nbsp;
+  <a href="https://claude.com/claude-code"><img src="docs/assets/claude-code.png" alt="Claude Code" width="200" /></a>
+</p>
+
 > **Status** — Phases 0–8, 10, and 15 (core) are implemented; the
-> Phase 13 TUI is shipped as a local-repo alpha. Phase 9 is planned;
-> Phase 16 (Codex, GitHub Copilot) is planned. No hosted accounts, no
-> `npm` publication, no provider-setup — install from a GitHub
-> download and run locally. Workday is review-only by design.
+> Phase 13 TUI ships in this build (npm-distributed alpha). Phase 9 is
+> planned; Phase 16 (Codex, GitHub Copilot) is planned. No hosted
+> accounts and no provider-setup — runs locally. Workday is
+> review-only by design.
 
 ## What applyr does today
 
@@ -58,7 +76,7 @@ the rules auditable and the state recoverable.
 
 | | |
 | --- | --- |
-| **Build** | `0.5.5a` (alpha) |
+| **Build** | `0.7.8a` (alpha) |
 | **Mode** | Single user, local-first, cron-friendly |
 | **Boards (today)** | Ashby, Lever (public JSON APIs); SimplifyJobs (public GitHub JSON feeds); Workday (public CXS JSON, review-only); LinkedIn, Indeed, Handshake, Greenhouse, Wellfound (Playwright) |
 | **Harnesses** | OpenCode, Claude Code (phase 15). Codex and GitHub Copilot planned (phase 16). |
@@ -71,29 +89,42 @@ the rules auditable and the state recoverable.
 
 ## Install / first run (from GitHub, no `git clone`)
 
-This build is published as a **GitHub release** with the standard
-source-code zip and tar.gz assets. Download the archive for
-`applyr 0.5.5a` from the Releases page, unpack it, and run the
-installer.
+Three ways in — all end at the same interactive installer, which asks
+for your coding agent and your profile (kept **locally only**).
 
-**macOS / Linux — one command:**
+**Option 1 — cURL one-liner (recommended):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh | bash
+```
+
+Downloads the source into `~/applyr` (override with `APPLYR_HOME`) and
+runs the installer from inside it.
+
+**Option 2 — bash, from a downloaded release:**
 
 ```bash
 # The project is named applyr; the GitHub repository is still keshm2/ares.
-curl -L -o applyr-0.5.5a.zip https://github.com/keshm2/ares/archive/refs/tags/0.5.5a.zip
-unzip applyr-0.5.5a.zip
-cd ares-0.5.5a
+curl -L -o applyr-0.7.8a.zip https://github.com/keshm2/ares/archive/refs/tags/0.7.8a.zip
+unzip applyr-0.7.8a.zip
+cd ares-0.7.8a
 bash scripts/install.sh
 ```
 
-The same flow with a tarball:
+(The same works with the `.tar.gz` asset and `tar -xzf`.)
+
+**Option 3 — npm (the TUI command):**
 
 ```bash
-curl -L -o applyr-0.5.5a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.5.5a.tar.gz
-tar -xzf applyr-0.5.5a.tar.gz
-cd ares-0.5.5a
-bash scripts/install.sh
+# The unscoped npm name "applyr" belongs to an unrelated package —
+# install the scoped one. The command it installs is still `applyr`.
+npm install -g @keshm2/applyr@alpha
+applyr        # no core found? it prints the one-line core installer above
 ```
+
+npm installs the `applyr` terminal UI globally; the agent core still
+lives in a local directory (`~/applyr` via option 1, or any unpacked
+release — point `APPLYR_ROOT` at it to run `applyr` from anywhere).
 
 `scripts/install.sh` is non-destructive:
 
@@ -104,14 +135,19 @@ bash scripts/install.sh
 3. Detects installed coding agents (opencode, Claude Code) and
    writes `config/harness.json`. When both are present, the
    installer asks which to use.
-4. If you choose Claude Code, offers to create
+4. Asks for your profile (name, email, links — the `safe_fields`
+   used to fill application forms) and creates `resumes/`: **drop
+   all your resumes there as PDFs** so applyr can scan them and
+   convert each to markdown for per-job tailoring. Everything you
+   enter stays in gitignored local files — nothing is uploaded.
+5. If you choose Claude Code, offers to create
    `.claude/settings.json` (asks first — it grants Claude broad
    repo-local tool access for headless runs).
-5. Regenerates per-harness agent definitions from `agents/`.
-6. Runs `scripts/validate_local_config.sh` (which also auto-seeds
+6. Regenerates per-harness agent definitions from `agents/`.
+7. Runs `scripts/validate_local_config.sh` (which also auto-seeds
    placeholder Ashby / Lever slug arrays from the project's vetted
    lists).
-7. If `npm` is available, builds the TUI.
+8. If `npm` is available, builds the TUI.
 
 If you cannot download directly with `curl` (corporate proxy,
 offline machine, etc.), download the zip from the GitHub release
@@ -151,10 +187,26 @@ through the service-account setup. Skip it and `applied` outcomes
 still land in `data/applied_jobs.json`; the local log remains the
 source of truth.
 
-## Build 0.5.5a — what's in it
+## Build 0.7.8a — what's in it
 
 The full release document is **[docs/RELEASE.md](docs/RELEASE.md)**.
-The short version:
+New since 0.5.5a:
+
+- **Easier setup** — the installer bootstraps itself from a cURL
+  one-liner, asks for your profile (kept locally only, stated in
+  color at the prompt), and creates the root `resumes/` PDF
+  drop-folder; three install paths: bash, cURL, npm
+  (`@keshm2/applyr`).
+- **TUI density redesign** — two-pane layouts on Jobs / Review /
+  History / Status, an AUTO-mode cockpit (cap gauge with heavy /
+  heavy+ / rainbow-MAX tiers, heartbeat counters, elapsed clock,
+  full-height log tail), esc-to-menu navigation, randomized sidebar
+  greeting with your first name, local 12-hour clock with time
+  zone, and resize fixes.
+- **Backspace fix** — macOS Backspace (DEL 0x7f) now erases in every
+  TUI text editor.
+
+Carried over from 0.5.5a:
 
 - **Project rename Ares → applyr** — TUI command, npm package,
   launchd label (`com.applyr.job-agent`), and env-var prefix
@@ -178,12 +230,12 @@ The short version:
 - **CI** — `.github/workflows/tui.yml` and
   `.github/workflows/extension.yml` typecheck, build, and
   smoke-test the TUI and the extension.
-- **Version references** — `BUILD_MARKER = "0.5.5a"` in
+- **Version references** — `BUILD_MARKER = "0.7.8a"` in
   `app/src/theme.ts` (visible in the TUI side-panel footer);
-  `app/package.json` and `extension/package.json` version
-  `0.5.5a`; `extension/src/manifest.json` version `0.5.5`
-  (Chrome Web Store rejects pre-release suffixes — the `a` is
-  dropped on the manifest only).
+  `app/package.json` is `@keshm2/applyr` version `0.7.8-alpha.0`
+  (npm requires strict semver — `0.7.8a` is the human-facing build
+  marker, `0.7.8-alpha.0` its semver form); the browser extension is
+  unchanged this build and stays at `0.5.5` / `0.5.5a`.
 
 The full changelog is at **[docs/CHANGELOG.md](docs/CHANGELOG.md)**.
 The pre-tag history is summarized at the bottom of that file.
@@ -348,9 +400,8 @@ Key files and entry points:
   up.
 - `docs/SETUP.md` — copy → edit → validate walkthrough for the
   local configs, plus the optional Google Sheets sync section.
-- `docs/RELEASE.md` — release notes for build `0.5.5a`.
-- `docs/CHANGELOG.md` — minimal changelog with `0.5.5a` as the
-  first entry.
+- `docs/RELEASE.md` — release notes for build `0.7.8a`.
+- `docs/CHANGELOG.md` — minimal changelog, newest build first.
 - `opencode.jsonc` — OpenCode configuration. The default agent is
   `job-scraper`; loads `AGENTS.md`, `config/targets.json`, and
   `data/applied_jobs.json` as instructions; enables the Playwright
@@ -426,7 +477,7 @@ hand-edit
   application cap (1–25) → `APPLYR_SESSION_CAP` → spawns
   `scripts/run_job_agent.sh` and tails the session log.
 - `src/ui/SidePanel.tsx` — right-side panel (applied / queue /
-  mode / build marker `0.5.5a`).
+  mode / build marker `0.7.8a`).
 - `src/ui/WelcomeScreen.tsx` / `HelpOverlay.tsx` — onboarding
   and in-app help.
 
@@ -541,7 +592,7 @@ outcomes (`applied_jobs` append + `record-event`) and derives
 **Install and run from the unpacked release archive:**
 
 ```bash
-cd applyr-0.5.5a/app
+cd applyr-0.7.8a/app
 npm install
 npm run build
 npm link        # exposes the `applyr` command on your PATH
@@ -607,7 +658,7 @@ the hint bar):
 
 **Side panel** (visible on terminals ≥ 64 columns and ≥ 18 rows):
 applied count, queue depth, mode badge, and **build marker**
-(`build 0.5.5a`). The side panel hides on narrower / shorter
+(`build 0.7.8a`). The side panel hides on narrower / shorter
 terminals and reappears when the terminal grows.
 
 Detailed walkthrough, including the `applyr setup` /

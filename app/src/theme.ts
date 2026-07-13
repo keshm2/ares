@@ -31,15 +31,22 @@ export const statusGlyph: Record<string, string> = {
 /** Selection marker — the one place boldness is spent on focus. */
 export const SELECT_MARKER = "▸";
 
+/** Hot red for the heavy+ tier — deliberately louder than the plain
+ *  `red` outcome color so 22+ caps read as a warning, not a failure. */
+export const HEAVY_PLUS_RED = "#FF3B30";
+
 /** Session-cap tiers — the cap picker colors by cost so the difference
- *  between a 3-job test and a 25-job MAX run is visible at a glance. */
+ *  between a 3-job test and a 25-job MAX run is visible at a glance.
+ *  25 = MAX (the gauge renders rainbow), 22+ = heavy+ (hot red),
+ *  17+ = heavy (yellow). */
 export interface CapTier {
   name: string;
   color: string;
 }
 export function capTier(cap: number): CapTier {
   if (cap >= 25) return { name: "MAX", color: theme.danger };
-  if (cap >= 15) return { name: "heavy", color: theme.warn };
+  if (cap >= 22) return { name: "heavy+", color: HEAVY_PLUS_RED };
+  if (cap >= 17) return { name: "heavy", color: theme.warn };
   if (cap >= 6) return { name: "standard", color: theme.accent };
   return { name: "light", color: theme.good };
 }
@@ -83,13 +90,14 @@ export const BANNER_GRADIENT = [
 export const BANNER_WIDTH = BANNER_ROWS[0].length;
 
 /** Below this size the app shows a "terminal too small" notice. The tab
- *  row is the binding constraint (~40 cols); the banner collapses earlier
- *  but the tab row would wrap before that matters. */
-export const MIN_COLUMNS = 40;
+ *  row is the binding constraint: with the Review "(n)" badge it needs
+ *  ~43 cols, and wrapping it corrupts the pinned frame. The banner
+ *  collapses earlier. */
+export const MIN_COLUMNS = 44;
 export const MIN_ROWS = 12;
 
 /** Build/release marker shown in the side panel footer. */
-export const BUILD_MARKER = "0.5.5a";
+export const BUILD_MARKER = "0.7.8a";
 
 /** Side panel width — narrow enough to coexist with content on 64-col+
  *  terminals. The panel hides below that width (see App showSidebar). */

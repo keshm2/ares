@@ -1,9 +1,15 @@
 {
-  "name": "applyr",
-  "version": "0.5.5a",
-  "description": "Terminal UI overlay for applyr — manual job search, automatic runs, review triage, status, and history over the Python core.",
+  "name": "@keshm2/applyr",
+  "version": "0.7.8-alpha.0",
+  "description": "Terminal UI overlay for applyr — manual job search, automatic runs, review triage, status, and history over the Python core. The unscoped npm name 'applyr' belongs to an unrelated package.",
   "publishConfig": {
-    "tag": "alpha"
+    "tag": "alpha",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/keshm2/ares.git",
+    "directory": "app"
   },
   "license": "MIT",
   "type": "module",

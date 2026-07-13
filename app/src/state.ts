@@ -54,6 +54,21 @@ export function loadState(root: string): ApplyrState {
   };
 }
 
+/** The user's first name from config/targets.json safe_fields — undefined
+ *  until setup has filled it in (placeholders don't count). Read-only:
+ *  config writes stay with the wizard/installer. */
+export function userFirstName(root: string): string | undefined {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(root, "config", "targets.json"), "utf8"),
+    ) as { safe_fields?: { first_name?: string } };
+    const name = (parsed.safe_fields?.first_name ?? "").trim();
+    return name && name.toUpperCase() !== "REPLACE_ME" ? name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Registry record for a queue/applied entry, matched by job_id. */
 export function registryByJobId(
   registry: RegistryRecord[],

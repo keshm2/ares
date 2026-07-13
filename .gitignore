@@ -12,8 +12,9 @@
 /data/job_registry.json
 /data/job_events.jsonl
 
-# Personal PII — resumes
+# Personal PII — resumes (project root drop-folder + legacy data/ location)
 /data/resumes/
+/resumes/
 
 # Playwright MCP browser session artifacts (logs, page snapshots)
 /.playwright-mcp/

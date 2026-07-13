@@ -33,9 +33,16 @@ export async function runWizard(root: string, checkOnly: boolean): Promise<numbe
     return answer || fallback;
   };
 
+  // Bold cyan on a TTY — the local-only promise must be unmissable.
+  const notice = (line: string) =>
+    console.log(process.stdout.isTTY ? `\x1b[1;36m${line}\x1b[0m` : line);
+
   try {
     console.log("applyr setup wizard — writes config/targets.json and config/discord_config.json.");
     console.log("Press enter to accept the [default] shown for any prompt.\n");
+    notice("🔒  Privacy: everything you enter is kept LOCALLY ONLY — written to");
+    notice("    gitignored files on this machine and never committed, uploaded, or shared.");
+    console.log("");
 
     // targets.json — start from the live file if present, else the example.
     const targetsBase = fs.existsSync(targetsPath)
@@ -75,6 +82,15 @@ export async function runWizard(root: string, checkOnly: boolean): Promise<numbe
       writeJson(discordPath, discord);
       console.log(`Wrote ${discordPath}\n`);
     }
+    // Resumes drop-folder — the agent scans PDFs here and converts each to
+    // markdown so it can tailor the best match per job.
+    const resumesDir = path.join(root, "resumes");
+    fs.mkdirSync(resumesDir, { recursive: true });
+    notice("📄  Resumes: drop ALL your resumes as PDFs into");
+    notice(`    ${resumesDir}/`);
+    notice("    applyr scans them and converts each to markdown for per-job tailoring.");
+    notice("    This folder is gitignored — local only.");
+    console.log("");
   } finally {
     rl.close();
   }

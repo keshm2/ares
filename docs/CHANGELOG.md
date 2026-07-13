@@ -7,6 +7,63 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.7.8a] — 2026-07-12
+
+npm package: **`@keshm2/applyr` version `0.7.8-alpha.0`** (the
+unscoped npm name `applyr` belongs to an unrelated package; `0.7.8a`
+is the human-facing build marker, `0.7.8-alpha.0` its strict-semver
+form).
+
+### Added
+
+- **Setup overhaul.** `scripts/install.sh` bootstraps itself from a
+  cURL one-liner (`curl -fsSL …/scripts/install.sh | bash` downloads
+  the source into `~/applyr`, override with `APPLYR_HOME`, then
+  re-runs from inside it); prompts for the user profile
+  (`safe_fields`, written atomically via `jq`) behind a bold-cyan
+  notice that everything stays **locally only**; creates the
+  gitignored root `resumes/` drop-folder — drop all resumes there
+  as PDFs for scan/convert-to-markdown tailoring. `applyr setup`
+  shows the same privacy notice and resumes instruction. Three
+  documented install paths: bash, cURL, npm.
+- **TUI density redesign.** Shared rules+columns split-view
+  primitives (`app/src/ui/Pane.tsx`); Jobs MANUAL, Review, and
+  History get a full-height detail pane (fit verdicts, urls,
+  reasoning, totals); Status gets a full-height recent-activity
+  column; AUTO mode is a cockpit — cap gauge, heartbeat outcome
+  counters, elapsed run clock, and a log tail that fills the
+  content region. Panes appear when the content band is ≥ 76
+  columns and degrade to the stacked layouts below.
+- **Cap tiers re-cut.** 25 = MAX with a **rainbow gauge**, 22–24 =
+  `heavy+` in a new hot red (`#FF3B30`), 17–21 = `heavy` (yellow),
+  6–16 standard, 1–5 light.
+- **Sidebar.** Randomized per-launch greeting (Hello / Welcome /
+  Nice to see you / Hey there) over the user's first name (rainbow,
+  from `safe_fields`); Screen / Failed / Seen / Sched rows; local
+  **12-hour clock with time-zone abbreviation**.
+- **Navigation.** `esc` returns to the welcome menu from any screen
+  (never quits, locked during a live run); an npm-installed
+  `applyr` with no core checkout prints the one-line core
+  installer instead of a stack trace.
+- **README.** applyr banner artwork at the head; explicit
+  requirement callout — **Claude Code or opencode must be
+  installed** — with both agents' artwork.
+
+### Fixed
+
+- **Backspace deleted nothing on macOS.** The Backspace key sends
+  DEL (0x7f), which Ink reports as `key.delete`; the editors
+  treated that as forward-delete — a no-op at the end of the line.
+  Backspace and delete now both erase backward in all three text
+  inputs.
+- **Resize breakage.** Welcome menu sheds intro / description /
+  state / footer bands by available rows so the `> [x]` options
+  are never clipped; option rows truncate instead of wrapping;
+  `MIN_COLUMNS` 40 → 44 (the tab row with the Review badge wrapped
+  at 40 and corrupted the pinned frame); sidebar threshold 64 → 72
+  columns; the content band has an explicit width so wide nested
+  rows can no longer squeeze the sidebar.
+
 ## [0.5.5a] — 2026-07-12 — first tagged build
 
 ### Added

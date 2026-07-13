@@ -46,8 +46,17 @@ export function WelcomeScreen({
   lastRun: string;
 }) {
   const selected = options[cursor] ?? options[0];
-  const wide = columns >= 104 && contentRows >= 18;
+  const wide = columns >= 84 && contentRows >= 16;
   const showLastRun = contentRows >= 16;
+  // Row tiers: the frame is clipped at the viewport (App pins height with
+  // overflow hidden), so on short terminals the menu sheds its supporting
+  // bands — intro, description, state, footer hint — before the options
+  // themselves get cut off.
+  const showIntro = contentRows >= 14;
+  const showSelected = contentRows >= 12;
+  const showState = wide || contentRows >= 22;
+  const showFooterHint = contentRows >= 10;
+  const tight = contentRows < 8; // every remaining margin costs an option row
   const health = heartbeat
     ? heartbeat.last_run_exit_code === 0
       ? { label: "healthy", color: theme.good }
@@ -59,32 +68,44 @@ export function WelcomeScreen({
       <Text bold color={theme.accent}>
         Welcome to applyr
       </Text>
-      <Box marginTop={1}>
-        <Text wrap="wrap">
-          Choose what you want to do first. Manual browsing, automatic runs,
-          review triage, and history all land in the same local record.
-        </Text>
-      </Box>
+      {showIntro ? (
+        <Box marginTop={1}>
+          <Text wrap="wrap">
+            Choose what you want to do first. Manual browsing, automatic runs,
+            review triage, and history all land in the same local record.
+          </Text>
+        </Box>
+      ) : null}
 
-      <Box marginTop={1} flexDirection={wide ? "row" : "column"}>
+      <Box marginTop={tight ? 0 : 1} flexDirection={wide ? "row" : "column"}>
         <Box flexDirection="column" marginRight={wide ? 4 : 0} width={wide ? 44 : undefined}>
-          <Text dimColor>Start here</Text>
-          <Box marginTop={1} flexDirection="column">
+          {tight ? null : <Text dimColor>Start here</Text>}
+          <Box marginTop={tight ? 0 : 1} flexDirection="column">
             {options.map((option, index) => {
               const focused = index === cursor;
+              // truncate-end: a wrapped option row grows the frame past the
+              // viewport on narrow terminals, which corrupts Ink's repaint.
               return (
-                <Text key={option.label} color={focused ? theme.accent : undefined} bold={focused}>
+                <Text
+                  key={option.label}
+                  color={focused ? theme.accent : undefined}
+                  bold={focused}
+                  wrap="truncate-end"
+                >
                   {focused ? ">" : " "} [{focused ? "x" : " "}] {option.label}
                 </Text>
               );
             })}
           </Box>
-          <Box marginTop={1} flexDirection="column">
-            <Text dimColor>Selected</Text>
-            <Text wrap="wrap">{selected.description}</Text>
-          </Box>
+          {showSelected ? (
+            <Box marginTop={1} flexDirection="column">
+              <Text dimColor>Selected</Text>
+              <Text wrap="wrap">{selected.description}</Text>
+            </Box>
+          ) : null}
         </Box>
 
+        {showState ? (
         <Box flexDirection="column" marginTop={wide ? 0 : 1}>
           <Text dimColor>Current state</Text>
           <Box marginTop={1} flexDirection="column">
@@ -102,11 +123,14 @@ export function WelcomeScreen({
             </Box>
           ) : null}
         </Box>
+        ) : null}
       </Box>
 
-      <Box marginTop={1}>
-        <Text dimColor>Use ↑/↓, j/k, or tab to move. Enter opens the selected page.</Text>
-      </Box>
+      {showFooterHint ? (
+        <Box marginTop={1}>
+          <Text dimColor>Use ↑/↓, j/k, or tab to move. Enter opens the selected page.</Text>
+        </Box>
+      ) : null}
     </Box>
   );
 }

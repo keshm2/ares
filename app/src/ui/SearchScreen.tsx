@@ -12,10 +12,10 @@ import {
   type SourceResult,
 } from "../jobs.js";
 import { SELECT_MARKER, statusGlyph, theme } from "../theme.js";
+import { DetailPane, PaneRow, PaneRule, paneLayout } from "./Pane.js";
 import {
   InlineTextInput,
   deleteBackward,
-  deleteForward,
   insertAtCursor,
   moveCursorLeft,
   moveCursorRight,
@@ -35,6 +35,7 @@ export function SearchScreen({
   onInputActiveChange,
   onStateChange,
   contentRows,
+  columns = 0,
 }: {
   root: string;
   active: boolean;
@@ -42,6 +43,8 @@ export function SearchScreen({
   onStateChange: () => void;
   /** Rows the shell hands this screen — the list grows/shrinks with it. */
   contentRows: number;
+  /** Columns of the content band — a detail pane opens when it fits. */
+  columns?: number;
 }) {
   const [query, setQuery] = useState("");
   const [queryCursor, setQueryCursor] = useState(0);
@@ -55,9 +58,11 @@ export function SearchScreen({
   const [offset, setOffset] = useState(0);
   const [message, setMessage] = useState("Press / and type a title query, then enter to search the live boards.");
   const [fits, setFits] = useState<Record<string, FitResult>>({});
-  // Screen-internal chrome: query row, sources row, selection details (2),
-  // message row, one row of slack.
-  const visible = Math.max(3, Math.min(30, contentRows - 6));
+  // With the detail pane the list only shares rows with the query,
+  // sources, and message lines; stacked (narrow) keeps room for the
+  // inline selection details below the list.
+  const pane = paneLayout(columns);
+  const visible = Math.max(3, Math.min(30, contentRows - (pane.show ? 4 : 6)));
 
   const busy = action !== "idle";
   const capturesInput = active && editing && !busy;
@@ -144,12 +149,12 @@ export function SearchScreen({
         } else if (key.rightArrow) {
           const next = moveCursorRight({ value: query, cursor: queryCursor });
           setQueryCursor(next.cursor);
-        } else if (key.backspace) {
+        } else if (key.backspace || key.delete) {
+          // macOS Backspace arrives as DEL (0x7f), which Ink reports as
+          // key.delete — treating it as forward-delete made the key a
+          // no-op at the end of the line. Both erase backward, like every
+          // shell prompt (ink-text-input does the same).
           const next = deleteBackward({ value: query, cursor: queryCursor });
-          setQuery(next.value);
-          setQueryCursor(next.cursor);
-        } else if (key.delete) {
-          const next = deleteForward({ value: query, cursor: queryCursor });
           setQuery(next.value);
           setQueryCursor(next.cursor);
         } else if (!key.ctrl && !key.meta && input && !/\p{C}/u.test(input)) {
@@ -216,20 +221,58 @@ export function SearchScreen({
           </Box>
         ))}
       </Box>
-      <Box flexDirection="column">
-        {page.map((job, index) => {
-          const absolute = offset + index;
-          const fitResult = fits[job.url];
-          const fitTail = fitResult ? `  ${fitResult.fit_status} ${fitResult.fit_score}` : "";
-          const line = `${absolute === cursor ? SELECT_MARKER : " "} ${job.company.padEnd(15)} ${job.title}${fitTail}`;
-          return absolute === cursor ? (
-            <Text key={job.url} color={theme.accent} inverse wrap="truncate-end">{line}</Text>
-          ) : (
-            <Text key={job.url} wrap="truncate-end">{line}</Text>
-          );
-        })}
+      <Box flexDirection="row" minHeight={pane.show ? visible : undefined}>
+        <Box flexDirection="column" flexGrow={1}>
+          {page.map((job, index) => {
+            const absolute = offset + index;
+            const fitResult = fits[job.url];
+            const fitTail = fitResult ? `  ${fitResult.fit_status} ${fitResult.fit_score}` : "";
+            const line = `${absolute === cursor ? SELECT_MARKER : " "} ${job.company.padEnd(15)} ${job.title}${fitTail}`;
+            return absolute === cursor ? (
+              <Text key={job.url} color={theme.accent} inverse wrap="truncate-end">{line}</Text>
+            ) : (
+              <Text key={job.url} wrap="truncate-end">{line}</Text>
+            );
+          })}
+        </Box>
+        {pane.show ? (
+          <DetailPane width={pane.width}>
+            {selected ? (
+              <>
+                <Text bold color={theme.accent} wrap="truncate-end">
+                  {selected.company} — {selected.title}
+                </Text>
+                <PaneRow label="source" value={selected.source} />
+                <PaneRow label="where" value={selected.location || "not listed"} />
+                <PaneRow label="url" value={selected.apply_url || selected.url} wrap="wrap" />
+                <PaneRule title="fit gate" />
+                {selectedFit ? (
+                  <>
+                    <PaneRow
+                      label="verdict"
+                      value={`${selectedFit.fit_status} · score ${selectedFit.fit_score}`}
+                      color={selectedFit.fit_status === "candidate" ? theme.good : selectedFit.fit_status === "needs_review" ? theme.warn : theme.danger}
+                    />
+                    <Text wrap="wrap">{selectedFit.reasoning}</Text>
+                  </>
+                ) : (
+                  <Text dimColor wrap="wrap">not run yet — press f to fit-check this posting</Text>
+                )}
+                <PaneRule title="actions" />
+                <Text dimColor wrap="wrap">enter/o open · f fit · s save to review</Text>
+              </>
+            ) : (
+              <>
+                <Text dimColor>No selection</Text>
+                <Text dimColor wrap="wrap">
+                  Press / to type a title query, enter to search the live boards, then ↑/↓ to browse.
+                </Text>
+              </>
+            )}
+          </DetailPane>
+        ) : null}
       </Box>
-      {selected ? (
+      {!pane.show && selected ? (
         <Box flexDirection="column">
           <Text dimColor wrap="truncate-end">{selected.source} · {selected.location || "location not listed"} · {selected.apply_url || selected.url}</Text>
           {selectedFit ? (
@@ -257,4 +300,4 @@ function SourceBadge({ result, loading }: { result?: SourceResult; loading: bool
 }
 
 export const SEARCH_HINTS = "/ query · ↑↓ move · enter/o open · f fit · s save";
-export const SEARCH_EDIT_HINTS = "type · ←→ move · backspace/delete · enter search · esc done";
+export const SEARCH_EDIT_HINTS = "type · ←→ move · backspace erase · enter search · esc done";

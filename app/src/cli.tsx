@@ -92,7 +92,20 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const root = findProjectRoot();
+  // npm-installed global `applyr` with no core checkout: point at the
+  // one-line core installer instead of a bare stack trace.
+  let root: string;
+  try {
+    root = findProjectRoot();
+  } catch {
+    console.error(
+      "applyr: no applyr core found. Install it with one command:\n\n" +
+        "  curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh | bash\n\n" +
+        "(installs to ~/applyr; set APPLYR_HOME to change, or APPLYR_ROOT to point\n" +
+        "at an existing checkout), then run `applyr` from that directory.",
+    );
+    return 1;
+  }
 
   switch (command) {
     case "":

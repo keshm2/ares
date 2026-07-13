@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import type { ApplyrState, Heartbeat } from "../state.js";
 import { theme, statusGlyph, statusColor } from "../theme.js";
+import { DetailPane, paneLayout } from "./Pane.js";
 
 interface Props {
   state: ApplyrState;
@@ -14,6 +15,9 @@ interface Props {
   /** Rows available — tall terminals get a recent-activity panel so the
    *  screen doesn't feel empty. */
   contentRows?: number;
+  /** Columns of the content band — recent activity moves to a
+   *  full-height right pane when it fits. */
+  columns?: number;
 }
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
@@ -35,27 +39,45 @@ export function StatusScreen({
   heartbeat,
   embedded,
   contentRows = 20,
+  columns = 0,
 }: Props) {
   const counts = { applied: 0, needs_review: 0, failed: 0 };
   for (const job of state.applied) {
     if (job.status in counts) counts[job.status as keyof typeof counts] += 1;
   }
   const healthy = heartbeat ? heartbeat.last_run_exit_code === 0 : null;
-  // Base sections take ~19 rows; anything beyond becomes recent activity.
-  const recentCount = Math.max(0, Math.min(8, contentRows - 21));
+  // Pane mode: recent activity fills a full-height right column instead
+  // of waiting for a tall terminal. Stacked mode keeps the old behavior
+  // (activity only when rows are spare).
+  const pane = paneLayout(columns);
+  const recentCount = pane.show
+    ? Math.max(3, Math.min(14, contentRows - 4))
+    : Math.max(0, Math.min(8, contentRows - 21));
   const recent = recentCount > 0 ? [...state.applied].reverse().slice(0, recentCount) : [];
-  return (
-    <Box flexDirection="column" paddingX={embedded ? 0 : 1}>
-      {embedded ? (
-        <Text bold color={theme.accent}>
-          Status
-        </Text>
-      ) : (
-        <Text bold color={theme.accent}>
-          applyr — status
-        </Text>
-      )}
 
+  const activity = (
+    <Box flexDirection="column">
+      <Text dimColor>Recent activity</Text>
+      <Box flexDirection="column" marginTop={1}>
+        {recent.length === 0 ? (
+          <Text dimColor>nothing recorded yet</Text>
+        ) : (
+          recent.map((job, i) => (
+            <Text key={`${job.job_id}-${i}`} wrap="truncate-end">
+              <Text color={statusColor[job.status] ?? "white"}>
+                {statusGlyph[job.status] ?? "•"}{" "}
+              </Text>
+              <Text dimColor>{job.date_applied}  </Text>
+              {job.company} — {job.title}
+            </Text>
+          ))
+        )}
+      </Box>
+    </Box>
+  );
+
+  const leftColumn = (
+    <Box flexDirection="column" flexGrow={1}>
       {/* Outcomes */}
       <Box marginTop={1} flexDirection="column">
         <Text dimColor>Outcomes</Text>
@@ -107,24 +129,29 @@ export function StatusScreen({
           <Text dimColor>run #{heartbeat.run_counter} at {heartbeat.last_run_completed_at}</Text>
         </Box>
       ) : null}
+    </Box>
+  );
 
-      {/* Recent activity — only when the terminal has room to spare. */}
-      {recent.length > 0 ? (
-        <Box marginTop={1} flexDirection="column">
-          <Text dimColor>Recent activity</Text>
-          <Box flexDirection="column" marginTop={1}>
-            {recent.map((job, i) => (
-              <Text key={`${job.job_id}-${i}`} wrap="truncate-end">
-                <Text color={statusColor[job.status] ?? "white"}>
-                  {statusGlyph[job.status] ?? "•"} {job.status.padEnd(13)}
-                </Text>
-                <Text dimColor>{job.date_applied}  </Text>
-                {job.company} — {job.title}
-              </Text>
-            ))}
-          </Box>
+  return (
+    <Box flexDirection="column" paddingX={embedded ? 0 : 1}>
+      <Text bold color={theme.accent}>
+        {embedded ? "Status" : "applyr — status"}
+      </Text>
+
+      {pane.show ? (
+        // Two-column dashboard: stats left, full-height recent activity
+        // right (the activity column gets the wider share — its rows are
+        // one-line outcome entries that benefit from width).
+        <Box flexDirection="row">
+          {leftColumn}
+          <DetailPane width={Math.max(pane.width, columns - 34)}>{activity}</DetailPane>
         </Box>
-      ) : null}
+      ) : (
+        <>
+          {leftColumn}
+          {recent.length > 0 ? <Box marginTop={1}>{activity}</Box> : null}
+        </>
+      )}
 
       {/* Last run footer */}
       <Box marginTop={1} flexDirection="column">

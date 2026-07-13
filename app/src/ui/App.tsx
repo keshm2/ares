@@ -10,7 +10,7 @@ import { HelpOverlay } from "./HelpOverlay.js";
 import { WelcomeScreen, type WelcomeOption } from "./WelcomeScreen.js";
 import { KeyHints } from "./KeyHints.js";
 import { SidePanel } from "./SidePanel.js";
-import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "../state.js";
+import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat, userFirstName } from "../state.js";
 import type { ApplyrState } from "../state.js";
 import { theme, MIN_COLUMNS, MIN_ROWS, SELECT_MARKER, SIDE_PANEL_WIDTH } from "../theme.js";
 
@@ -164,7 +164,12 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
       }
       setConfirmQuit(false);
       if (input === "?") return setHelpOpen(true);
-      if (input === "w") {
+      // esc backs out of any screen to the welcome menu (never quits, and
+      // never mid-run — navigation is locked while an agent run is live).
+      // Screens' own esc handling happens while typing, which deactivates
+      // this handler via childInputActive.
+      if (input === "w" || key.escape) {
+        if (key.escape && runInProgress) return;
         setWelcomeCursor(welcomeIndexFor(tab, mode));
         return setWelcome(true);
       }
@@ -219,7 +224,11 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
   // Side panel: shown when the terminal is wide and tall enough; below
   // the threshold it hides and the content takes the full width (clean
   // degradation on narrower/shorter terminals).
-  const showSidebar = columns >= 64 && rows >= 18;
+  // 72 (not 64): the welcome menu column needs ~44 cols, so the sidebar
+  // only appears once the content band keeps at least ~48 cols beside it —
+  // below that the two columns collided and wrapped, corrupting the frame
+  // on resize.
+  const showSidebar = columns >= 72 && rows >= 18;
   const sideOverhead = showSidebar ? SIDE_PANEL_WIDTH + 2 : 0; // panel + gutter
   // On very wide terminals, center a readable content column instead of
   // leaving the right half of the screen empty: the horizontal padding
@@ -231,7 +240,8 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
   // instead of leaving large empty margins.
   const pad = columns > 160 + sideOverhead ? Math.floor((columns - 140 - sideOverhead) / 2) : 1;
   const ruleWidth = Math.max(0, columns - pad * 2);
-  const contentCols = columns - pad * 2 - sideOverhead;
+  // Floor keeps downstream width math sane on the smallest supported sizes.
+  const contentCols = Math.max(24, columns - pad * 2 - sideOverhead);
 
   // Responsive layout math: the shell chrome (banner, mode row, tabs,
   // rule, margins, hint bar) is measured, and what's left is handed to
@@ -256,7 +266,7 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
     ? "" // the edit hints above are the whole story while typing
     : runInProgress
       ? "q quit"
-      : "1-4/←→ tabs · m mode · R reload · w welcome · ? help · q quit";
+      : "1-4/←→ tabs · esc/w menu · m mode · R reload · ? help · q quit";
   const allHints = [tabHints, globalHints].filter(Boolean).join(" · ");
 
   // The frame is pinned to exactly the viewport height with overflow
@@ -312,7 +322,10 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
         flexGrow={1}
         overflow="hidden"
       >
-        <Box flexDirection="column" flexGrow={1}>
+        {/* Explicit width (not just flexGrow): nested row layouts inside
+            screens have wide min-content and would otherwise push into
+            the sidebar; with a fixed band the inner Texts truncate. */}
+        <Box flexDirection="column" width={contentCols} flexShrink={0} overflow="hidden">
           {welcome ? (
             <WelcomeScreen
               contentRows={contentRows}
@@ -338,6 +351,7 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
                     heartbeat={heartbeat}
                     embedded
                     contentRows={contentRows}
+                    columns={contentCols}
                   />
                 ) : tab === "jobs" ? (
                   mode === "manual" ? (
@@ -347,6 +361,7 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
                       onInputActiveChange={setChildInputActive}
                       onStateChange={refresh}
                       contentRows={contentRows}
+                      columns={contentCols}
                     />
                   ) : (
                     <RunScreen
@@ -354,6 +369,7 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
                       active={!helpOpen}
                       onInputActiveChange={setChildInputActive}
                       onRunningChange={setRunInProgress}
+                      contentRows={contentRows}
                     />
                   )
                 ) : tab === "review" ? (
@@ -363,12 +379,14 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
                     refreshNonce={refreshNonce}
                     onStateChange={refresh}
                     contentRows={contentRows}
+                    columns={contentCols}
                   />
                 ) : (
                   <HistoryScreen
                     state={state}
                     active={tab === "history" && !helpOpen}
                     contentRows={contentRows}
+                    columns={contentCols}
                   />
                 )}
               </Box>
@@ -380,13 +398,23 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
             flexDirection="column"
             marginLeft={1}
             width={SIDE_PANEL_WIDTH + 1}
+            flexShrink={0}
             borderStyle="single"
             borderRight={false}
             borderTop={false}
             borderBottom={false}
             borderColor={theme.rule}
           >
-            <SidePanel applied={counts.applied} pending={unresolved} mode={mode} />
+            <SidePanel
+              firstName={userFirstName(root)}
+              applied={counts.applied}
+              pending={unresolved}
+              failed={counts.failed}
+              seen={state.registry.length}
+              heartbeat={heartbeat}
+              screen={welcome ? "Menu" : TAB_LABEL[tab]}
+              mode={mode}
+            />
           </Box>
         ) : null}
       </Box>

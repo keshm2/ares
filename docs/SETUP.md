@@ -4,31 +4,46 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
-> **Build:** this document ships with release `0.5.5a`. The
+> **Build:** this document ships with release `0.7.8a`. The
 > full release notes are in [`RELEASE.md`](./RELEASE.md); the
 > project changelog is in [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## 0. Universal install (recommended)
 
 One command from a fresh GitHub download handles sections 1 and 3,
-detects your coding agent, and builds the optional TUI:
+detects your coding agent, asks for your profile, and builds the
+optional TUI:
 
 ```bash
-# From the unpacked release archive (no git clone required):
+# Easiest — downloads into ~/applyr and runs the installer:
+curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh | bash
+
+# Or from an unpacked release archive (no git clone required):
 bash scripts/install.sh
+
+# Or via npm (installs the `applyr` TUI command; it points you at the
+# core installer above on first run if no core is found):
+npm install -g @keshm2/applyr@alpha
 ```
+
+The installer also prompts for your profile (the `safe_fields` used to
+fill application forms) and creates a `resumes/` folder at the project
+root — **drop all your resumes there as PDFs**; applyr scans them and
+converts each to markdown so it can tailor the best match per job.
+Everything you enter is written only to gitignored local files
+(`config/`, `resumes/`) and never leaves your machine.
 
 **Downloading the release archive.** The project is named applyr; the
 GitHub repository for this release is still `keshm2/ares`:
 
 ```bash
 # zip
-curl -L -o applyr-0.5.5a.zip https://github.com/keshm2/ares/archive/refs/tags/0.5.5a.zip
-unzip applyr-0.5.5a.zip && cd ares-0.5.5a
+curl -L -o applyr-0.7.8a.zip https://github.com/keshm2/ares/archive/refs/tags/0.7.8a.zip
+unzip applyr-0.7.8a.zip && cd ares-0.7.8a
 
 # or tarball
-curl -L -o applyr-0.5.5a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.5.5a.tar.gz
-tar -xzf applyr-0.5.5a.tar.gz && cd ares-0.5.5a
+curl -L -o applyr-0.7.8a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.7.8a.tar.gz
+tar -xzf applyr-0.7.8a.tar.gz && cd ares-0.7.8a
 ```
 
 The release page also exposes the standard
