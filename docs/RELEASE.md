@@ -43,6 +43,13 @@ stay current automatically, leave cleanly.
   `docs/SETUP.md` §3.8).
 - **README rewrite** — cut to ~a quarter of its length; phase
   planning and per-build inventories now live only in the docs.
+- **Discord is optional** — the installer and `applyr setup` ask
+  whether you want Discord status updates; opting in offers one
+  channel for everything or separate channels per status (⚠ each
+  channel needs its own webhook link). Opting out keeps every
+  outcome local; the validator and reporter treat a disabled config
+  as a clean skip, and legacy configs (no `enabled` field) keep
+  working unchanged.
 
 It also carries everything from the untagged `0.7.8a` follow-ups:
 phase 9 (single-user structure review) and the TUI/setup work

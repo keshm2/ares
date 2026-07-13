@@ -41,7 +41,9 @@
   release 0.7.9a (2026-07-13 — dedicated uninstaller
   scripts/uninstall.sh + `applyr uninstall`; README trimmed to
   install/updates/uninstall/usage/safety, phase content moved to
-  docs; first auto-update rollout).
+  docs; first auto-update rollout; Discord made optional — install
+  opt-in with one-channel vs separate-channels choice, disabled
+  config = local-only outcomes, validator/reporter skip cleanly).
 - **Implement next:** phase 12 — multi-agent cost tiering
   (docs/PLAN.md §3.13), the second beta build item. Phase 13 remains
   partial (npm publish pending `npm login`; provider-setup and
@@ -137,6 +139,10 @@ today:
   needs_review, or failed webhook respectively). After every batch, call
   @discord-reporter to send the summary (summary webhook, or success
   webhook as fallback). Never invoke @discord-reporter for skipped_unfit.
+  Discord is OPTIONAL: when config/discord_config.json is missing or has
+  "enabled": false, the reporter logs one skip line and outcomes stay
+  local (state files + TUI). Never treat a disabled reporter as a failed
+  outcome.
 - ALWAYS canonicalize every raw job that survives the deterministic
   role/level prefilter into one internal record via the canonical helper
   (scripts/job_state.py) before any dedup or fit decision. A

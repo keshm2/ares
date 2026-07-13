@@ -1,4 +1,5 @@
 {
+  "enabled": true,
   "webhooks": {
     "success": "REPLACE_ME",
     "needs_review": "REPLACE_ME",

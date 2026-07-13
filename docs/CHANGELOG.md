@@ -49,6 +49,18 @@ pushing the `VERSION` bump to `main` rolls it out.
   `--yes` never deletes data. npm installs additionally run
   `npm uninstall -g @keshm2/applyr`.
 
+- **Discord is now optional (opt-in at install).** The installer and
+  `applyr setup` ask whether to use Discord for status updates; no
+  writes `{"enabled": false}` and outcomes stay local (state files +
+  TUI). Opting in offers one channel for all updates or separate
+  channels per status, with a highlighted ⚠ warning that Discord
+  binds each webhook to one channel — each channel needs its own
+  webhook link. Validator treats a missing/disabled config as a
+  warning, never an error (enabled configs still hard-fail on
+  placeholders); the discord-reporter logs one skip line when
+  disabled; an absent `enabled` field means enabled, so existing
+  configs keep working.
+
 ### Changed
 
 - **README cut to a quarter of its length.** Phase planning, roadmap

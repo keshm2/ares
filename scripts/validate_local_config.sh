@@ -30,10 +30,22 @@ fail() { echo "validate_local_config: ERROR: $*" >&2; exit 1; }
 # --- Existence + JSON validity ---------------------------------------------
 
 [ -f "$TARGETS" ] || fail "missing required config file: $TARGETS"
-[ -f "$DISCORD" ] || fail "missing required config file: $DISCORD"
-
 jq -e . "$TARGETS" >/dev/null 2>&1 || fail "invalid JSON in $TARGETS"
-jq -e . "$DISCORD" >/dev/null 2>&1 || fail "invalid JSON in $DISCORD"
+
+# Discord is OPTIONAL: a missing file or "enabled": false disables Discord
+# reporting entirely (outcomes stay local) — a warning, never an error. An
+# absent `enabled` field means enabled (legacy configs).
+DISCORD_ENABLED=1
+if [ ! -f "$DISCORD" ]; then
+  DISCORD_ENABLED=0
+  warn "$DISCORD missing — Discord reporting disabled; outcomes stay local (enable via 'applyr setup')"
+else
+  jq -e . "$DISCORD" >/dev/null 2>&1 || fail "invalid JSON in $DISCORD"
+  if [ "$(jq -r 'if has("enabled") then .enabled else true end' "$DISCORD")" = "false" ]; then
+    DISCORD_ENABLED=0
+    warn "Discord reporting disabled in $DISCORD — outcomes stay local (enable via 'applyr setup')"
+  fi
+fi
 
 # --- targets.json field validation -----------------------------------------
 
@@ -104,6 +116,8 @@ done
 # summary is optional and falls back to success at runtime.
 # The legacy top-level `webhook_url` field is no longer read.
 
+if [ "$DISCORD_ENABLED" -eq 1 ]; then
+
 check_object "$DISCORD" webhooks
 
 # Discord webhook URL shape: https://discord.com/api/webhooks/<numeric_id>/<token>
@@ -130,6 +144,8 @@ if [ -n "$SUMMARY_URL" ] && [ "$SUMMARY_URL" != "REPLACE_ME" ]; then
   printf '%s' "$SUMMARY_URL" | grep -Eq "$WEBHOOK_RE" \
     || warn "$DISCORD: webhooks.summary does not look like a Discord webhook URL — summary will fall back to the success webhook at runtime"
 fi
+
+fi # DISCORD_ENABLED
 
 # --- Phase 6: vetted slug auto-seeding (non-fatal) --------------------------
 # Seeds ashby_company_slugs / lever_company_slugs from the project-owned

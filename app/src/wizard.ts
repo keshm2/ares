@@ -64,23 +64,55 @@ export async function runWizard(root: string, checkOnly: boolean): Promise<numbe
       console.log(`Wrote ${targetsPath}\n`);
     }
 
-    // discord_config.json
+    // discord_config.json — OPTIONAL. Outcomes always land in the local
+    // state files and the TUI; Discord is an opt-in extra channel.
+    const warnLine = (line: string) =>
+      console.log(process.stdout.isTTY ? `\x1b[1;33m${line}\x1b[0m` : line);
+    let configureDiscord = true;
     if (fs.existsSync(discordPath)) {
-      console.log("config/discord_config.json exists — keeping it.\n");
-    } else {
-      const discord: Json = { webhooks: {} };
-      const webhooks = discord.webhooks as Json;
-      console.log(
-        "Discord webhooks (per-outcome routing). One webhook URL can be reused for every route.",
+      const redo = await ask("config/discord_config.json exists — reconfigure it? (y/N)", "n");
+      configureDiscord = redo.toLowerCase() === "y";
+      if (!configureDiscord) console.log("Keeping existing discord_config.json.\n");
+    }
+    if (configureDiscord) {
+      const optIn = await ask(
+        "Use Discord for status updates (applied / needs-review / failed / summary)? (y/N)",
+        "n",
       );
-      const success = await ask("webhooks.success (required)", "");
-      webhooks.success = success;
-      webhooks.needs_review = await ask("webhooks.needs_review", success);
-      webhooks.failed = await ask("webhooks.failed", success);
-      const summary = await ask("webhooks.summary (optional, falls back to success)", "");
-      if (summary) webhooks.summary = summary;
-      writeJson(discordPath, discord);
-      console.log(`Wrote ${discordPath}\n`);
+      if (optIn.toLowerCase() !== "y") {
+        writeJson(discordPath, { enabled: false, webhooks: {} });
+        console.log(
+          "Discord skipped — outcomes stay local (state files + TUI). Re-run `applyr setup` to enable it later.\n",
+        );
+      } else {
+        console.log("\nHow should the updates be routed?");
+        console.log("  1) One channel for ALL status updates (one webhook link)");
+        console.log("  2) Separate channels per status (success / needs-review / failed / summary)");
+        warnLine("⚠  Separate channels: Discord binds each webhook to ONE channel, so");
+        warnLine("   EACH channel needs its own webhook link (4 links for option 2).");
+        const mode = await ask("Choose", "1");
+        const webhooks: Json = {};
+        if (mode.trim() === "2") {
+          webhooks.success = await ask("success webhook URL", "");
+          webhooks.needs_review = await ask("needs-review webhook URL", "");
+          webhooks.failed = await ask("failed webhook URL", "");
+          const summary = await ask("summary webhook URL (optional, falls back to success)", "");
+          if (summary) webhooks.summary = summary;
+        } else {
+          const url = await ask("the one shared webhook URL", "");
+          webhooks.success = url;
+          webhooks.needs_review = url;
+          webhooks.failed = url;
+          webhooks.summary = url;
+        }
+        if (!webhooks.success) {
+          writeJson(discordPath, { enabled: false, webhooks: {} });
+          console.log("No webhook URL entered — wrote Discord as disabled; re-run `applyr setup` to enable.\n");
+        } else {
+          writeJson(discordPath, { enabled: true, webhooks });
+          console.log(`Wrote ${discordPath} (Discord enabled)\n`);
+        }
+      }
     }
     // Resumes drop-folder — the agent scans PDFs here and converts each to
     // markdown so it can tailor the best match per job.

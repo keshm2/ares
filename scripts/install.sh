@@ -28,11 +28,11 @@ say()  { echo "install: $*"; }
 warn() { echo "install: WARNING: $*" >&2; }
 fail() { echo "install: ERROR: $*" >&2; exit 1; }
 
-# Colors only on a TTY; the privacy notice must stand out.
+# Colors only on a TTY; the privacy notice and warnings must stand out.
 if [ -t 1 ]; then
-  C_NOTICE=$'\033[1;36m'; C_RESET=$'\033[0m'
+  C_NOTICE=$'\033[1;36m'; C_WARN=$'\033[1;33m'; C_RESET=$'\033[0m'
 else
-  C_NOTICE=""; C_RESET=""
+  C_NOTICE=""; C_WARN=""; C_RESET=""
 fi
 
 # --- 0. Bootstrap (curl | bash, or run outside the repo) ----------------------
@@ -69,16 +69,68 @@ command -v jq >/dev/null 2>&1 || fail "jq is required (brew install jq / apt ins
 command -v python3 >/dev/null 2>&1 || fail "python3 is required"
 
 # --- 2. Live configs from examples -------------------------------------------
-for pair in "targets" "discord_config"; do
-  live="config/${pair}.json"
-  example="config/${pair}.example.json"
-  if [ -f "$live" ]; then
-    say "$live exists — keeping it."
+if [ -f "config/targets.json" ]; then
+  say "config/targets.json exists — keeping it."
+else
+  cp "config/targets.example.json" "config/targets.json"
+  say "created config/targets.json from the example — fill in the placeholders (or run 'applyr setup')."
+fi
+
+# --- 2b. Discord status updates (OPTIONAL, opt-in) -----------------------------
+# Outcomes always land in the local state files and the TUI; Discord
+# webhooks are an optional extra channel. Opting out writes a disabled
+# config so the validator stays green; enable later via 'applyr setup'.
+DISCORD_LIVE="config/discord_config.json"
+write_disabled_discord() {
+  printf '{\n  "enabled": false,\n  "webhooks": {}\n}\n' > "$DISCORD_LIVE"
+}
+if [ -f "$DISCORD_LIVE" ]; then
+  say "$DISCORD_LIVE exists — keeping it."
+elif [ -t 0 ]; then
+  echo
+  printf "Use Discord for status updates (applied / needs-review / failed / summary)? [y/N] "
+  read -r DISCORD_OPT || DISCORD_OPT=""
+  if [ "$DISCORD_OPT" = "y" ] || [ "$DISCORD_OPT" = "Y" ]; then
+    echo
+    echo "How should the updates be routed?"
+    echo "  1) One channel for ALL status updates (one webhook link)"
+    echo "  2) Separate channels per status (success / needs-review / failed / summary)"
+    echo "${C_WARN}⚠  Separate channels: Discord binds each webhook to ONE channel, so${C_RESET}"
+    echo "${C_WARN}   EACH channel needs its own webhook link (4 links for option 2).${C_RESET}"
+    printf "Choose [1/2, default 1]: "
+    read -r DISCORD_MODE || DISCORD_MODE=""
+    ask_url() { # <label>
+      local url
+      printf "  %s webhook URL: " "$1" >&2
+      read -r url || url=""
+      printf '%s' "$url"
+    }
+    if [ "$DISCORD_MODE" = "2" ]; then
+      U_SUCCESS="$(ask_url "success")"
+      U_REVIEW="$(ask_url "needs-review")"
+      U_FAILED="$(ask_url "failed")"
+      U_SUMMARY="$(ask_url "summary (optional, enter to fall back to success)")"
+    else
+      U_ALL="$(ask_url "the one shared")"
+      U_SUCCESS="$U_ALL"; U_REVIEW="$U_ALL"; U_FAILED="$U_ALL"; U_SUMMARY="$U_ALL"
+    fi
+    if [ -z "$U_SUCCESS" ]; then
+      warn "no webhook URL entered — writing Discord as disabled; enable later with 'applyr setup'."
+      write_disabled_discord
+    else
+      jq -n --arg s "$U_SUCCESS" --arg r "$U_REVIEW" --arg f "$U_FAILED" --arg m "$U_SUMMARY" \
+        '{enabled: true, webhooks: ({success: $s, needs_review: $r, failed: $f} + (if $m == "" then {} else {summary: $m} end))}' \
+        > "$DISCORD_LIVE"
+      say "wrote $DISCORD_LIVE (Discord enabled)."
+    fi
   else
-    cp "$example" "$live"
-    say "created $live from $example — fill in the placeholders (or run 'applyr setup')."
+    write_disabled_discord
+    say "Discord skipped — outcomes stay local (state files + TUI). Enable any time with 'applyr setup'."
   fi
-done
+else
+  write_disabled_discord
+  say "non-interactive install — wrote $DISCORD_LIVE as disabled (enable via 'applyr setup')."
+fi
 
 # --- 3. Harness detection (Phase 15 + 16: all four major coding agents) -------
 # Detected agents are offered in full-capability-first order; Codex and

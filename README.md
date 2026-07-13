@@ -47,10 +47,12 @@ curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh
 ```
 
 That single command downloads applyr into `~/applyr` (override with
-`APPLYR_HOME`), asks for your coding agent and your profile (kept
+`APPLYR_HOME`), asks for your coding agent, your profile (kept
 **locally only** — gitignored files on your machine, never uploaded),
-creates the `resumes/` folder (**drop all your resumes there as
-PDFs**), builds the TUI, and puts the **`applyr` command on your
+and whether you want **optional Discord status updates** (one channel
+for everything, or separate channels — each needs its own webhook
+link), creates the `resumes/` folder (**drop all your resumes there
+as PDFs**), builds the TUI, and puts the **`applyr` command on your
 PATH**. When it finishes, type `applyr` and you're in.
 
 Prefer npm? Same result:

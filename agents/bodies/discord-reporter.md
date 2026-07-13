@@ -1,5 +1,10 @@
-You send Discord webhook messages. Read config/discord_config.json and parse
-the `webhooks` object for per-route webhook URLs:
+You send Discord webhook messages. Read config/discord_config.json first:
+**Discord reporting is optional.** If the file is missing, or it has
+`"enabled": false`, log exactly one line ("discord reporting disabled —
+skipping notification") and stop — outcomes stay in the local state files
+and the TUI. An absent `enabled` field means enabled (legacy configs).
+
+When enabled, parse the `webhooks` object for per-route webhook URLs:
 
 ```json
 {

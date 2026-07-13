@@ -131,22 +131,27 @@ In `config/targets.json`:
 - `preferred_locations`, `fallback_scope`, `graduation_date` — review and
   personalize.
 
-In `config/discord_config.json`:
+In `config/discord_config.json` — **Discord is optional.** The
+installer (and `applyr setup`) asks whether you want Discord status
+updates at all; answering no writes `{"enabled": false}` and every
+outcome simply stays local (state files + TUI). Opting in, you choose:
 
-- `webhooks.success` — required. A real Discord webhook URL for the
-  success channel (`https://discord.com/api/webhooks/<numeric_id>/<token>`).
-  This route is also the fallback for the optional summary route.
-- `webhooks.needs_review` — required. A real Discord webhook URL for the
-  needs-review channel.
-- `webhooks.failed` — required. A real Discord webhook URL for the failed
-  channel.
-- `webhooks.summary` — webhook URL for the batch-summary channel.
-  Optional: if absent, the summary is routed to `webhooks.success` at
-  runtime.
-- A Discord webhook is bound to exactly one channel, so routing each
-  outcome to its own channel requires a separate webhook URL per route.
-  To keep all outcomes in a single channel during initial setup, point
-  every route at the same webhook URL.
+- **One channel for all updates** — one webhook URL, written to every
+  route.
+- **Separate channels per status** — ⚠ Discord binds each webhook to
+  exactly ONE channel, so **each channel needs its own webhook link**
+  (up to 4).
+
+Fields, when enabled (`"enabled": true`, or the field absent — legacy
+configs are treated as enabled):
+
+- `webhooks.success` — required when enabled
+  (`https://discord.com/api/webhooks/<numeric_id>/<token>`); also the
+  fallback for the optional summary route.
+- `webhooks.needs_review` — required when enabled.
+- `webhooks.failed` — required when enabled.
+- `webhooks.summary` — optional; absent falls back to
+  `webhooks.success` at runtime.
 
 ## 3. Validate
 
