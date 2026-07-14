@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { py } from "./platform.js";
 import type { AppliedJob } from "./state.js";
 
 /**
@@ -16,11 +17,12 @@ function run(root: string, cmd: string, args: string[]): string {
 }
 
 export function appendAppliedJob(root: string, entry: AppliedJob): void {
-  run(root, "bash", [
-    "scripts/append_state_entry.sh",
+  const { cmd, args } = py([
+    "scripts/append_state_entry.py",
     "data/applied_jobs.json",
     JSON.stringify(entry),
   ]);
+  run(root, cmd, args);
 }
 
 export function recordEvent(
@@ -34,7 +36,8 @@ export function recordEvent(
     url?: string;
   },
 ): void {
-  run(root, "python3", ["scripts/job_state.py", "record-event", JSON.stringify(event)]);
+  const { cmd, args } = py(["scripts/job_state.py", "record-event", JSON.stringify(event)]);
+  run(root, cmd, args);
 }
 
 export interface TrackerSyncResult {
@@ -61,7 +64,8 @@ export function syncInternshipTracker(
     notes?: string;
   },
 ): TrackerSyncResult {
-  const res = spawnSync("python3", ["scripts/sync_internship_tracker.py", JSON.stringify(row)], {
+  const sync = py(["scripts/sync_internship_tracker.py", JSON.stringify(row)]);
+  const res = spawnSync(sync.cmd, sync.args, {
     cwd: root,
     encoding: "utf8",
   });
@@ -89,7 +93,8 @@ export interface ValidatorResult {
 }
 
 export function runValidator(root: string): ValidatorResult {
-  const res = spawnSync("bash", ["scripts/validate_local_config.sh"], {
+  const val = py(["scripts/validate_local_config.py"]);
+  const res = spawnSync(val.cmd, val.args, {
     cwd: root,
     encoding: "utf8",
   });
@@ -104,8 +109,13 @@ export function openUrl(url: string): void {
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
     throw new Error(`refusing to open unsupported URL protocol: ${parsed.protocol}`);
   }
-  const opener =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+  if (process.platform === "win32") {
+    // `start` is a cmd.exe builtin, not an executable; the empty "" is the
+    // window title so a quoted URL isn't mistaken for one.
+    execFileSync("cmd", ["/c", "start", "", parsed.toString()], { stdio: "ignore" });
+    return;
+  }
+  const opener = process.platform === "darwin" ? "open" : "xdg-open";
   execFileSync(opener, [parsed.toString()], { stdio: "ignore" });
 }
 

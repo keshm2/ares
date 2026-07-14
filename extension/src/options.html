@@ -44,9 +44,11 @@
     <h1>applyr — bridge connection</h1>
     <p class="note">
       The extension talks only to the local applyr bridge
-      (<code>python3 scripts/extension_bridge.py</code>). The token lives in
-      <code>config/extension_bridge.json</code> in your applyr checkout —
-      print it with <code>python3 scripts/extension_bridge.py --show-token</code>.
+      (<code>py -3 scripts/extension_bridge.py</code> on Windows,
+      <code>python3 scripts/extension_bridge.py</code> on macOS/Linux).
+      The token lives in <code>config/extension_bridge.json</code> in your
+      applyr checkout — print it with the same command plus
+      <code>--show-token</code>.
     </p>
     <label for="bridgeUrl">Bridge URL</label>
     <input id="bridgeUrl" type="url" placeholder="http://127.0.0.1:8377" />

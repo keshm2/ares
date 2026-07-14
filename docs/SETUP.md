@@ -4,7 +4,7 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
-> **Build:** this document ships with release `0.8.0a`. The
+> **Build:** this document ships with release `0.8.2a`. The
 > full release notes are in [`RELEASE.md`](./RELEASE.md); the
 > project changelog is in [`CHANGELOG.md`](./CHANGELOG.md).
 
@@ -12,7 +12,7 @@ examples before running the agent.
 
 One command from a fresh GitHub download handles sections 1 and 3,
 detects your coding agent, asks for your profile, and builds the
-optional TUI:
+optional TUI + browser extension:
 
 ```bash
 # Easiest — one command: downloads into ~/applyr, runs the installer,
@@ -25,6 +25,15 @@ bash scripts/install.sh
 # Or via npm (installs the `applyr` TUI command; on first run with no
 # core it offers to download the core for you):
 npm install -g @keshm/applyr
+```
+
+```powershell
+# Windows PowerShell (native, no WSL): downloads into %USERPROFILE%\applyr,
+# runs the installer, and puts the `applyr` command on your PATH.
+irm https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.ps1 | iex
+
+# Or from an unpacked release archive:
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
 **Automatic updates.** Every scheduled run and every `applyr` launch
@@ -47,12 +56,12 @@ GitHub repository for this release is still `keshm2/ares`:
 
 ```bash
 # zip
-curl -L -o applyr-0.8.0a.zip https://github.com/keshm2/ares/archive/refs/tags/0.8.0a.zip
-unzip applyr-0.8.0a.zip && cd ares-0.8.0a
+curl -L -o applyr-0.8.2a.zip https://github.com/keshm2/ares/archive/refs/tags/0.8.2a.zip
+unzip applyr-0.8.2a.zip && cd ares-0.8.2a
 
 # or tarball
-curl -L -o applyr-0.8.0a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.8.0a.tar.gz
-tar -xzf applyr-0.8.0a.tar.gz && cd ares-0.8.0a
+curl -L -o applyr-0.8.2a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.8.2a.tar.gz
+tar -xzf applyr-0.8.2a.tar.gz && cd ares-0.8.2a
 ```
 
 The release page also exposes the standard
@@ -326,10 +335,15 @@ and automatic applications dedupe against each other.
 python3 scripts/extension_bridge.py
 ```
 
+```powershell
+py -3 scripts\extension_bridge.py
+```
+
 The first start generates `config/extension_bridge.json` (gitignored,
 `chmod 600`) with the per-install token and default port `8377`.
 Print the token any time with
-`python3 scripts/extension_bridge.py --show-token`. Leave the bridge
+`python3 scripts/extension_bridge.py --show-token` (Windows:
+`py -3 scripts\extension_bridge.py --show-token`). Leave the bridge
 running while you use the extension.
 
 **2. Build and load the extension:**

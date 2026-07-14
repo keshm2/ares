@@ -11,6 +11,7 @@ import { HelpOverlay } from "./HelpOverlay.js";
 import { WelcomeScreen, type WelcomeOption } from "./WelcomeScreen.js";
 import { KeyHints } from "./KeyHints.js";
 import { SidePanel } from "./SidePanel.js";
+import { UpdateBox } from "./UpdateBox.js";
 import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "../state.js";
 import { displayName } from "../settings.js";
 import type { ApplyrState } from "../state.js";
@@ -92,7 +93,17 @@ function stdoutSize(): { columns: number; rows: number } {
 /** The persistent shell: banner, tab row, content region, key-hint bar.
  *  Every band is derived from the live terminal size and re-derived on
  *  resize — nothing is laid out from fixed dimensions. */
-export function App({ root, initialTab = "status" }: { root: string; initialTab?: Tab }) {
+export function App({
+  root,
+  initialTab = "status",
+  updateVersion,
+  onUpdateInstall,
+}: {
+  root: string;
+  initialTab?: Tab;
+  updateVersion?: string;
+  onUpdateInstall?: () => void;
+}) {
   const { exit } = useApp();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [mode, setMode] = useState<Mode>("manual");
@@ -102,6 +113,11 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
   const [runInProgress, setRunInProgress] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmQuit, setConfirmQuit] = useState(false);
+  // Update prompt: shown once per session when cli.tsx detected a newer
+  // upstream VERSION. Dismissed on "no"; "yes" hands off to cli.tsx
+  // (which runs scripts/update.py after the TUI exits the alt screen).
+  const [updateDismissed, setUpdateDismissed] = useState(false);
+  const showUpdateBox = Boolean(updateVersion) && !updateDismissed;
   // The welcome walkthrough opens every plain `applyr` launch; jumping
   // straight to a screen (`applyr review`) skips it.
   const [welcome, setWelcome] = useState(initialTab === "status");
@@ -258,7 +274,8 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
   // the active screen so lists grow on tall terminals and shrink on
   // short ones instead of assuming a fixed page size.
   const bannerRows = bannerHeight(columns, rows);
-  const chromeRows = bannerRows + 7; // mode 1 + tabs 2 + rule 1 + content margin 1 + hints 2
+  const updateRows = showUpdateBox ? 7 : 0; // update box margin 1 + box height 6
+  const chromeRows = bannerRows + 7 + updateRows; // mode 1 + tabs 2 + rule 1 + content margin 1 + hints 2
   const contentRows = Math.max(6, rows - chromeRows);
 
   // The hint bar always reflects what the keyboard will actually do right
@@ -438,6 +455,25 @@ export function App({ root, initialTab = "status" }: { root: string; initialTab?
           </Box>
         ) : null}
       </Box>
+      {/* Update prompt — bottom-right band above the hint bar. Shown
+          once per session when a newer upstream VERSION was detected at
+          launch. Keyboard-first (y/n); see UpdateBox for the mouse note. */}
+      {showUpdateBox ? (
+        <Box paddingX={pad} marginTop={1} justifyContent="flex-end">
+          <UpdateBox
+            version={updateVersion!}
+            active={!childInputActive}
+            columns={columns}
+            rows={rows}
+            pad={pad}
+            onYes={() => {
+              onUpdateInstall?.();
+              exit();
+            }}
+            onNo={() => setUpdateDismissed(true)}
+          />
+        </Box>
+      ) : null}
       {/* Hint bar — pinned to the bottom as a status bar. */}
       <Box paddingX={pad} marginTop={1}>
         {confirmQuit ? (

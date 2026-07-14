@@ -42,7 +42,7 @@ async function callBridge(
   } catch {
     return {
       ok: false,
-      error: "bridge unreachable — start it with: python3 scripts/extension_bridge.py",
+      error: "bridge unreachable — start scripts/extension_bridge.py (Windows: py -3 ..., macOS/Linux: python3 ...)",
     };
   }
   try {

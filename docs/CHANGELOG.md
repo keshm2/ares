@@ -9,6 +9,37 @@ but trimmed to fit a small in-repo doc.
 
 ## [0.8.0a] — 2026-07-13
 
+## [0.8.2a] — 2026-07-14
+
+npm package: `@keshm/applyr` version `0.8.2-alpha.0`.
+
+### Added
+
+- **Native Windows path completed.** `install.ps1`, `run_job_agent.py`,
+  `scheduler.py`, `uninstall.py`, `update.py`, `append_state_entry.py`,
+  and `validate_local_config.py` now cover install/update/runtime without
+  WSL or bash on Windows.
+- **Update prompt in the TUI.** On a plain `applyr` launch, when a newer
+  version is detected, the UI now shows a bottom-right install prompt with
+  a purple-to-white wave outline and yes/no actions.
+
+### Fixed
+
+- **Browser extension Windows compatibility.** The localhost bridge no
+  longer shells out to literal `python3` or `bash append_state_entry.sh`;
+  it now uses `sys.executable` and `append_state_entry.py`, so the bridge
+  works from native PowerShell/cmd installs.
+- **Banner rerender glitch.** The logo/banner no longer rewrites stray
+  ASCII blocks during navigation; `Banner` is memoized and only rerenders
+  on actual size changes.
+
+### Changed
+
+- **README shortened again.** Kept practical install/usage/safety info,
+  pushed the rest into the docs.
+
+## [0.8.0a] — 2026-07-13
+
 npm package: `@keshm/applyr` version `0.8.0-alpha.0` (default `latest`
 dist-tag — `npm install -g @keshm/applyr` gets it).
 

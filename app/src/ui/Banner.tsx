@@ -25,7 +25,7 @@ export function bannerHeight(columns: number, rows: number): number {
  * wordmark when the terminal is too narrow or too short for the art
  * (never corrupts layout).
  */
-export function Banner({ columns, rows }: { columns: number; rows: number }) {
+export const Banner = React.memo(function Banner({ columns, rows }: { columns: number; rows: number }) {
   if (bannerVariant(columns, rows) === "wordmark") {
     return (
       <Box paddingX={1} justifyContent="center">
@@ -49,4 +49,4 @@ export function Banner({ columns, rows }: { columns: number; rows: number }) {
       ))}
     </Box>
   );
-}
+});

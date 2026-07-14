@@ -148,7 +148,7 @@ def deterministic_leg() -> None:
     canonical: dict[str, dict] = {}
     for job in GOLDEN_JOBS:
         name, expect = job["name"], job["expect"]
-        p = run(["python3", helper("job_state.py"), "canonicalize", json.dumps(job["raw"])])
+        p = run([sys.executable, helper("job_state.py"), "canonicalize", json.dumps(job["raw"])])
         if p.returncode != 0:
             report(f"canonicalize:{name}", "FAIL", p.stderr.strip()[-120:])
             continue
@@ -159,7 +159,7 @@ def deterministic_leg() -> None:
         report(f"canonicalize:{name}", "PASS" if got == want else "FAIL",
                "" if got == want else f"got {got}")
 
-        p = run(["python3", helper("evaluate_job_fit.py"), json.dumps(rec), "--targets", targets])
+        p = run([sys.executable, helper("evaluate_job_fit.py"), json.dumps(rec), "--targets", targets])
         try:
             fit = json.loads(p.stdout)
         except json.JSONDecodeError:
@@ -171,7 +171,7 @@ def deterministic_leg() -> None:
                "" if got == want else f"got {got}")
 
     # State writes — temp registry/events/applied only.
-    state = ["python3", helper("job_state.py")]
+    state = [sys.executable, helper("job_state.py")]
     p1 = run(state + ["ensure-files", "--registry", registry, "--events", events])
     p2 = run(state + ["ensure-files", "--registry", registry, "--events", events])
     report("state:ensure-files-idempotent",
@@ -209,8 +209,8 @@ def deterministic_leg() -> None:
                f"latest_status={latest}")
 
     entry = json.dumps({"job_id": "conformance-1", "company": "GoldenCo", "title": "SWE Intern"})
-    p1 = run(["bash", helper("append_state_entry.sh"), applied, entry])
-    p2 = run(["bash", helper("append_state_entry.sh"), applied, entry])
+    p1 = run([sys.executable, helper("append_state_entry.py"), applied, entry])
+    p2 = run([sys.executable, helper("append_state_entry.py"), applied, entry])
     report("state:append-dedup",
            "PASS" if p1.returncode == 0 and p2.returncode == 2 else "FAIL",
            f"rc1={p1.returncode} rc2={p2.returncode}")

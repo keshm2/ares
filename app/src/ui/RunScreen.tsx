@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import { latestSessionLog, readHeartbeat } from "../state.js";
+import { py } from "../platform.js";
 import { theme, statusGlyph, capTier } from "../theme.js";
 import { RainbowText } from "./KeyHints.js";
 import {
@@ -22,7 +23,7 @@ const PROMPT_MAX = 500;
 type Phase = "idle" | "running" | "done";
 
 /**
- * Trigger a run without leaving the app: spawns run_job_agent.sh and
+ * Trigger a run without leaving the app: spawns run_job_agent.py and
  * tails the session log into the content region. The script owns
  * locking, validation, and the harness invocation.
  *
@@ -111,7 +112,8 @@ export function RunScreen({
     setElapsed(0);
     setPhase("running");
     const extraPrompt = promptInput.trim();
-    const proc = spawn("bash", ["scripts/run_job_agent.sh"], {
+    const runner = py(["scripts/run_job_agent.py"]);
+    const proc = spawn(runner.cmd, runner.args, {
       cwd: root,
       // APPLYR_SESSION_CAP is the documented name; the legacy ARES_* name
       // is still set so an un-migrated runner copy honors the cap too.
@@ -361,7 +363,7 @@ export function RunScreen({
                 {sessionCap === null ? (
                   <>Press <Text bold color={theme.accent}>e</Text>, type a count, then enter. Optional: <Text bold color={theme.accent}>p</Text> for an extra prompt.</>
                 ) : (
-                  <>Press <Text bold color={theme.accent}>s</Text> to start via{" "}<Text dimColor>scripts/run_job_agent.sh</Text></>
+                  <>Press <Text bold color={theme.accent}>s</Text> to start via{" "}<Text dimColor>scripts/run_job_agent.py</Text></>
                 )}
               </Text>
               <Text dimColor>scrapes configured boards · fit-gates · tailors · applies ({sessionCap ?? "–"}/25 cap)</Text>

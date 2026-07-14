@@ -1,23 +1,37 @@
-# Release notes — applyr 0.8.0a
+# Release notes — applyr 0.8.2a
 
-> **Build:** `0.8.0a` — alpha.
+> **Build:** `0.8.2a` — alpha.
 > **Branch:** `main`.
-> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.0a"`
+> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.2a"`
 > (visible in the TUI side-panel footer).
-> **npm package:** `@keshm/applyr` version `0.8.0-alpha.0`, published
+> **npm package:** `@keshm/applyr` version `0.8.2-alpha.0`, published
 > to the default `latest` dist-tag — `npm install -g @keshm/applyr`
 > gets it. The unscoped npm name `applyr` belongs to an unrelated
 > package — never `npm install applyr`. npm requires strict semver, so
-> `0.8.0a` is the human-facing marker and `0.8.0-alpha.0` its semver
+> `0.8.2a` is the human-facing marker and `0.8.2-alpha.0` its semver
 > form.
 > **Rollout:** the first auto-updated release — clients that installed
 > the updater lineage self-update on their next scheduled run or
 > `applyr` launch; older installs update manually once
 > (`bash scripts/update.sh`).
-> **Browser extension:** unchanged — stays at `0.5.5` / `0.5.5a`.
+> **Browser extension:** `0.8.2` / `0.8.2a`.
 > **Previous releases:** `0.7.8a` and `0.5.5a` — deep-dive notes live
 > at this path under their git tags; the index is
 > [`CHANGELOG.md`](./CHANGELOG.md).
+
+## What's new in 0.8.2a
+
+- **Native Windows path completed.** The installer, updater, scheduler,
+  runner, validator, uninstaller, and state append helper now have
+  native PowerShell/Python paths instead of falling back to WSL/bash.
+- **Browser extension works on native Windows installs.** The bridge now
+  calls helpers through `sys.executable` and `append_state_entry.py`, and
+  the extension UI/docs tell Windows users to start it with `py -3`.
+- **TUI update prompt.** On app launch, when a newer version exists, the
+  TUI shows a bottom-right install prompt with a purple-to-white wave
+  outline and yes/no actions.
+- **Banner glitch fixed.** The logo no longer sheds or gains ASCII blocks
+  during navigation rerenders.
 
 ## What's new in 0.8.0a
 

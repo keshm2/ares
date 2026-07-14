@@ -296,18 +296,27 @@ else
   warn "  bash scripts/validate_local_config.sh"
 fi
 
-# --- 8. TUI (optional) ---------------------------------------------------------
-if command -v npm >/dev/null 2>&1; then
-  if [ ! -d "app/node_modules" ]; then
-    say "building the TUI (app/) …"
-    (cd app && npm install --silent && npm run build --silent) \
-      && say "TUI ready." \
-      || warn "TUI build failed — the agent works without it; see docs/SETUP.md 3.2."
-  else
-    say "TUI already installed."
+# --- 8. TUI / extension (optional) ---------------------------------------------
+build_node_surface() {
+  local dir="$1" label="$2"
+  if [ ! -f "$dir/package.json" ]; then
+    return 0
   fi
+  if [ -d "$dir/node_modules" ] && [ -d "$dir/dist" ]; then
+    say "$label already installed."
+    return 0
+  fi
+  say "building $label ($dir/) …"
+  (cd "$dir" && npm install --silent && npm run build --silent) \
+    && say "$label ready." \
+    || warn "$label build failed — see docs/SETUP.md."
+}
+
+if command -v npm >/dev/null 2>&1; then
+  build_node_surface app "the TUI"
+  build_node_surface extension "the browser extension"
 else
-  say "node/npm not found — skipping the optional TUI (docs/SETUP.md 3.2)."
+  say "node/npm not found — skipping the optional TUI and browser extension (docs/SETUP.md)."
 fi
 
 # --- 9. `applyr` command on PATH ------------------------------------------------
