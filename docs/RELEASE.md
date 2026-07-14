@@ -1,22 +1,47 @@
-# Release notes — applyr 0.8.4a
+# Release notes — applyr 0.8.041a
 
-> **Build:** `0.8.4a` — alpha.
+> **Build:** `0.8.041a` — alpha.
 > **Branch:** `main`.
-> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.4a"`
-> (visible in the TUI side-panel footer).
-> **npm package:** `@keshm/applyr` version `0.8.4-alpha.0`, published
+> **TUI in-app marker:** `app/src/theme.ts` →
+> `BUILD_MARKER = "0.8.041a"` (visible in the TUI side-panel footer).
+> **npm package:** `@keshm/applyr` version `0.8.41-alpha.0`, published
 > to the default `latest` dist-tag — `npm install -g @keshm/applyr`
 > gets it. The unscoped npm name `applyr` belongs to an unrelated
-> package — never `npm install applyr`. npm requires strict semver, so
-> `0.8.4a` is the human-facing marker and `0.8.4-alpha.0` its semver
-> form.
+> package — never `npm install applyr`. npm requires strict semver,
+> which disallows leading zeros in a numeric identifier, so the human
+> marker `0.8.041a` maps to semver `0.8.41-alpha.0` (npm would
+> silently strip the zero on publish either way — set explicitly here
+> to avoid the package.json and the published version disagreeing).
 > **Rollout:** clients that installed the updater lineage self-update
 > on their next scheduled run or `applyr` launch; older installs
 > update manually once (`bash scripts/install/update.sh`).
 > **Browser extension:** unchanged in this build — `0.8.2` / `0.8.2a`.
-> **Previous releases:** `0.8.3a`, `0.8.2a`, `0.7.8a`, and `0.5.5a` —
-> deep-dive notes live at this path under their git tags; the index is
-> [`CHANGELOG.md`](./CHANGELOG.md).
+> **Previous releases:** `0.8.4a`, `0.8.3a`, `0.8.2a`, `0.7.8a`, and
+> `0.5.5a` — deep-dive notes live at this path under their git tags;
+> the index is [`CHANGELOG.md`](./CHANGELOG.md).
+
+## What's new in 0.8.041a
+
+Hotfix — the `0.8.4a` restructure renamed this repo's own local clone
+from `~/ares` to `~/applyr` as part of the GitHub rename, which
+immediately broke the installed `applyr` command: the PATH wrapper
+that `install.sh`/`install.ps1` generate bakes in the absolute install
+path as plain text at install time, and had no way to notice the
+directory had moved.
+
+- **Fixed: the `applyr` PATH wrapper broke when the install directory
+  was renamed or moved.** Both the Unix wrapper
+  (`~/.local/bin/applyr`) and the Windows wrappers
+  (`applyr.cmd`/`applyr.ps1`) now fall back through a short list of
+  candidates — `$APPLYR_ROOT`, the originally recorded path,
+  `$APPLYR_HOME`, `~/applyr`, and `~/ares` (covering this exact rename
+  in either direction) — before failing with a clear, actionable
+  message instead of a raw Node `MODULE_NOT_FOUND` stack trace.
+  Verified with real tests: normal launch, both rename-fallback
+  directions, and the total-failure error path all behave correctly.
+  Anyone who already hit this needs to re-run the installer once to
+  regenerate their wrapper with the new logic; every install from this
+  point forward gets it automatically.
 
 ## What's new in 0.8.4a
 

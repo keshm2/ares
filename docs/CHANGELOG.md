@@ -7,6 +7,33 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.8.041a] — 2026-07-14
+
+npm package: `@keshm/applyr` version `0.8.41-alpha.0` (the human
+marker `0.8.041a` maps to `0.8.41-alpha.0` in strict semver — a
+leading zero in a numeric identifier, e.g. `041`, isn't valid semver
+and npm strips it silently on publish, so it's set explicitly here
+instead).
+
+### Fixed
+
+- **Installer PATH wrapper broke when the install directory was
+  renamed or moved.** `scripts/install/install.sh` and `install.ps1`
+  generate a tiny launcher (`~/.local/bin/applyr` on Unix,
+  `applyr.cmd`/`applyr.ps1` on Windows) that baked in the absolute
+  install path as plain text at install time — moving or renaming
+  that directory afterward (as just happened during the `0.8.4a`
+  restructure: `~/ares` → `~/applyr`) left the wrapper pointing at a
+  path that no longer existed, surfacing as a raw Node
+  `MODULE_NOT_FOUND` stack trace with no actionable guidance. Both
+  wrappers now fall back through a short list of candidates —
+  `$APPLYR_ROOT`, the originally recorded path, `$APPLYR_HOME`,
+  `~/applyr`, and `~/ares` (covering exactly this kind of rename in
+  either direction) — before failing with a clear message pointing at
+  `APPLYR_ROOT` or re-running the installer, instead of a cryptic
+  crash. Verified with real (not just static) tests: normal launch,
+  both rename-fallback directions, and the total-failure error path.
+
 ## [0.8.4a] — 2026-07-14
 
 npm package: `@keshm/applyr` version `0.8.4-alpha.0`.
