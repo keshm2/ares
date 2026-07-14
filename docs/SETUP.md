@@ -4,7 +4,7 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
-> **Build:** this document ships with release `0.7.9a`. The
+> **Build:** this document ships with release `0.8.0a`. The
 > full release notes are in [`RELEASE.md`](./RELEASE.md); the
 > project changelog is in [`CHANGELOG.md`](./CHANGELOG.md).
 
@@ -47,12 +47,12 @@ GitHub repository for this release is still `keshm2/ares`:
 
 ```bash
 # zip
-curl -L -o applyr-0.7.9a.zip https://github.com/keshm2/ares/archive/refs/tags/0.7.9a.zip
-unzip applyr-0.7.9a.zip && cd ares-0.7.9a
+curl -L -o applyr-0.8.0a.zip https://github.com/keshm2/ares/archive/refs/tags/0.8.0a.zip
+unzip applyr-0.8.0a.zip && cd ares-0.8.0a
 
 # or tarball
-curl -L -o applyr-0.7.9a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.7.9a.tar.gz
-tar -xzf applyr-0.7.9a.tar.gz && cd ares-0.7.9a
+curl -L -o applyr-0.8.0a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.8.0a.tar.gz
+tar -xzf applyr-0.8.0a.tar.gz && cd ares-0.8.0a
 ```
 
 The release page also exposes the standard

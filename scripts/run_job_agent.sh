@@ -243,7 +243,14 @@ elif [ "$HARNESS" = "claude" ]; then
   # Claude Code headless: CLAUDE.md (canonical rules pointer) and the
   # .claude/agents/ subagents load automatically; the orchestrator body is
   # the shared source read explicitly since -p mode has no --agent flag.
+  # A scheduled/background run is non-interactive, so Claude Code cannot
+  # prompt for tool approval — without this it declines every Bash call
+  # (read-only checks AND the mandated state helpers) and the run does no
+  # real work. bypassPermissions is the analog of Copilot's
+  # --allow-all-tools below; this is an autonomous agent the user opted
+  # into. Override with APPLYR_CLAUDE_PERMISSION_MODE if you want tighter.
   claude -p \
+    --permission-mode "${APPLYR_CLAUDE_PERMISSION_MODE:-bypassPermissions}" \
     "You are the job-scraper orchestrator. Read agents/bodies/job-scraper.md and execute it exactly as your instructions. $RUN_PROMPT" \
     >> "$SESSION_LOG" 2>&1 || RUN_RC=$?
 else

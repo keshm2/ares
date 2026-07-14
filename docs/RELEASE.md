@@ -1,13 +1,14 @@
-# Release notes — applyr 0.7.9a
+# Release notes — applyr 0.8.0a
 
-> **Build:** `0.7.9a` — alpha.
+> **Build:** `0.8.0a` — alpha.
 > **Branch:** `main`.
-> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.7.9a"`
+> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.0a"`
 > (visible in the TUI side-panel footer).
-> **npm package:** `@keshm/applyr` version `0.7.9-alpha.0`, dist-tag
-> `alpha`. The unscoped npm name `applyr` belongs to an unrelated
+> **npm package:** `@keshm/applyr` version `0.8.0-alpha.0`, published
+> to the default `latest` dist-tag — `npm install -g @keshm/applyr`
+> gets it. The unscoped npm name `applyr` belongs to an unrelated
 > package — never `npm install applyr`. npm requires strict semver, so
-> `0.7.9a` is the human-facing marker and `0.7.9-alpha.0` its semver
+> `0.8.0a` is the human-facing marker and `0.8.0-alpha.0` its semver
 > form.
 > **Rollout:** the first auto-updated release — clients that installed
 > the updater lineage self-update on their next scheduled run or
@@ -18,10 +19,23 @@
 > at this path under their git tags; the index is
 > [`CHANGELOG.md`](./CHANGELOG.md).
 
+## What's new in 0.8.0a
+
+- **Fixed: the Claude Code harness ran but applied to nothing.** A
+  scheduled/background `claude -p` run is non-interactive, so Claude
+  Code could not prompt for tool approval and declined every Bash
+  call — read-only checks and the mandated state helpers alike — so
+  the run reported "complete" having done no work. The runner now
+  invokes claude with `--permission-mode bypassPermissions` (the
+  analog of the Copilot branch's `--allow-all-tools`; override via
+  `APPLYR_CLAUDE_PERMISSION_MODE`).
+- **Node ≥ 22 is now required** (`engines`), matching the TUI's
+  modern JS output.
+
 ## What this build is
 
-`0.7.9a` is the **distribution** release: install with one command,
-stay current automatically, leave cleanly.
+`0.8.0a` carries the **distribution** story forward: install with one
+command, stay current automatically, leave cleanly.
 
 - **One-command install** — the cURL one-liner ends with a working
   `applyr` on your PATH; an npm-installed `applyr` with no core
@@ -93,9 +107,9 @@ applyr uninstall          # add --keep-data to keep config/data/resumes
 
 ## Release artifacts
 
-- Git tag `0.7.9a` on `main` — GitHub's automatic source archives are
+- Git tag `0.8.0a` on `main` — GitHub's automatic source archives are
   the manual-install path.
-- npm: `@keshm/applyr@0.7.9-alpha.0` under the `alpha` dist-tag
+- npm: `@keshm/applyr@0.8.0-alpha.0` under the `alpha` dist-tag
   (`cd app && npm publish` — publishConfig sets `access: public` and
   the tag). Publish requires `npm login`.
 - CI workflows (`.github/workflows/tui.yml`, `extension.yml`) run on

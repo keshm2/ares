@@ -97,7 +97,7 @@ export const MIN_COLUMNS = 54;
 export const MIN_ROWS = 12;
 
 /** Build/release marker shown in the side panel footer. */
-export const BUILD_MARKER = "0.7.9a";
+export const BUILD_MARKER = "0.8.0a";
 
 /** Side panel width — narrow enough to coexist with content on 64-col+
  *  terminals. The panel hides below that width (see App showSidebar). */

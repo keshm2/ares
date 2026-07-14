@@ -10,7 +10,7 @@
 > routes per-outcome updates to Discord, and appends one row per
 > success to a Google Sheet tracker.
 >
-> **Build 0.7.9a** — see [Release notes](docs/RELEASE.md) and
+> **Build 0.8.0a** — see [Release notes](docs/RELEASE.md) and
 > [Changelog](docs/CHANGELOG.md). The build marker is also shown in
 > the TUI side-panel footer.
 
@@ -71,11 +71,11 @@ Or fully manual, from a release archive:
 
 ```bash
 # The project is named applyr; the GitHub repository is still keshm2/ares.
-curl -L -o applyr-0.7.9a.zip https://github.com/keshm2/ares/archive/refs/tags/0.7.9a.zip
-unzip applyr-0.7.9a.zip && cd ares-0.7.9a && bash scripts/install.sh
+curl -L -o applyr-0.8.0a.zip https://github.com/keshm2/ares/archive/refs/tags/0.8.0a.zip
+unzip applyr-0.8.0a.zip && cd ares-0.8.0a && bash scripts/install.sh
 ```
 
-**Prerequisites:** `python3` and `jq` always; `node` ≥ 18 + `npm` for
+**Prerequisites:** `python3` and `jq` always; `node` ≥ 22 + `npm` for
 the TUI; a coding agent (above). No `git` required.
 
 ## Automatic updates
@@ -153,7 +153,7 @@ is **[docs/SETUP.md](docs/SETUP.md)**.
 
 | | |
 | --- | --- |
-| **Build** | `0.7.9a` (alpha) |
+| **Build** | `0.8.0a` (alpha) |
 | **Mode** | Single user, local-first, cron-friendly |
 | **Boards** | Ashby, Lever (public JSON APIs); SimplifyJobs (public GitHub JSON feeds); Workday (public CXS JSON, review-only); LinkedIn, Indeed, Handshake, Greenhouse, Wellfound (Playwright) |
 | **Harnesses** | OpenCode, Claude Code (full capability); Codex CLI, GitHub Copilot CLI (API-boards degraded path) — see `AGENTS.md` capability matrix |

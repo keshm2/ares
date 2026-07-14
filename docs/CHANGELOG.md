@@ -7,7 +7,28 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
-## [Unreleased] — on `main`
+## [0.8.0a] — 2026-07-13
+
+npm package: `@keshm/applyr` version `0.8.0-alpha.0` (default `latest`
+dist-tag — `npm install -g @keshm/applyr` gets it).
+
+### Fixed
+
+- **Claude Code harness ran but did no work.** A scheduled/background
+  `claude -p` run is non-interactive, so Claude Code could not prompt
+  for tool approval and declined *every* Bash call — the read-only
+  checks and the mandated `scripts/job_state.py` /
+  `append_state_entry.sh` state helpers alike — finishing "complete"
+  with zero applications. The runner now passes
+  `--permission-mode bypassPermissions` (the analog of the Copilot
+  branch's `--allow-all-tools`; override with
+  `APPLYR_CLAUDE_PERMISSION_MODE`). `scripts/run_job_agent.sh`.
+
+### Changed
+
+- **Node ≥ 22 now required** (`app/package.json` `engines`, README
+  prerequisites). Older runtimes fail to parse the TUI's modern
+  syntax (e.g. `??` in `cli.js`).
 
 ### Added
 
