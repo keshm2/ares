@@ -7,6 +7,7 @@ export interface AppliedJob {
   company: string;
   title: string;
   url: string;
+  apply_url?: string;
   date_applied: string;
   status: "applied" | "failed" | "needs_review";
   role_type?: string;

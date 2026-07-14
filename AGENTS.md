@@ -418,6 +418,15 @@ the helpers or prompts.
   with a stable job_key (the canonical identity) and a job_id. job_id is
   "{source}-{external_job_id}" when an external id is available, otherwise
   the job_key.
+- The canonical record also carries `apply_url` and `normalized_apply_url`
+  — the ATS's direct application-form link (e.g. Ashby's `.../application`
+  page), distinct from the generic job-listing `url`. Whenever you write a
+  needs_review/applied/failed entry to data/applied_jobs.json or
+  data/review_queue.json (see "File write discipline"), or populate a
+  Discord "Apply URL" field, carry `apply_url` forward from the canonical
+  record: use `normalized_apply_url` if non-empty, else fall back to `url`.
+  Keep the existing `url` field on those entries too — it still records
+  where the posting was found; `apply_url` is additive, not a replacement.
 - Upsert each canonical record into the registry:
   `python3 scripts/state/job_state.py upsert-job '<canonical-job-json>'`
   The helper merges by job_key — existing records are updated, new records
@@ -458,12 +467,16 @@ the helpers or prompts.
 
 ## File write discipline
 - applied_jobs.json entries must include: job_id, company, title, url,
-  date_applied, status (applied|failed|needs_review), role_type
+  apply_url, date_applied, status (applied|failed|needs_review), role_type
   (internship|new_grad), source (linkedin|indeed|greenhouse|lever|
   wellfound|handshake|ashbyhq|simplify|workday), resume_used
   (swe|ai_ml|balanced|cyber|networking_cyber),
   ats_score (number), location_tier (preferred|fallback),
-  cover_letter_used (bool). When status is "failed" or "needs_review",
+  cover_letter_used (bool). review_queue.json entries must also include
+  apply_url alongside url. `apply_url` is the canonical record's
+  `normalized_apply_url` (falling back to `url` when empty) — the direct
+  application-form link, not just the job listing; see "Canonical
+  registry and event log" above. When status is "failed" or "needs_review",
   a "reasoning" field is also required — a specific, one-sentence
   explanation of why the application failed or needs review (e.g.
   "ATS score 38/100 — requires CISSP certification not present in

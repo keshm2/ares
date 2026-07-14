@@ -22,6 +22,7 @@ import glob
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -30,6 +31,28 @@ from datetime import datetime, timezone
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.chdir(PROJECT_ROOT)
 IS_WINDOWS = os.name == "nt"
+
+# --- Stop-run support (POSIX only) ------------------------------------------
+# Contract with the TUI (app/src/ui/RunScreen.tsx + app/src/platform.ts):
+#   - POSIX: the TUI sends a real SIGTERM to *this* process (its direct Node
+#     child) — nothing else. _handle_stop_signal below kills the harness's
+#     whole process group (started via start_new_session=True below so it's
+#     a separate group from ours) and lets control return normally through
+#     _run()'s existing lock-release path.
+#   - Windows: the TUI does NOT rely on Python signal handling — Windows
+#     doesn't deliver real POSIX signals through Node's child_process.kill(),
+#     it just force-terminates. Instead the TUI shells out to
+#     `taskkill /PID <this pid> /T /F` itself, killing the whole tree
+#     (Python + harness + descendants) from the outside in one shot. This is
+#     a known, accepted platform limitation: our signal handler will likely
+#     never get a chance to run gracefully on Windows. Safety there comes
+#     from the already-atomic state writes (tempfile + os.replace, see
+#     write_heartbeat.py / append_state_entry.py) and acquire_lock()'s
+#     existing stale-holder-PID self-heal on the next run attempt — not from
+#     anything in this file.
+_harness_proc = None  # subprocess.Popen | None — set while the harness runs
+_stop_requested = False  # set by _handle_stop_signal on SIGTERM/SIGINT
+_stop_signum = None  # the signal number that triggered the stop, if any
 
 
 def now_local() -> str:
@@ -128,6 +151,81 @@ def kill_pid(pid: int) -> None:
 def py_run(args, **kw):
     """Run a bundled Python helper under the current interpreter."""
     return subprocess.run([sys.executable, *args], **kw)
+
+
+def _kill_harness_group(grace_sec: float = 5.0) -> None:
+    """Terminate the harness's whole process group.
+
+    POSIX only — the harness Popen is started with start_new_session=True
+    precisely so it (and everything it shells out to: bash, curl,
+    Playwright/browser) lives in its own process group, separate from this
+    process's own group. Same TERM-then-wait-then-KILL shape as kill_pid()
+    above (and the same 5s grace period), just applied to a whole group via
+    os.killpg instead of a single pid via os.kill.
+    """
+    if _harness_proc is None or IS_WINDOWS:
+        return
+    try:
+        pgid = os.getpgid(_harness_proc.pid)
+    except OSError:  # ProcessLookupError: already gone
+        return
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except OSError:
+        # ProcessLookupError: group already gone. PermissionError: also
+        # possible in practice (observed in testing) if the group died
+        # between getpgid() and killpg() and the now-unused pgid was
+        # recycled for an unrelated process — either way, nothing left of
+        # ours to signal.
+        return
+    deadline = time.time() + grace_sec
+    while time.time() < deadline:
+        if _harness_proc.poll() is not None:
+            return
+        time.sleep(0.1)
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except OSError:
+        pass
+
+
+def _handle_stop_signal(signum, frame):  # noqa: ARG001 - frame required by signal API
+    """SIGTERM/SIGINT handler: request a stop and kill the harness group.
+
+    Deliberately does NOT call sys.exit() or attempt to run the rest of
+    _run()'s normal post-processing (Discord summary, etc.) from inside the
+    handler — it just flags the stop and kills the subprocess tree, then
+    lets control fall back out of the (now-dead) Popen.wait() in
+    _run_harness_cmd and continue through _run()'s normal return path, so
+    the existing `finally: shutil.rmtree(lock_dir, ...)` in main() still
+    releases the lock correctly.
+    """
+    global _stop_requested, _stop_signum
+    _stop_requested = True
+    _stop_signum = signum
+    _kill_harness_group()
+
+
+def _run_harness_cmd(cmd, out) -> int:
+    """Launch the harness CLI and wait for it, tracking it for stop support.
+
+    POSIX: start_new_session=True puts the harness (and everything it
+    spawns) into a new process group separate from ours, so
+    _kill_harness_group() can kill that whole group without touching this
+    process. Windows: plain Popen — Windows has no equivalent primitive, and
+    per the stop-support contract the Windows TUI kills the whole tree from
+    outside via `taskkill /T /F` instead of relying on Python-side signal
+    handling (see the module-level comment near IS_WINDOWS).
+    """
+    global _harness_proc
+    popen_kwargs = {"stdout": out, "stderr": subprocess.STDOUT}
+    if not IS_WINDOWS:
+        popen_kwargs["start_new_session"] = True
+    proc = subprocess.Popen(cmd, **popen_kwargs)
+    _harness_proc = proc
+    rc = proc.wait()
+    _harness_proc = None
+    return rc
 
 
 def main() -> int:
@@ -332,6 +430,13 @@ def _run(logs_dir: str, run_log: str) -> int:
 
     log(run_log, f"Starting run via harness: {harness}")
 
+    # Install stop-signal handlers just before we start the harness Popen —
+    # POSIX only (see the module-level comment near IS_WINDOWS for why
+    # Windows doesn't get Python-side signal handling here).
+    if not IS_WINDOWS:
+        signal.signal(signal.SIGTERM, _handle_stop_signal)
+        signal.signal(signal.SIGINT, _handle_stop_signal)
+
     run_rc = 0
     exe = shutil.which(harness) or harness
     with open(session_log, "a", encoding="utf-8") as out:
@@ -346,13 +451,13 @@ def _run(logs_dir: str, run_log: str) -> int:
             except OSError:
                 pass
             cmd = [exe, "run", "--agent", "job-scraper", *print_flag, run_prompt]
-            run_rc = subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT).returncode
+            run_rc = _run_harness_cmd(cmd, out)
         elif harness == "claude":
             perm = os.environ.get("APPLYR_CLAUDE_PERMISSION_MODE", "bypassPermissions")
             cmd = [exe, "-p", "--permission-mode", perm,
                    "You are the job-scraper orchestrator. Read agents/bodies/job-scraper.md "
                    "and execute it exactly as your instructions. " + run_prompt]
-            run_rc = subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT).returncode
+            run_rc = _run_harness_cmd(cmd, out)
         else:
             degraded = (
                 "You are the job-scraper orchestrator. Read agents/bodies/job-scraper.md and "
@@ -369,7 +474,17 @@ def _run(logs_dir: str, run_log: str) -> int:
                 cmd = [exe, "exec", degraded]
             else:
                 cmd = [exe, "-p", degraded, "--allow-all-tools"]
-            run_rc = subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT).returncode
+            run_rc = _run_harness_cmd(cmd, out)
+
+    # A stop was requested (SIGTERM from the TUI, or SIGINT/Ctrl+C from a
+    # terminal) — _handle_stop_signal() already killed the harness's process
+    # group. Overwrite whatever raw returncode the (now-dead) harness process
+    # happened to exit with, in favor of the standard shell "128 + signal
+    # number" convention (130 for SIGINT, 143 for SIGTERM), so the recorded
+    # exit code always reflects *why* we stopped rather than an arbitrary
+    # code from a process we just killed out from under itself.
+    if _stop_requested:
+        run_rc = 128 + _stop_signum
 
     # --- Health marker + heartbeat ------------------------------------------
     after = _count_outcomes()
@@ -395,6 +510,14 @@ def _run(logs_dir: str, run_log: str) -> int:
             pass
 
     tail = f"applied={d_applied} needs_review={d_review} failed={d_failed} skipped_unfit={d_skipped}"
+    if _stop_requested:
+        # Stopped runs skip the normal complete/failed post-processing
+        # (no Discord summary, etc.) — just record it clearly and return.
+        with open(session_log, "a", encoding="utf-8") as fh:
+            fh.write(f"run_job_agent: stopped {now_utc()} rc={run_rc} {tail}\n")
+        log(run_log, f"STOPPED: run terminated by user request (signal {_stop_signum}). Log: {session_log}")
+        return run_rc
+
     if run_rc != 0:
         with open(session_log, "a", encoding="utf-8") as fh:
             fh.write(f"run_job_agent: failed {now_utc()} rc={run_rc} {tail}\n")

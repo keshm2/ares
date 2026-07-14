@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
-import { RainbowText } from "./KeyHints.js";
+import { RainbowText, AutoSparkleText } from "./KeyHints.js";
 import type { Heartbeat } from "../state.js";
 import { theme, BUILD_MARKER, SIDE_PANEL_WIDTH } from "../theme.js";
 
@@ -72,7 +72,15 @@ export function SidePanel({
       : { label: `exit ${heartbeat.last_run_exit_code}`, color: theme.danger }
     : { label: "off", color: undefined };
 
-  const Row = ({ label, value, color }: { label: string; value: string; color?: string }) => (
+  const Row = ({
+    label,
+    value,
+    color,
+  }: {
+    label: string;
+    value: React.ReactNode;
+    color?: string;
+  }) => (
     <Box>
       <Text dimColor>{label.padEnd(8)}</Text>
       <Text bold color={color} wrap="truncate-end">
@@ -97,8 +105,8 @@ export function SidePanel({
         <Row label="Screen" value={screen} color={theme.accent} />
         <Row
           label="Mode"
-          value={mode === "manual" ? "MANUAL" : "AUTO"}
-          color={mode === "manual" ? theme.accent : theme.warn}
+          value={mode === "manual" ? "MANUAL" : <AutoSparkleText>AUTO</AutoSparkleText>}
+          color={mode === "manual" ? theme.accent : undefined}
         />
       </Box>
 

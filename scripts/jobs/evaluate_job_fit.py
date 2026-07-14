@@ -26,7 +26,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 
 DEFAULT_TARGETS = "config/targets.json"
-DECISION_VERSION = "phase4-v2"
+DECISION_VERSION = "phase4-v3"
 
 
 # Candidate skills derived from the two shipped base resumes. The fit helper
@@ -506,9 +506,9 @@ def evaluate_fit(job: dict, targets: dict) -> dict:
 
     score = max(0, min(100, int(score)))
 
-    if score < 45:
+    if score < 70:
         status = "skipped_unfit"
-    elif score < 65:
+    elif score < 75:
         status = "needs_review"
     else:
         status = "candidate"

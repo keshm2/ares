@@ -57,8 +57,9 @@ export function HistoryScreen({
           return;
         }
         try {
-          openUrl(entry.url);
-          setMessage(`Opened ${entry.url}`);
+          const target = entry.apply_url || entry.url;
+          openUrl(target);
+          setMessage(`Opened ${target}`);
         } catch (err) {
           setMessage(`Could not open browser: ${helperError(err)}`);
         }

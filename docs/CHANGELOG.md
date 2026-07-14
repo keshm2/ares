@@ -7,6 +7,55 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.8.43a] — 2026-07-14
+
+npm package: `@keshm/applyr` version `0.8.43-alpha.0`.
+
+### Added
+
+- **Dedicated live-run screen** — a phase checklist (Scrape → Fit-gate →
+  Tailor → Apply → Report) with an animated progress bar, driven by new
+  progress markers the job-scraper agent prints at each phase boundary
+  and per application attempt (`[apply] <title> @ <company>` — see
+  `agents/bodies/job-scraper.md`). The screen now shows which company
+  and role is currently being applied to, live.
+- **Stop / correct-and-continue for a run in progress.** `x` arms a
+  stop (press again to confirm); `c` on the confirm prompt instead
+  queues a correction that stops the run cleanly and restarts it with
+  the instruction folded in. Neither fires while typing. Backed by a
+  real SIGTERM/SIGINT handler in `run_job_agent.py` that kills the
+  whole harness process group on POSIX; Windows uses `taskkill /T /F`
+  from the TUI side instead.
+- **"AUTO" sparkle effect** — animates through a purple → white blend
+  (matching the update-prompt box's traveling ring) everywhere "AUTO"
+  appears in the TUI.
+- **Cycling activity glyph** (`.` → `·` → `•` → `*`) on the
+  running-status title and the current phase's checklist bullet.
+
+### Changed
+
+- **`needs_review` fit-score floor raised from 45 to 70** —
+  `evaluate_job_fit.py`'s `decision_version` moved `phase4-v2` →
+  `phase4-v3`.
+- **Discord notifications and the review queue / history screens now
+  link to the direct application-form URL** (`apply_url`) instead of
+  the generic job-listing URL.
+
+### Fixed
+
+- **Fast-failing runs left the TUI stuck on "waiting for session
+  log…"** with no way to see why. The log tail is now read
+  synchronously the instant a run's process closes, instead of relying
+  solely on a 1-second poll that a sub-second failure could outrun.
+- **The progress bar could render blank** until phase-detection matched
+  something in the log; it's now always visible during a run, with a
+  minimum-fill floor.
+- **Sparkle animation color artifacts** — a circular gradient wrap
+  could interpolate directly between non-adjacent palette colors
+  (maroon → violet), showing a stray green/blue tint. Switched to a
+  ping-pong reflection, which only ever interpolates between adjacent
+  colors.
+
 ## [0.8.42a] — 2026-07-14
 
 npm package: `@keshm/applyr` version `0.8.42-alpha.0`.

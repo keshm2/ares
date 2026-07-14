@@ -30,6 +30,29 @@ Determine what your harness can actually do, then follow the
   append, review queue, record-event, Discord). Never silently skip
   such a job and never attempt a browser apply without browser tools.
 
+## Progress markers (print exactly these — the TUI parses them)
+
+Print each marker as its own line, verbatim, at the point described below.
+These lines are how the TUI's live-run screen shows phase progress and
+which job is currently being applied to — treat them as required output,
+not optional narration, and never bundle them into a larger sentence.
+
+- Right before starting Phase 1: `[•] Scraping job boards`
+- Right after step 9 (unique canonical batch built), before starting step
+  10's fit-gate loop: `[✓] Scraping job boards` then
+  `[•] Filtering + fit-gating`
+- Right before starting Phase 2: `[✓] Filtering + fit-gating` then
+  `[•] Tailoring resume`
+- Right before starting Phase 3: `[✓] Tailoring resume` then
+  `[•] Applying to jobs`
+- Immediately before each application attempt in Phase 3 step 2 (opening
+  the application URL), one line per attempt, not batched:
+  `[apply] <title> @ <company>` — the exact title and company from the
+  canonical job record for the job about to be applied to.
+- Right before starting Phase 4: `[✓] Applying to jobs` then
+  `[•] Sending report`
+- Right after Phase 4 step 3 (final summary printed): `[✓] Sending report`
+
 ## Workflow (execute in order)
 
 ### Phase 1 — Scrape

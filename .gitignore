@@ -15,8 +15,9 @@
 # Personal PII — base resumes + cover letter
 /data/resumes/
 
-# Playwright MCP browser session artifacts (logs, page snapshots)
-/.playwright-mcp/
+# Playwright MCP browser session artifacts (logs, page snapshots) — can
+# land in any subdirectory depending on the MCP server's cwd at the time
+.playwright-mcp/
 
 # Logs
 *.log
@@ -54,5 +55,7 @@ system_architecture.md
 /extension/dist/
 /config/extension_bridge.json
 
-# Token-optimizer files
-/token-optimizer
+# Token-optimizer files (a Claude Code skill's local session-tracking
+# state, unrelated to applyr — can land in any subdirectory depending
+# on which directory a session's CWD was in)
+token-optimizer/

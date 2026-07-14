@@ -38,6 +38,15 @@ skip the notification and log a single warning to the session output — do not
 abort the run. A missing `needs_review` or `failed` webhook must not block the
 batch summary or other outcomes.
 
+## Apply URL field
+Every embed's "Apply URL" field must link directly to the application
+form, not just the job listing. Populate `$URL` (used below as `$url`)
+from the job's `apply_url` if the entry/record has one, falling back to
+`url` only when `apply_url` is absent or empty. `apply_url` is the ATS's
+direct application-form link (e.g. Ashby's `.../application` page, as
+opposed to the generic `.../` listing page) — always prefer it when
+present.
+
 ## Payload rules (apply to every notification)
 - Append `?wait=true` to the webhook URL so Discord returns a synchronous
   response body.

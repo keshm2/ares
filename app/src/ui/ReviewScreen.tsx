@@ -189,8 +189,9 @@ export function ReviewScreen({ root, active, refreshNonce, onStateChange, conten
       }
       try {
         if (input === "o" || key.return) {
-          openUrl(selected.url);
-          setMessage(`Opened ${selected.url}`);
+          const target = selected.apply_url || selected.url;
+          openUrl(target);
+          setMessage(`Opened ${target}`);
         } else if (input === "a") {
           markApplied(selected);
           refresh();

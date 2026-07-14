@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 
 /**
  * Cross-platform interpreter resolution. The runtime helpers are Python
@@ -51,4 +51,26 @@ export function pythonCmd(): { cmd: string; prefix: string[] } {
 export function py(args: string[]): { cmd: string; args: string[] } {
   const p = pythonCmd();
   return { cmd: p.cmd, args: [...p.prefix, ...args] };
+}
+
+/**
+ * Force-kill a process tree by PID. POSIX callers should just call
+ * `child.kill("SIGTERM")` directly instead of using this — run_job_agent.py
+ * installs a SIGTERM handler there that gracefully kills its harness
+ * subprocess group and flushes state, so a plain signal is sufficient.
+ *
+ * This helper exists only for Windows, where graceful signal handling
+ * from a Node parent isn't reliably achievable: `taskkill /T /F` force-
+ * kills the whole tree at once instead. That's a deliberate, accepted
+ * platform difference (not a bug) — state writes are still safe under a
+ * hard kill because the Python side uses atomic temp-file+rename writes
+ * throughout.
+ */
+export function stopProcessTree(pid: number): void {
+  if (process.platform !== "win32") return; // POSIX: caller sends SIGTERM directly
+  try {
+    execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+  } catch {
+    /* already exited, or taskkill unavailable — nothing more we can do */
+  }
 }

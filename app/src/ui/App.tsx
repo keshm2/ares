@@ -10,7 +10,7 @@ import { SettingsScreen, SETTINGS_HINTS, SETTINGS_SECTION_HINTS } from "./Settin
 import { ResumesScreen, RESUMES_HINTS } from "./ResumesScreen.js";
 import { HelpOverlay } from "./HelpOverlay.js";
 import { WelcomeScreen, type WelcomeOption } from "./WelcomeScreen.js";
-import { KeyHints } from "./KeyHints.js";
+import { KeyHints, AutoSparkleText } from "./KeyHints.js";
 import { SidePanel } from "./SidePanel.js";
 import { UpdateBox } from "./UpdateBox.js";
 import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "../state.js";
@@ -321,9 +321,13 @@ export function App({
       <Banner columns={columns} rows={rows} />
       <Box paddingX={pad} justifyContent="flex-end">
         <Text dimColor>MODE </Text>
-        <Text bold color={mode === "manual" ? theme.accent : theme.warn}>
-          {mode === "manual" ? "MANUAL" : "AUTO"}
-        </Text>
+        {mode === "manual" ? (
+          <Text bold color={theme.accent}>
+            MANUAL
+          </Text>
+        ) : (
+          <AutoSparkleText>AUTO</AutoSparkleText>
+        )}
       </Box>
       {/* Tab row */}
       <Box paddingX={pad} marginTop={1}>

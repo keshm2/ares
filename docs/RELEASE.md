@@ -1,22 +1,70 @@
-# Release notes — applyr 0.8.42a
+# Release notes — applyr 0.8.43a
 
-> **Build:** `0.8.42a` — alpha.
+> **Build:** `0.8.43a` — alpha.
 > **Branch:** `main`.
-> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.42a"`
+> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.43a"`
 > (visible in the TUI side-panel footer).
-> **npm package:** `@keshm/applyr` version `0.8.42-alpha.0`, published
+> **npm package:** `@keshm/applyr` version `0.8.43-alpha.0`, published
 > to the default `latest` dist-tag — `npm install -g @keshm/applyr`
 > gets it. The unscoped npm name `applyr` belongs to an unrelated
 > package — never `npm install applyr`.
 > **Rollout:** clients that installed the updater lineage self-update
 > on their next scheduled run or `applyr` launch; older installs
-> update manually once (`bash scripts/install/update.sh`). **See the
-> "Fixed" note below if you have a schedule installed from before
-> 0.8.4a** — it needs a one-time manual refresh.
+> update manually once (`bash scripts/install/update.sh`).
 > **Browser extension:** unchanged in this build — `0.8.2` / `0.8.2a`.
-> **Previous releases:** `0.8.041a`, `0.8.4a`, `0.8.3a`, `0.8.2a`,
-> `0.7.8a`, and `0.5.5a` — deep-dive notes live at this path under
-> their git tags; the index is [`CHANGELOG.md`](./CHANGELOG.md).
+> **Previous releases:** `0.8.42a`, `0.8.041a`, `0.8.4a`, `0.8.3a`,
+> `0.8.2a`, `0.7.8a`, and `0.5.5a` — deep-dive notes live at this path
+> under their git tags; the index is [`CHANGELOG.md`](./CHANGELOG.md).
+
+## What's new in 0.8.43a
+
+- **The live-run screen has its own UI.** Starting an automatic run now
+  shows a phase checklist (Scrape → Fit-gate → Tailor → Apply → Report)
+  with an animated progress bar, instead of the same cockpit view used
+  when idle. The job-scraper agent now prints explicit progress markers
+  at each phase boundary and one `[apply] <title> @ <company>` line per
+  application attempt (see `agents/bodies/job-scraper.md`'s "Progress
+  markers" section) — previously nothing drove this UI on a real run, so
+  the checklist and progress bar never actually activated outside a
+  hand-crafted test. The screen now also shows which company and role
+  is currently being applied to, live.
+- **Stop and correct a run in progress.** `x` arms a stop (press again
+  to confirm — a stray keystroke can't kill a run); `c` on the confirm
+  prompt instead lets you type a correction (e.g. "only apply to IC
+  roles, not manager positions"), which stops the run cleanly and
+  restarts it with that instruction folded in. Neither fires while
+  you're typing in a text field. `run_job_agent.py` now installs a real
+  SIGTERM/SIGINT handler that kills the whole harness process group
+  (POSIX) so stop actually stops everything it spawned, not just the
+  direct child; the Windows TUI path uses `taskkill /T /F` instead,
+  since Windows has no equivalent signal delivery.
+- **Fixed: fast-failing runs left the screen stuck on "waiting for
+  session log…"** with no way to see why short of leaving the TUI. The
+  log tail is now read synchronously the moment a run's process closes,
+  not only via the 1-second poll that a run finishing in under a second
+  could outrun entirely.
+- **The `needs_review` fit-score floor moved from 45 to 70** — fewer
+  borderline jobs land in your review queue; `evaluate_job_fit.py`'s
+  `decision_version` moved to `phase4-v3` to match.
+  Discord notifications and the review queue / history screens now
+  send the direct application-form link (`apply_url`) instead of the
+  generic job-listing link, so clicking through from a notification
+  lands you on the actual form.
+- **"AUTO" sparkles** — animates through a purple → white blend (the
+  same two colors as the update-prompt box's traveling ring) everywhere
+  it appears: the mode indicator and the sidebar's Mode row. An earlier
+  version of this animation cycled through the banner's full violet →
+  maroon palette, which read as "too much red" and could show a stray
+  green/blue tint at the wrap-around seam between maroon and violet —
+  fixed by dropping to the two-color purple/white blend and switching
+  the gradient interpolation from a circular wrap to a ping-pong
+  reflection, which by construction never interpolates between two
+  non-adjacent colors.
+- **A cycling activity glyph** (`.` → `·` → `•` → `*`, Claude-Code-style)
+  now marks the running-status title and the current phase's checklist
+  bullet, so a live run visibly signals "still working" even during a
+  long silent stretch (e.g. a slow board fetch) instead of relying on
+  the elapsed clock alone.
 
 ## What's new in 0.8.42a
 

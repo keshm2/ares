@@ -68,6 +68,37 @@ export function hueColor(hue: number): string {
   return `#${hex(r)}${hex(g)}${hex(b)}`;
 }
 
+/** #rrggbb → [r, g, b] (0-255 each) — helper for gradientColor's lerp. */
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+
+/** phase (any real number) → #rrggbb, smoothly interpolated within the
+ *  given gradient (default BANNER_GRADIENT). Bounces back and forth
+ *  across the stops (a triangle wave) instead of wrapping the last stop
+ *  straight back to the first — a straight wrap would lerp maroon
+ *  (#800020, near-zero green/blue) directly to violet (#A78BFA, high
+ *  blue), passing through muddy green/blue-tinted hues on the way.
+ *  Ping-ponging means every step is a lerp between two *adjacent*,
+ *  intentionally-designed stops, so it can never produce an off-palette
+ *  hue — the gradient analog of hueColor's hue wheel, used to drive the
+ *  animated AUTO-mode sparkle. */
+export function gradientColor(phase: number, stops: readonly string[] = BANNER_GRADIENT): string {
+  const n = stops.length;
+  if (n === 1) return stops[0]!;
+  const period = 2 * (n - 1);
+  const x = (((phase % period) + period) % period); // wrap into [0, period)
+  const t = x <= n - 1 ? x : period - x; // reflect the second half back — the ping-pong
+  const i = Math.min(n - 2, Math.floor(t));
+  const frac = t - i;
+  const [r1, g1, b1] = hexToRgb(stops[i]!);
+  const [r2, g2, b2] = hexToRgb(stops[i + 1]!);
+  const lerp = (a: number, b: number) => Math.round(a + (b - a) * frac);
+  const hex = (v: number) => v.toString(16).padStart(2, "0");
+  return `#${hex(lerp(r1, r2))}${hex(lerp(g1, g2))}${hex(lerp(b1, b2))}`;
+}
+
 /** ASCII banner — the one loud element. Rows fade violet → maroon. */
 export const BANNER_ROWS = [
   " █████╗ ██████╗ ██████╗ ██╗     ██╗   ██╗██████╗ ",
@@ -87,6 +118,21 @@ export const BANNER_GRADIENT = [
   "#800020", // maroon
 ] as const;
 
+/** Purple → white — the same two-color blend UpdateBox's traveling
+ *  border ring uses (see blend() there), reused here so every "AUTO"
+ *  sparkle (AutoSparkleText, GradientProgressBar) reads as one visual
+ *  language across the app. gradientColor's ping-pong bounces cleanly
+ *  between the two, so this never touches the banner's plum/maroon end
+ *  (which read as "too much red" when it was in the sparkle mix). The
+ *  static banner keeps its own full BANNER_GRADIENT — this is scoped to
+ *  animations only. */
+export const SPARKLE_GRADIENT = [theme.accent, "#FFFFFF"] as const;
+
+/** Cycling "working" glyph — the terminal-spinner analog of a color
+ *  animation, small dot growing to a starburst and back (". to *" and
+ *  a bit beyond), used anywhere text needs to signal live activity. */
+export const SPINNER_FRAMES = [".", "·", "•", "*", "•", "·"] as const;
+
 export const BANNER_WIDTH = BANNER_ROWS[0].length;
 
 /** Below this size the app shows a "terminal too small" notice. The tab
@@ -97,7 +143,7 @@ export const MIN_COLUMNS = 54;
 export const MIN_ROWS = 12;
 
 /** Build/release marker shown in the side panel footer. */
-export const BUILD_MARKER = "0.8.42a";
+export const BUILD_MARKER = "0.8.43a";
 
 /** Side panel width — narrow enough to coexist with content on 64-col+
  *  terminals. The panel hides below that width (see App showSidebar). */
