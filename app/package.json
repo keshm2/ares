@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/keshm2/ares.git",
+    "url": "git+https://github.com/keshm2/applyr.git",
     "directory": "app"
   },
   "license": "MIT",

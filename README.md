@@ -33,13 +33,13 @@ up whatever you have and asks if you have more than one.
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.ps1 | iex
 ```
 
 **Or via npm:**
@@ -56,8 +56,9 @@ The installer drops applyr in `~/applyr` (or `%USERPROFILE%\applyr`
 on Windows; override with `APPLYR_HOME`), asks for your coding
 agent, your profile (kept **locally only** — gitignored files on
 your machine, never uploaded), and whether you want Discord
-status updates, creates the `resumes/` folder (drop your PDFs
-there), and puts `applyr` on your PATH. When it finishes, just
+status updates, creates the `data/resumes/` folder (add your base
+resumes there — see [docs/SETUP.md](docs/SETUP.md) for the expected
+filenames), and puts `applyr` on your PATH. When it finishes, just
 type `applyr`.
 
 You'll also need `python3`, `jq`, and (for the TUI) `node` ≥ 22
@@ -98,8 +99,8 @@ uninstall: `applyr uninstall`.
 
 These are how applyr is wired, not suggestions:
 
-- **Personal data stays local.** Live configs, `data/`, `logs/`,
-  and `resumes/` are gitignored and never leave your machine.
+- **Personal data stays local.** Live configs, `data/` (incl.
+  resumes), and `logs/` are gitignored and never leave your machine.
 - **Form fields are filled only from `config/targets.json`
   `"safe_fields"`.** Passwords, SSNs, and payment info are
   never stored. A form asking for something outside safe_fields
@@ -120,4 +121,4 @@ browser extension — see **[docs/SETUP.md](docs/SETUP.md)**.
 
 ## License
 
-MIT. The repository is `keshm2/ares`; the project name is applyr.
+MIT.

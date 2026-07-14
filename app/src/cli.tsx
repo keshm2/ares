@@ -36,9 +36,9 @@ Inside the app, press ? for the full key reference.
 State writes go through the repo's Python/bash helpers — the TUI never
 edits state JSON directly. Set APPLYR_ROOT to run outside the repo.`;
 
-const VERSION_URL = "https://raw.githubusercontent.com/keshm2/ares/main/VERSION";
-const BOOTSTRAP_URL = "https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh";
-const BOOTSTRAP_URL_PS1 = "https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.ps1";
+const VERSION_URL = "https://raw.githubusercontent.com/keshm2/applyr/main/VERSION";
+const BOOTSTRAP_URL = "https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.sh";
+const BOOTSTRAP_URL_PS1 = "https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.ps1";
 
 /** The one-command core bootstrap for the current OS. */
 function bootstrapOneLiner(): string {

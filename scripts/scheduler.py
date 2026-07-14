@@ -157,9 +157,11 @@ def _print_heartbeat() -> None:
 
 
 def _linux_note() -> int:
+    minutes = INTERVAL // 60
     sys.stderr.write(
         "scheduler: no built-in Linux scheduler — install a systemd user timer "
-        "running scripts/run_job_agent.sh every 30 min. See docs/SETUP.md section 5.\n"
+        f"running scripts/run_job_agent.sh every {minutes} min "
+        "(APPLYR_SCHEDULE_INTERVAL_SEC). See docs/SETUP.md section 5.\n"
     )
     return 1
 

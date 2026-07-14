@@ -5,7 +5,7 @@ One command from a fresh machine to a validated, harness-configured setup
 that runs natively on PowerShell and cmd.exe - no WSL, no bash, no jq.
 
   # one-liner (from anywhere):
-  irm https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.ps1 | iex
+  irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.ps1 | iex
   # or from a clone/unpacked release:
   powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 
@@ -15,7 +15,7 @@ Steps mirror scripts/install.sh:
   2. Copy config/*.example.json to live configs where missing.
   2b. Optional Discord status updates (opt-in).
   3. Detect installed coding agents; write config/harness.json.
-  4. Ask for the profile (safe_fields, kept LOCAL ONLY); create resumes/.
+  4. Ask for the profile (safe_fields, kept LOCAL ONLY).
   5. Offer .claude/settings.json (headless permissions) when Claude Code present.
   6. Regenerate per-harness agent definitions.
   7. Run the config validator.
@@ -57,10 +57,10 @@ if (-not $projectRoot) {
   # Always re-fetch and overwrite tracked files, even for an existing install:
   # heals a stale or corrupted local copy (e.g. an old script version with a
   # bug) instead of re-running whatever happens to already be on disk.
-  # Gitignored local state (config\*.json, data\, logs\, resumes\,
-  # docs\PLAN.md) isn't in the tarball, so it's left untouched.
+  # Gitignored local state (config\*.json, data\, logs\, docs\PLAN.md)
+  # isn't in the tarball, so it's left untouched.
   $tgz = Join-Path $env:TEMP ("applyr-" + [System.Guid]::NewGuid().ToString() + ".tar.gz")
-  Invoke-WebRequest -UseBasicParsing -Uri "https://codeload.github.com/keshm2/ares/tar.gz/refs/heads/main" -OutFile $tgz
+  Invoke-WebRequest -UseBasicParsing -Uri "https://codeload.github.com/keshm2/applyr/tar.gz/refs/heads/main" -OutFile $tgz
   # tar.exe ships with Windows 10+; --strip-components drops the top dir.
   & tar.exe -xzf $tgz --strip-components=1 -C $target
   if ($LASTEXITCODE -ne 0) { Fail "failed to unpack the source tarball (needs Windows 10+ tar.exe)" }
@@ -166,14 +166,14 @@ if (Test-Path "config\harness.json") {
   }
 }
 
-# --- 4. Profile (safe_fields, LOCAL ONLY) + resumes --------------------------
+# --- 4. Profile (safe_fields, LOCAL ONLY) -------------------------------
 $targets = Get-Content "config\targets.json" -Raw | ConvertFrom-Json
 $firstName = $null
 if ($targets.safe_fields) { $firstName = $targets.safe_fields.first_name }
 if ((-not $firstName) -or ($firstName -eq "REPLACE_ME")) {
   Write-Host ""
   Write-Host "[lock] Privacy: everything you enter below is kept LOCALLY ONLY." -ForegroundColor Cyan
-  Write-Host "       It is written to gitignored files on this machine (config/, resumes/)" -ForegroundColor Cyan
+  Write-Host "       It is written to gitignored files on this machine (config/, data/resumes/)" -ForegroundColor Cyan
   Write-Host "       and is never committed, uploaded, or shared." -ForegroundColor Cyan
   Write-Host ""
   Write-Host "Your profile - used only to fill application forms (press enter to skip a field):"
@@ -198,12 +198,12 @@ if ((-not $firstName) -or ($firstName -eq "REPLACE_ME")) {
     Say "profile skipped - run 'applyr setup' any time to fill it in."
   }
 }
-New-Item -ItemType Directory -Force -Path "resumes" | Out-Null
+New-Item -ItemType Directory -Force -Path "data\resumes" | Out-Null
 Write-Host ""
-Write-Host "[docs] Resumes: drop ALL your resumes as PDFs into" -ForegroundColor Cyan
-Write-Host ("       " + (Join-Path $projectRoot "resumes")) -ForegroundColor Cyan
-Write-Host "       applyr scans them and converts each to markdown to tailor per job." -ForegroundColor Cyan
-Write-Host "       This folder is gitignored - local only." -ForegroundColor Cyan
+Write-Host "[docs] Resumes: add your base resumes (markdown + matching PDF) to" -ForegroundColor Cyan
+Write-Host ("       " + (Join-Path $projectRoot "data\resumes")) -ForegroundColor Cyan
+Write-Host "       See docs/SETUP.md for the expected filenames - applyr picks one" -ForegroundColor Cyan
+Write-Host "       per job by category and tailors it. This folder is gitignored - local only." -ForegroundColor Cyan
 Write-Host ""
 
 # --- 5. Claude Code headless permissions (opt-in) ----------------------------

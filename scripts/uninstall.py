@@ -12,8 +12,8 @@ Removes, in order:
   1. The schedule (scheduler.py uninstall — launchd/schtasks).
   2. The `applyr` command on PATH — only applyr's own wrapper/shim pointing
      at THIS install.
-  3. The install directory (live config, data/, logs/, resumes/ — PII), only
-     after an explicit confirmation (or --yes).
+  3. The install directory (live config, data/ incl. resumes, logs/ — PII),
+     only after an explicit confirmation (or --yes).
 
 npm installs: `npm uninstall -g @keshm/applyr` removes the TUI command (a
 reminder is printed when one is detected). The npm package never owns the
@@ -136,7 +136,7 @@ def main(argv) -> int:
             print()
             print("About to permanently delete the install directory and EVERYTHING in it:")
             print(f"  {ROOT}")
-            print("This includes your live config, application history (data/), logs, and resumes/.")
+            print("This includes your live config, application history and resumes (data/), and logs.")
             try:
                 reply = input("Delete it? [y/N] ").strip()
             except EOFError:

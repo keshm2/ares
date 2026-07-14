@@ -5,7 +5,7 @@
 # setup. Non-destructive: existing live configs are never overwritten.
 #
 #   bash scripts/install.sh                                      # from a clone/unpacked release
-#   curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.sh | bash
 #
 # Steps:
 #   0. Bootstrap: when piped (curl | bash) or run outside the repo,
@@ -14,8 +14,7 @@
 #   2. Copy config/*.example.json to live configs where missing.
 #   3. Detect installed coding agents (opencode, claude) and write
 #      config/harness.json (only if missing).
-#   4. Ask for the user's profile (safe_fields) — kept locally only —
-#      and create resumes/ for the user's PDF resumes.
+#   4. Ask for the user's profile (safe_fields) — kept locally only.
 #   5. Offer to create .claude/settings.json (headless permission
 #      pre-approval) when Claude Code is the harness — asks first.
 #   6. Regenerate per-harness agent definitions from agents/.
@@ -55,9 +54,9 @@ else
   # Always re-fetch and overwrite tracked files, even for an existing install:
   # heals a stale or corrupted local copy (e.g. an old script version with a
   # bug) instead of re-running whatever happens to already be on disk.
-  # Gitignored local state (config/*.json, data/, logs/, resumes/,
-  # docs/PLAN.md) isn't in the tarball, so it's left untouched.
-  curl -fsSL "https://codeload.github.com/keshm2/ares/tar.gz/refs/heads/main" \
+  # Gitignored local state (config/*.json, data/, logs/, docs/PLAN.md)
+  # isn't in the tarball, so it's left untouched.
+  curl -fsSL "https://codeload.github.com/keshm2/applyr/tar.gz/refs/heads/main" \
     | tar -xz --strip-components=1 -C "$TARGET_DIR"
   # Re-attach stdin to the terminal so the interactive prompts below work
   # even though the script itself arrived on stdin.
@@ -197,7 +196,7 @@ else
   fi
 fi
 
-# --- 4. User profile (safe_fields) + resumes folder ---------------------------
+# --- 4. User profile (safe_fields) ---------------------------------------
 # Asked only when the live config still holds placeholders, and only on a
 # real terminal. Every value lands in gitignored local config — nothing
 # leaves this machine.
@@ -210,7 +209,7 @@ profile_placeholder() {
 if [ -t 0 ] && profile_placeholder "first_name"; then
   echo
   echo "${C_NOTICE}🔒  Privacy: everything you enter below is kept LOCALLY ONLY.${C_RESET}"
-  echo "${C_NOTICE}    It is written to gitignored files on this machine (config/, resumes/)${C_RESET}"
+  echo "${C_NOTICE}    It is written to gitignored files on this machine (config/, data/resumes/)${C_RESET}"
   echo "${C_NOTICE}    and is never committed, uploaded, or shared.${C_RESET}"
   echo
   echo "Your profile — used only to fill application forms (press enter to skip a field):"
@@ -251,12 +250,12 @@ if [ -t 0 ] && profile_placeholder "first_name"; then
   fi
 fi
 
-mkdir -p resumes
+mkdir -p data/resumes
 echo
-echo "${C_NOTICE}📄  Resumes: drop ALL your resumes as PDFs into${C_RESET}"
-echo "${C_NOTICE}    $PROJECT_ROOT/resumes/${C_RESET}"
-echo "${C_NOTICE}    applyr scans them and converts each to markdown so it can tailor${C_RESET}"
-echo "${C_NOTICE}    the best-matching resume per job. This folder is gitignored — local only.${C_RESET}"
+echo "${C_NOTICE}📄  Resumes: add your base resumes (markdown + matching PDF) to${C_RESET}"
+echo "${C_NOTICE}    $PROJECT_ROOT/data/resumes/${C_RESET}"
+echo "${C_NOTICE}    See docs/SETUP.md for the expected filenames — applyr picks one per${C_RESET}"
+echo "${C_NOTICE}    job by category and tailors it. This folder is gitignored — local only.${C_RESET}"
 echo
 
 # --- 5. Claude Code headless permissions (opt-in, asks first) ----------------

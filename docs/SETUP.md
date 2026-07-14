@@ -17,7 +17,7 @@ optional TUI + browser extension:
 ```bash
 # Easiest — one command: downloads into ~/applyr, runs the installer,
 # and puts the `applyr` command on your PATH (~/.local/bin):
-curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.sh | bash
 
 # Or from an unpacked release archive (no git clone required):
 bash scripts/install.sh
@@ -30,7 +30,7 @@ npm install -g @keshm/applyr
 ```powershell
 # Windows PowerShell (native, no WSL): downloads into %USERPROFILE%\applyr,
 # runs the installer, and puts the `applyr` command on your PATH.
-irm https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.ps1 | iex
 
 # Or from an unpacked release archive:
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -40,28 +40,33 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 checks the `VERSION` file on GitHub `main` and self-updates when a
 newer build was pushed (fail-open — no network just means no update).
 Git checkouts fast-forward pull; archive installs overlay the new
-tarball; live config, `data/`, `logs/`, and `resumes/` are never
-touched. Run one manually with `applyr update` (or
-`bash scripts/update.sh`); opt out with `APPLYR_AUTO_UPDATE=0`.
+tarball; live config, `data/`, and `logs/` are never touched. Run one
+manually with `applyr update` (or `bash scripts/update.sh`); opt out
+with `APPLYR_AUTO_UPDATE=0`.
 
 The installer also prompts for your profile (the `safe_fields` used to
-fill application forms) and creates a `resumes/` folder at the project
-root — **drop all your resumes there as PDFs**; applyr scans them and
-converts each to markdown so it can tailor the best match per job.
-Everything you enter is written only to gitignored local files
-(`config/`, `resumes/`) and never leaves your machine.
+fill application forms) and creates a `data/resumes/` folder — add your
+base resumes there as markdown files with a matching PDF, named by
+category: `base_resume_swe.md`/`.pdf` (pure software roles),
+`base_resume_ai_ml.md`/`.pdf` (AI/ML), `base_resume_cyber.md`/`.pdf`
+(security), `base_resume_networking_cyber.md`/`.pdf` (networking),
+`base_resume_balanced.md`/`.pdf` (the default, used when a job doesn't
+clearly match one category), plus `base_cover_letter.md` as the voice
+and structure reference for tailored cover letters. applyr picks one
+base resume per job and tailors it. Everything you enter is written
+only to gitignored local files (`config/`, `data/resumes/`) and never
+leaves your machine.
 
-**Downloading the release archive.** The project is named applyr; the
-GitHub repository for this release is still `keshm2/ares`:
+**Downloading the release archive.**
 
 ```bash
 # zip
-curl -L -o applyr-0.8.3a.zip https://github.com/keshm2/ares/archive/refs/tags/0.8.3a.zip
-unzip applyr-0.8.3a.zip && cd ares-0.8.3a
+curl -L -o applyr-0.8.3a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.8.3a.zip
+unzip applyr-0.8.3a.zip && cd applyr-0.8.3a
 
 # or tarball
-curl -L -o applyr-0.8.3a.tar.gz https://github.com/keshm2/ares/archive/refs/tags/0.8.3a.tar.gz
-tar -xzf applyr-0.8.3a.tar.gz && cd ares-0.8.3a
+curl -L -o applyr-0.8.3a.tar.gz https://github.com/keshm2/applyr/archive/refs/tags/0.8.3a.tar.gz
+tar -xzf applyr-0.8.3a.tar.gz && cd applyr-0.8.3a
 ```
 
 The release page also exposes the standard
@@ -381,7 +386,7 @@ If the panel reports "bridge unreachable", start the bridge (step 1).
 ## 3.7 Two users on one machine (Phase 9)
 
 applyr is **single-user by design**: everything personal lives in the
-clone (`config/`, `data/`, `logs/`, `resumes/`, `.playwright-mcp/`).
+clone (`config/`, `data/` incl. resumes, `logs/`, `.playwright-mcp/`).
 To run applyr for two people on one machine, use **two separate
 clones** (e.g. `~/applyr-alice` and `~/applyr-bob`), each with its own
 configs, state, and resumes — point the TUI at the right one with

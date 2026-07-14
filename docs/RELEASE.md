@@ -117,7 +117,7 @@ or opencode (full capability), or Codex CLI / GitHub Copilot CLI
 
 ```bash
 # install (one command; puts `applyr` on your PATH):
-curl -fsSL https://raw.githubusercontent.com/keshm2/ares/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install.sh | bash
 
 # or via npm:
 npm install -g @keshm/applyr

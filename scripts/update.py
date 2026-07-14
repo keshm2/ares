@@ -9,8 +9,9 @@ Compares the local VERSION against upstream main and, when they differ,
 updates in place:
   - git checkout:    git pull --ff-only origin main
   - tarball install: download the main tarball and overlay it
-Per-user files (live config/*.json, data/, logs/, resumes/, .playwright-mcp/)
-are gitignored and absent from the tarball, so an overlay cannot clobber them.
+Per-user files (live config/*.json, data/ incl. resumes, logs/,
+.playwright-mcp/) are gitignored and absent from the tarball, so an
+overlay cannot clobber them.
 
   update.py           # manual, verbose
   update.py --auto    # hook mode: quiet, ALWAYS exits 0 (fail-open)
@@ -39,11 +40,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 VERSION_URL = os.environ.get(
     "APPLYR_UPDATE_URL",
-    "https://raw.githubusercontent.com/keshm2/ares/main/VERSION",
+    "https://raw.githubusercontent.com/keshm2/applyr/main/VERSION",
 )
 TARBALL_URL = os.environ.get(
     "APPLYR_TARBALL_URL",
-    "https://codeload.github.com/keshm2/ares/tar.gz/refs/heads/main",
+    "https://codeload.github.com/keshm2/applyr/tar.gz/refs/heads/main",
 )
 
 
@@ -149,7 +150,7 @@ def _overlay_tarball(fail_open) -> None:
             with tarfile.open(tmp_tgz, "r:gz") as tar:
                 members = []
                 for m in tar.getmembers():
-                    # strip-components=1: drop the leading "ares-main/" segment.
+                    # strip-components=1: drop the leading "applyr-main/" segment.
                     parts = m.name.split("/", 1)
                     if len(parts) < 2 or not parts[1]:
                         continue

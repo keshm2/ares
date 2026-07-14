@@ -61,8 +61,8 @@
 ## Single-user deployment (phase 9)
 
 **applyr runs as one user on one machine.** State files in `data/`,
-live configs in `config/`, logs in `logs/`, and the resume folders
-(`resumes/`, `data/resumes/`) are all implicitly per-user — there is
+live configs in `config/`, logs in `logs/`, and the resume folder
+(`data/resumes/`) are all implicitly per-user — there is
 no profile abstraction and none should be introduced without an
 explicitly approved phase. Two people who want to run applyr on the
 same machine today do so via **two separate clones** with two
@@ -75,7 +75,7 @@ profile-based multi-user is a deliberately deferred future migration.
 | --- | --- | --- |
 | Per-user: live config | `config/targets.json`, `config/discord_config.json`, `config/google_sheets_config.json`, `config/service-account-key.json`, `config/harness.json`, `config/extension_bridge.json`, `.claude/settings.json` | All gitignored; hold PII/secrets/per-machine choices |
 | Per-user: runtime state | `data/applied_jobs.json`, `data/review_queue.json`, `data/job_registry.json`, `data/job_events.jsonl` | Written only by the `scripts/` helpers |
-| Per-user: personal documents | `resumes/` (root PDF drop-folder), `data/resumes/` (markdown resumes + cover letter) | Gitignored PII |
+| Per-user: personal documents | `data/resumes/` (markdown resumes + cover letter, each with a matching PDF) | Gitignored PII |
 | Per-user: logs + heartbeat | `logs/` (`run_job_agent.log`, `session_*.log`, `heartbeat.json`, `launchd.{out,err}.log`, `tmp/`) | Retention pruned by the runner |
 | Per-user: browser artifacts | `.playwright-mcp/` | Playwright profile/session state |
 | Per-user: schedule | `~/Library/LaunchAgents/com.applyr.job-agent.plist` | Lives outside the repo; label is fixed (see seams) |
@@ -102,7 +102,7 @@ today:
 - **Google service-account key path** — the
   `service_account_key_path` field inside
   `config/google_sheets_config.json`.
-- **Resume folders** — root `resumes/` and `data/resumes/`.
+- **Resume folder** — `data/resumes/`.
 - **launchd label** — `com.applyr.job-agent` is fixed in
   `scheduler.sh`, so two clones cannot both install the 30-minute
   schedule today; a second install would need a per-clone label.

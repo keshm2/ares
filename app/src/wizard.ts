@@ -114,15 +114,6 @@ export async function runWizard(root: string, checkOnly: boolean): Promise<numbe
         }
       }
     }
-    // Resumes drop-folder — the agent scans PDFs here and converts each to
-    // markdown so it can tailor the best match per job.
-    const resumesDir = path.join(root, "resumes");
-    fs.mkdirSync(resumesDir, { recursive: true });
-    notice("📄  Resumes: drop ALL your resumes as PDFs into");
-    notice(`    ${resumesDir}/`);
-    notice("    applyr scans them and converts each to markdown for per-job tailoring.");
-    notice("    This folder is gitignored — local only.");
-    console.log("");
   } finally {
     rl.close();
   }
