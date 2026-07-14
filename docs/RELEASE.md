@@ -1,23 +1,49 @@
-# Release notes — applyr 0.8.2a
+# Release notes — applyr 0.8.3a
 
-> **Build:** `0.8.2a` — alpha.
+> **Build:** `0.8.3a` — alpha.
 > **Branch:** `main`.
-> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.2a"`
+> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.3a"`
 > (visible in the TUI side-panel footer).
-> **npm package:** `@keshm/applyr` version `0.8.2-alpha.0`, published
+> **npm package:** `@keshm/applyr` version `0.8.3-alpha.0`, published
 > to the default `latest` dist-tag — `npm install -g @keshm/applyr`
 > gets it. The unscoped npm name `applyr` belongs to an unrelated
 > package — never `npm install applyr`. npm requires strict semver, so
-> `0.8.2a` is the human-facing marker and `0.8.2-alpha.0` its semver
+> `0.8.3a` is the human-facing marker and `0.8.3-alpha.0` its semver
 > form.
-> **Rollout:** the first auto-updated release — clients that installed
-> the updater lineage self-update on their next scheduled run or
-> `applyr` launch; older installs update manually once
-> (`bash scripts/update.sh`).
-> **Browser extension:** `0.8.2` / `0.8.2a`.
-> **Previous releases:** `0.7.8a` and `0.5.5a` — deep-dive notes live
-> at this path under their git tags; the index is
+> **Rollout:** clients that installed the updater lineage self-update
+> on their next scheduled run or `applyr` launch; older installs
+> update manually once (`bash scripts/update.sh`).
+> **Browser extension:** unchanged in this build — `0.8.2` / `0.8.2a`.
+> **Previous releases:** `0.8.2a`, `0.7.8a`, and `0.5.5a` — deep-dive
+> notes live at this path under their git tags; the index is
 > [`CHANGELOG.md`](./CHANGELOG.md).
+
+## What's new in 0.8.3a
+
+Installer-only bugfix release — no TUI, extension, or core behavior
+changes.
+
+- **Fixed: `install.ps1` "Unexpected token" parse errors on Windows.**
+  The script had no BOM and used em-dashes in strings/comments.
+  Windows PowerShell 5.1 (`powershell.exe`, the version that actually
+  ships on Windows — not PS7's `pwsh.exe`) reads BOM-less `.ps1` files
+  under the legacy ANSI codepage rather than UTF-8, which corrupted
+  the em-dash bytes and broke the tokenizer, producing "Unexpected
+  token" / "Missing closing '}'" errors that blocked the parse before
+  a single line executed. Confirmed by round-tripping the file through
+  cp1252 and reparsing with PowerShell's own AST parser, then fixed by
+  replacing every em-dash with a plain ASCII hyphen.
+- **Fixed: the installer one-liner couldn't self-heal.** Both
+  `install.ps1` and `install.sh` skipped re-downloading the source
+  tarball whenever an install already existed at `$target`
+  (`AGENTS.md` present), so anyone who'd already hit the bug above —
+  or any other stale/corrupted local copy — got stuck re-running the
+  same broken script every time they retried `irm ... | iex` /
+  `curl ... | bash`. Both installers now always re-fetch and overwrite
+  the tracked source files before delegating to the local installer,
+  even when one is already present. Gitignored local state
+  (`config/*.json`, `data/`, `logs/`, `resumes/`, `docs/PLAN.md`)
+  isn't part of the tarball, so it's never touched.
 
 ## What's new in 0.8.2a
 

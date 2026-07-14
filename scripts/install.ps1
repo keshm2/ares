@@ -49,17 +49,22 @@ if ($scriptPath) {
 if (-not $projectRoot) {
   $target = if ($env:APPLYR_HOME) { $env:APPLYR_HOME } else { Join-Path $HOME "applyr" }
   if (Test-Path (Join-Path $target "AGENTS.md")) {
-    Say "existing install found at $target - re-running its installer."
+    Say "existing install found at $target - refreshing it from GitHub before re-running."
   } else {
     Say "downloading applyr into $target ..."
-    New-Item -ItemType Directory -Force -Path $target | Out-Null
-    $tgz = Join-Path $env:TEMP ("applyr-" + [System.Guid]::NewGuid().ToString() + ".tar.gz")
-    Invoke-WebRequest -UseBasicParsing -Uri "https://codeload.github.com/keshm2/ares/tar.gz/refs/heads/main" -OutFile $tgz
-    # tar.exe ships with Windows 10+; --strip-components drops the top dir.
-    & tar.exe -xzf $tgz --strip-components=1 -C $target
-    if ($LASTEXITCODE -ne 0) { Fail "failed to unpack the source tarball (needs Windows 10+ tar.exe)" }
-    Remove-Item $tgz -ErrorAction SilentlyContinue
   }
+  New-Item -ItemType Directory -Force -Path $target | Out-Null
+  # Always re-fetch and overwrite tracked files, even for an existing install:
+  # heals a stale or corrupted local copy (e.g. an old script version with a
+  # bug) instead of re-running whatever happens to already be on disk.
+  # Gitignored local state (config\*.json, data\, logs\, resumes\,
+  # docs\PLAN.md) isn't in the tarball, so it's left untouched.
+  $tgz = Join-Path $env:TEMP ("applyr-" + [System.Guid]::NewGuid().ToString() + ".tar.gz")
+  Invoke-WebRequest -UseBasicParsing -Uri "https://codeload.github.com/keshm2/ares/tar.gz/refs/heads/main" -OutFile $tgz
+  # tar.exe ships with Windows 10+; --strip-components drops the top dir.
+  & tar.exe -xzf $tgz --strip-components=1 -C $target
+  if ($LASTEXITCODE -ne 0) { Fail "failed to unpack the source tarball (needs Windows 10+ tar.exe)" }
+  Remove-Item $tgz -ErrorAction SilentlyContinue
   & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $target "scripts\install.ps1")
   exit $LASTEXITCODE
 }

@@ -47,13 +47,18 @@ else
   command -v tar  >/dev/null 2>&1 || fail "tar is required for the one-line install"
   TARGET_DIR="${APPLYR_HOME:-$HOME/applyr}"
   if [ -f "$TARGET_DIR/AGENTS.md" ]; then
-    say "existing install found at $TARGET_DIR — re-running its installer."
+    say "existing install found at $TARGET_DIR — refreshing it from GitHub before re-running."
   else
     say "downloading applyr into $TARGET_DIR …"
-    mkdir -p "$TARGET_DIR"
-    curl -fsSL "https://codeload.github.com/keshm2/ares/tar.gz/refs/heads/main" \
-      | tar -xz --strip-components=1 -C "$TARGET_DIR"
   fi
+  mkdir -p "$TARGET_DIR"
+  # Always re-fetch and overwrite tracked files, even for an existing install:
+  # heals a stale or corrupted local copy (e.g. an old script version with a
+  # bug) instead of re-running whatever happens to already be on disk.
+  # Gitignored local state (config/*.json, data/, logs/, resumes/,
+  # docs/PLAN.md) isn't in the tarball, so it's left untouched.
+  curl -fsSL "https://codeload.github.com/keshm2/ares/tar.gz/refs/heads/main" \
+    | tar -xz --strip-components=1 -C "$TARGET_DIR"
   # Re-attach stdin to the terminal so the interactive prompts below work
   # even though the script itself arrived on stdin.
   if [ -e /dev/tty ]; then

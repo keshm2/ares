@@ -7,6 +7,30 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.8.3a] — 2026-07-14
+
+npm package: `@keshm/applyr` version `0.8.3-alpha.0`.
+
+### Fixed
+
+- **Windows PowerShell installer: "Unexpected token" parse errors.**
+  `install.ps1` had no BOM and used em-dashes in strings/comments;
+  Windows PowerShell 5.1 (`powershell.exe`, not PS7's `pwsh.exe`) reads
+  BOM-less `.ps1` files under the legacy ANSI codepage instead of
+  UTF-8, which corrupted the em-dash bytes and broke the tokenizer —
+  reproduced by round-tripping the file through cp1252 and reparsing
+  with PowerShell's own AST parser. Replaced every em-dash with a
+  plain ASCII hyphen.
+- **Installer one-liner never healed a broken local install.**
+  `install.ps1` / `install.sh` skipped re-downloading the source
+  tarball whenever `$target/AGENTS.md` already existed, so anyone who
+  hit the bug above (or any other stale/corrupted local copy) got
+  stuck re-running the same broken script forever via
+  `irm ... | iex`. Both installers now always re-fetch and overwrite
+  tracked files before delegating, even for an existing install;
+  gitignored local state (`config/*.json`, `data/`, `logs/`,
+  `resumes/`, `docs/PLAN.md`) is never touched.
+
 ## [0.8.0a] — 2026-07-13
 
 ## [0.8.2a] — 2026-07-14
