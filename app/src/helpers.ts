@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import { py } from "./platform.js";
 import type { AppliedJob } from "./state.js";
 
@@ -117,6 +118,54 @@ export function openUrl(url: string): void {
   }
   const opener = process.platform === "darwin" ? "open" : "xdg-open";
   execFileSync(opener, [parsed.toString()], { stdio: "ignore" });
+}
+
+/** Open a local directory in the OS file manager (Finder/Explorer/whatever
+ *  handles xdg-open on Linux). Creates the directory first if it doesn't
+ *  exist yet, so a fresh install's empty data/resumes/ still opens cleanly
+ *  instead of erroring. */
+export function openPath(target: string): void {
+  fs.mkdirSync(target, { recursive: true });
+  if (process.platform === "win32") {
+    execFileSync("cmd", ["/c", "start", "", target], { stdio: "ignore" });
+    return;
+  }
+  const opener = process.platform === "darwin" ? "open" : "xdg-open";
+  execFileSync(opener, [target], { stdio: "ignore" });
+}
+
+export interface ConvertResumeResult {
+  ok: boolean;
+  stem: string;
+  mdPath?: string;
+  chars?: number;
+  error?: string;
+}
+
+/** Convert a resume/cover-letter PDF already in data/resumes/ to markdown
+ *  via scripts/state/convert_resume.py (pypdf text extraction — Python
+ *  owns this, not a TS PDF-parsing dependency). Never throws; failures
+ *  come back as { ok: false, error }. */
+export function convertResumePdf(root: string, stem: string, force = false): ConvertResumeResult {
+  const args = ["scripts/state/convert_resume.py", stem];
+  if (force) args.push("--force");
+  const conv = py(args);
+  const res = spawnSync(conv.cmd, conv.args, { cwd: root, encoding: "utf8" });
+  const stdout = (res.stdout ?? "").trim();
+  let parsed: { ok?: boolean; md_path?: string; chars?: number; error?: string } = {};
+  try {
+    parsed = stdout ? JSON.parse(stdout) : {};
+  } catch {
+    // non-JSON stdout — fall through to the generic failure path
+  }
+  if (res.status === 0 && parsed.ok) {
+    return { ok: true, stem, mdPath: parsed.md_path, chars: parsed.chars };
+  }
+  return {
+    ok: false,
+    stem,
+    error: parsed.error ?? (res.stderr ?? "").trim() ?? `exit ${res.status}`,
+  };
 }
 
 /** Message from a failed helper invocation, trimmed for display. */

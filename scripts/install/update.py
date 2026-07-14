@@ -11,7 +11,10 @@ updates in place:
   - tarball install: download the main tarball and overlay it
 Per-user files (live config/*.json, data/ incl. resumes, logs/,
 .playwright-mcp/) are gitignored and absent from the tarball, so an
-overlay cannot clobber them.
+overlay cannot clobber them. An already-installed launchd/schtasks
+schedule is also refreshed post-update (see _refresh_schedule_if_installed)
+so a future script relocation can't strand it on a stale path the way
+the 0.8.4a scripts/ reorg did for pre-existing schedules.
 
   update.py           # manual, verbose
   update.py --auto    # hook mode: quiet, ALWAYS exits 0 (fail-open)
@@ -185,6 +188,35 @@ def _safe_extractall(tar, dest_root, members) -> None:
                 shutil.copyfileobj(src, out)
 
 
+def _refresh_schedule_if_installed(say) -> None:
+    """A launchd/schtasks entry bakes in an absolute path to the runner
+    script at install time. If a future release ever relocates that
+    script again (as the 0.8.4a scripts/ reorg did), an already-installed
+    schedule would keep invoking the stale path forever — the tarball
+    overlay never deletes old files, so nothing errors, it just silently
+    stops receiving updates while VERSION reports current. Re-running
+    scheduler.py install (fully idempotent — identical content when
+    nothing changed) after every update keeps an existing schedule
+    pointed at wherever the runner actually lives now. Only touches a
+    schedule the user already opted into; never installs a new one."""
+    is_mac = sys.platform == "darwin"
+    is_win = os.name == "nt"
+    if not (is_mac or is_win):
+        return  # Linux has no scriptable schedule here (systemd is manual)
+    scheduler = os.path.join("scripts", "runtime", "scheduler.py")
+    if not os.path.isfile(scheduler):
+        return
+    status = subprocess.run([sys.executable, scheduler, "status"],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    installed = "NOT loaded" not in status.stdout and "NOT registered" not in status.stdout
+    if not installed:
+        return
+    r = subprocess.run([sys.executable, scheduler, "install"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if r.returncode != 0:
+        say("WARNING: could not refresh the existing schedule — run scripts/runtime/scheduler.py install")
+
+
 def _post_update(say) -> None:
     # Each step warn-only so a hiccup never bricks an already-updated install.
     if subprocess.run([sys.executable, "scripts/validate/generate_agent_definitions.py"],
@@ -193,6 +225,7 @@ def _post_update(say) -> None:
     if subprocess.run([sys.executable, "scripts/validate/validate_local_config.py"],
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
         say("WARNING: config validation reported issues — run scripts/validate/validate_local_config.py")
+    _refresh_schedule_if_installed(say)
     npm = shutil.which("npm")
     if npm:
         for rel, label in (("app", "TUI"), ("extension", "browser extension")):

@@ -4,7 +4,7 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
-> **Build:** this document ships with release `0.8.041a`. The
+> **Build:** this document ships with release `0.8.42a`. The
 > full release notes are in [`RELEASE.md`](./RELEASE.md); the
 > project changelog is in [`CHANGELOG.md`](./CHANGELOG.md).
 
@@ -57,16 +57,25 @@ base resume per job and tailors it. Everything you enter is written
 only to gitignored local files (`config/`, `data/resumes/`) and never
 leaves your machine.
 
+**Only have PDFs?** Open the TUI's **Resumes** screen (`applyr resumes`,
+or press `5`/select it from the welcome menu) — it shows which of the
+categories above are missing their `.md`, lets you open `data/resumes/`
+directly in Finder/Explorer, and converts a PDF you've dropped in to
+markdown on the spot (`scripts/state/convert_resume.py`, text
+extraction via `pypdf` — `pip3 install pypdf` if it's not already
+installed). Extraction only, not OCR: a scanned image with no text
+layer needs a hand-written `.md` instead.
+
 **Downloading the release archive.**
 
 ```bash
 # zip
-curl -L -o applyr-0.8.041a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.8.041a.zip
-unzip applyr-0.8.041a.zip && cd applyr-0.8.041a
+curl -L -o applyr-0.8.42a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.8.42a.zip
+unzip applyr-0.8.42a.zip && cd applyr-0.8.42a
 
 # or tarball
-curl -L -o applyr-0.8.041a.tar.gz https://github.com/keshm2/applyr/archive/refs/tags/0.8.041a.tar.gz
-tar -xzf applyr-0.8.041a.tar.gz && cd applyr-0.8.041a
+curl -L -o applyr-0.8.42a.tar.gz https://github.com/keshm2/applyr/archive/refs/tags/0.8.42a.tar.gz
+tar -xzf applyr-0.8.42a.tar.gz && cd applyr-0.8.42a
 ```
 
 The release page also exposes the standard

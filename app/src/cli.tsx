@@ -20,6 +20,7 @@ Usage: applyr [command]
 
   (no command)      open the app (status · jobs · review · history)
   review | history  open the app on that screen
+  resumes           open the app on the Resumes screen
   status            one-shot pipeline overview (scripting/CI friendly)
   run               trigger a run in the current terminal (no app shell)
   setup [--check]   interactive config wizard; --check only validates
@@ -242,6 +243,8 @@ async function main(): Promise<number> {
       return openApp(root, "review");
     case "history":
       return openApp(root, "history");
+    case "resumes":
+      return openApp(root, "resumes");
     case "status": {
       const state = loadState(root);
       const unresolved = state.queue.filter((e) => !isResolved(state, e)).length;

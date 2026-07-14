@@ -4,3 +4,7 @@
 google-api-python-client>=2.0.0
 google-auth>=2.0.0
 google-auth-httplib2>=0.1.0
+
+# Resume PDF -> markdown conversion (scripts/state/convert_resume.py,
+# TUI Resumes screen). Pure-Python text extraction, no system deps.
+pypdf>=5.0.0

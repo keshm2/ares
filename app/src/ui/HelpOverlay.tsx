@@ -28,11 +28,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
  *  the sectioned reference (an overflowing frame corrupts Ink's repaint). */
 function CompactHelp() {
   const lines: Array<[string, string]> = [
-    ["Everywhere", "1-5/←→/tab screens · esc/w menu · m mode · R reload · q quit"],
+    ["Everywhere", "1-6/←→/tab screens · esc/w menu · m mode · R reload · q quit"],
     ["Jobs MANUAL", "/ query · ↑↓ select · enter/o open · f fit · s save"],
     ["Jobs AUTO", "e cap (25=MAX) · p prompt · s start"],
     ["Review", "↑↓ · enter/o open · a applied · d dismiss · x resolved"],
     ["History", "↑↓ · enter/o open"],
+    ["Resumes", "↑↓ · o open folder · c convert PDF"],
     ["Config", "↑↓ · enter open/edit/toggle · esc back"],
   ];
   return (
@@ -53,9 +54,9 @@ function CompactHelp() {
 }
 
 /** Full key reference, opened with `?` from anywhere in the app.
- *  Needs ~31 rows; shorter terminals get the compact variant. */
+ *  Needs ~36 rows; shorter terminals get the compact variant. */
 export function HelpOverlay({ contentRows = 40 }: { contentRows?: number }) {
-  if (contentRows < 31) return <CompactHelp />;
+  if (contentRows < 36) return <CompactHelp />;
   return (
     <Box flexDirection="column">
       <Text bold color={theme.accent}>
@@ -63,7 +64,7 @@ export function HelpOverlay({ contentRows = 40 }: { contentRows?: number }) {
       </Text>
       <Box marginTop={1} flexDirection="column">
         <Section title="Everywhere">
-          <Key k="1-5 / tab / ←→" desc="switch screen (Status · Jobs · Review · History · Config)" />
+          <Key k="1-6 / tab / ←→" desc="switch screen (Status · Jobs · Review · History · Resumes · Config)" />
           <Key k="m" desc="toggle MANUAL / AUTO mode (changes the Jobs screen)" />
           <Key k="R" desc="reload state from disk" />
           <Key k="esc / w" desc="back to the welcome menu (esc never quits; locked mid-run)" />
@@ -90,6 +91,11 @@ export function HelpOverlay({ contentRows = 40 }: { contentRows?: number }) {
         </Section>
         <Section title="History">
           <Key k="enter / o" desc="open the posting" />
+        </Section>
+        <Section title="Resumes">
+          <Key k="↑↓ or j/k" desc="select a resume category" />
+          <Key k="o" desc="open data/resumes/ in Finder / Explorer / file manager" />
+          <Key k="c / enter" desc="convert the selected PDF to markdown (skips if already converted)" />
         </Section>
         <Section title="Config (settings)">
           <Key k="enter" desc="open a section / edit the selected field (current values always shown)" />

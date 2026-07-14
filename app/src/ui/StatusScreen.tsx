@@ -161,7 +161,7 @@ export function StatusScreen({
 
       {embedded ? null : (
         <Box marginTop={1}>
-          <Text dimColor>Open the app with: applyr (screens: status · jobs · review · history)</Text>
+          <Text dimColor>Open the app with: applyr (screens: status · jobs · review · history · resumes · settings)</Text>
         </Box>
       )}
     </Box>

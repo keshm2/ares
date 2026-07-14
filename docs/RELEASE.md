@@ -1,24 +1,59 @@
-# Release notes — applyr 0.8.041a
+# Release notes — applyr 0.8.42a
 
-> **Build:** `0.8.041a` — alpha.
+> **Build:** `0.8.42a` — alpha.
 > **Branch:** `main`.
-> **TUI in-app marker:** `app/src/theme.ts` →
-> `BUILD_MARKER = "0.8.041a"` (visible in the TUI side-panel footer).
-> **npm package:** `@keshm/applyr` version `0.8.41-alpha.0`, published
+> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.42a"`
+> (visible in the TUI side-panel footer).
+> **npm package:** `@keshm/applyr` version `0.8.42-alpha.0`, published
 > to the default `latest` dist-tag — `npm install -g @keshm/applyr`
 > gets it. The unscoped npm name `applyr` belongs to an unrelated
-> package — never `npm install applyr`. npm requires strict semver,
-> which disallows leading zeros in a numeric identifier, so the human
-> marker `0.8.041a` maps to semver `0.8.41-alpha.0` (npm would
-> silently strip the zero on publish either way — set explicitly here
-> to avoid the package.json and the published version disagreeing).
+> package — never `npm install applyr`.
 > **Rollout:** clients that installed the updater lineage self-update
 > on their next scheduled run or `applyr` launch; older installs
-> update manually once (`bash scripts/install/update.sh`).
+> update manually once (`bash scripts/install/update.sh`). **See the
+> "Fixed" note below if you have a schedule installed from before
+> 0.8.4a** — it needs a one-time manual refresh.
 > **Browser extension:** unchanged in this build — `0.8.2` / `0.8.2a`.
-> **Previous releases:** `0.8.4a`, `0.8.3a`, `0.8.2a`, `0.7.8a`, and
-> `0.5.5a` — deep-dive notes live at this path under their git tags;
-> the index is [`CHANGELOG.md`](./CHANGELOG.md).
+> **Previous releases:** `0.8.041a`, `0.8.4a`, `0.8.3a`, `0.8.2a`,
+> `0.7.8a`, and `0.5.5a` — deep-dive notes live at this path under
+> their git tags; the index is [`CHANGELOG.md`](./CHANGELOG.md).
+
+## What's new in 0.8.42a
+
+- **Resumes screen** — a 6th TUI tab (`applyr resumes`, or pick it from
+  the welcome menu). Shows all 6 filenames `resume-tailor.md` actually
+  reads (`base_resume_swe`, `_ai_ml`, `_cyber`, `_networking_cyber`,
+  `_balanced`, `base_cover_letter`), each marked ready / needs
+  conversion / not added yet. `o` opens `data/resumes/` directly in
+  Finder/Explorer/xdg-open — no more guessing where applyr expects
+  resumes to live. `c` converts a PDF that's missing its markdown
+  counterpart on the spot, via the new `scripts/state/convert_resume.py`
+  (real `pypdf` text extraction, now declared in `requirements.txt`) —
+  no more silently-unusable resumes because the tailoring agent only
+  reads `.md`. A `(N)` badge on the tab bar surfaces pending
+  conversions, matching the existing Review badge.
+
+### Fixed — read this if you have an existing schedule from before 0.8.4a
+
+Auto-update could silently strand an already-installed launchd/schtasks
+schedule on a stale script path. The `0.8.4a` `scripts/` reorg was the
+first update to ever relocate the runner script itself; the
+tarball-overlay updater adds/overwrites files but never deletes old
+ones, so a schedule entry written before that reorg kept invoking the
+old flat `scripts/run_job_agent.sh` forever — `VERSION` correctly
+reported the current build, but the *scheduled* pipeline silently
+never picked up anything shipped after 0.8.4a. (The interactive TUI
+was never affected — `applyr` always rebuilds fresh from source on
+every update.)
+
+`update.py` now re-runs `scheduler.py install` (fully idempotent —
+identical content when nothing changed) after every successful update
+whenever a schedule is already present, so this class of bug can't
+recur for anyone past this release.
+
+**One-time fix if you're currently affected:** run `applyr` once and
+accept the update prompt (this alone refreshes the schedule going
+forward), or simply `applyr uninstall` and reinstall.
 
 ## What's new in 0.8.041a
 

@@ -7,6 +7,39 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.8.42a] — 2026-07-14
+
+npm package: `@keshm/applyr` version `0.8.42-alpha.0`.
+
+### Added
+
+- **Resumes screen (6th TUI tab, `applyr resumes`, or the welcome
+  menu).** Shows all 6 filenames `resume-tailor.md` actually reads,
+  each marked ready / needs conversion / not added; `o` opens
+  `data/resumes/` in Finder/Explorer/xdg-open; `c` converts a PDF
+  missing its markdown counterpart on the spot via the new
+  `scripts/state/convert_resume.py` (`pypdf` text extraction, added to
+  `requirements.txt`). A `(N)` badge on the tab bar surfaces pending
+  conversions, matching the existing Review badge.
+
+### Fixed
+
+- **Auto-update could silently strand an already-installed schedule on
+  a stale script path.** The 0.8.4a `scripts/` reorg was the first
+  update to ever relocate the runner script itself; the tarball-overlay
+  updater never deletes old files, so a launchd/schtasks entry written
+  before the reorg kept invoking the old flat `scripts/run_job_agent.sh`
+  forever — `VERSION` correctly reported current, but the *scheduled*
+  pipeline silently never modernized (the interactive TUI was
+  unaffected; it rebuilds fresh from source on every update).
+  `update.py` now re-runs `scheduler.py install` (fully idempotent)
+  after every update whenever a schedule is already present, so this
+  class of bug can't recur for anyone past this release.
+  **If you already have a schedule installed from before 0.8.4a**,
+  one-time fix: run `applyr` once and accept the update prompt, or
+  just re-run the installer — either refreshes the schedule. Simplest
+  option: `applyr uninstall` then reinstall.
+
 ## [0.8.041a] — 2026-07-14
 
 npm package: `@keshm/applyr` version `0.8.41-alpha.0` (the human
