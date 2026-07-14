@@ -7,6 +7,52 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.8.4a] — 2026-07-14
+
+npm package: `@keshm/applyr` version `0.8.4-alpha.0`.
+
+### Changed
+
+- **Repository renamed `keshm2/ares` → `keshm2/applyr`** to match the
+  product's actual name. All 19 hardcoded install/update URLs updated
+  (installer scripts, the TUI's bootstrap/version constants,
+  `app/package.json`), plus the GitHub-tarball extracted-folder-name
+  assumption in `docs/SETUP.md`'s manual-download instructions.
+- **`scripts/` reorganized** from 26 flat files into `install/`,
+  `runtime/`, `state/`, `jobs/`, `validate/` by concern. Every literal
+  `scripts/<name>` invocation across the TUI, the browser extension,
+  the three agent system prompts, this repo's own inter-script calls,
+  and the docs was updated to match; ten scripts that compute their
+  own project root via `__file__`/`BASH_SOURCE` parent-directory
+  arithmetic needed one more level of unwrapping. Verified end-to-end
+  with a real `applyr status` run and the full conformance suite
+  (13/13 PASS), not just static checks.
+- **Removed the unimplemented root `resumes/` drop-folder.** Nothing
+  in the codebase ever consumed it; `data/resumes/` is the real,
+  load-bearing location (`resume-tailor.md` reads from it directly).
+  Every installer/doc/uninstaller reference now points at
+  `data/resumes/`, with the actual expected filenames documented in
+  `docs/SETUP.md`.
+
+### Fixed
+
+- Hardcoded `/Users/keshmuthu/ares` absolute path in three
+  `.claude/settings.local.json` Bash permission strings.
+- `scheduler.py`'s Linux advice hardcoded "every 30 min" regardless of
+  `APPLYR_SCHEDULE_INTERVAL_SEC`; now reflects the actual configured
+  interval.
+
+### Housekeeping
+
+- Purged 59MB of stale `logs/tmp/` scrape scratch, the orphaned
+  `token-optimizer/` cache, and stale `.playwright-mcp/` session
+  artifacts (all gitignored, no tracked-file impact). Moved
+  `system_architecture.md` into `docs/`.
+- Published `0.8.3-alpha.0` to npm (tagged on GitHub since the
+  0.8.3a release but never published — `0.8.2-alpha.0` has the same
+  gap and remains unpublished) and created the missing GitHub Release
+  page for `0.8.3a`.
+
 ## [0.8.3a] — 2026-07-14
 
 npm package: `@keshm/applyr` version `0.8.3-alpha.0`.

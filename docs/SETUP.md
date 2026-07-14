@@ -4,7 +4,7 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
-> **Build:** this document ships with release `0.8.3a`. The
+> **Build:** this document ships with release `0.8.4a`. The
 > full release notes are in [`RELEASE.md`](./RELEASE.md); the
 > project changelog is in [`CHANGELOG.md`](./CHANGELOG.md).
 
@@ -61,12 +61,12 @@ leaves your machine.
 
 ```bash
 # zip
-curl -L -o applyr-0.8.3a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.8.3a.zip
-unzip applyr-0.8.3a.zip && cd applyr-0.8.3a
+curl -L -o applyr-0.8.4a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.8.4a.zip
+unzip applyr-0.8.4a.zip && cd applyr-0.8.4a
 
 # or tarball
-curl -L -o applyr-0.8.3a.tar.gz https://github.com/keshm2/applyr/archive/refs/tags/0.8.3a.tar.gz
-tar -xzf applyr-0.8.3a.tar.gz && cd applyr-0.8.3a
+curl -L -o applyr-0.8.4a.tar.gz https://github.com/keshm2/applyr/archive/refs/tags/0.8.4a.tar.gz
+tar -xzf applyr-0.8.4a.tar.gz && cd applyr-0.8.4a
 ```
 
 The release page also exposes the standard

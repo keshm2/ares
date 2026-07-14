@@ -13,7 +13,7 @@ a Google Sheet tracker.
 It's built on top of a coding agent — applyr is the workflow, the
 agent is the executor.
 
-> **Build 0.8.3a** — see [Release notes](docs/RELEASE.md) and
+> **Build 0.8.4a** — see [Release notes](docs/RELEASE.md) and
 > [Changelog](docs/CHANGELOG.md).
 
 ## You need a coding agent

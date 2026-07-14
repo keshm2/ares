@@ -1,22 +1,64 @@
-# Release notes — applyr 0.8.3a
+# Release notes — applyr 0.8.4a
 
-> **Build:** `0.8.3a` — alpha.
+> **Build:** `0.8.4a` — alpha.
 > **Branch:** `main`.
-> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.3a"`
+> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.4a"`
 > (visible in the TUI side-panel footer).
-> **npm package:** `@keshm/applyr` version `0.8.3-alpha.0`, published
+> **npm package:** `@keshm/applyr` version `0.8.4-alpha.0`, published
 > to the default `latest` dist-tag — `npm install -g @keshm/applyr`
 > gets it. The unscoped npm name `applyr` belongs to an unrelated
 > package — never `npm install applyr`. npm requires strict semver, so
-> `0.8.3a` is the human-facing marker and `0.8.3-alpha.0` its semver
+> `0.8.4a` is the human-facing marker and `0.8.4-alpha.0` its semver
 > form.
 > **Rollout:** clients that installed the updater lineage self-update
 > on their next scheduled run or `applyr` launch; older installs
-> update manually once (`bash scripts/update.sh`).
+> update manually once (`bash scripts/install/update.sh`).
 > **Browser extension:** unchanged in this build — `0.8.2` / `0.8.2a`.
-> **Previous releases:** `0.8.2a`, `0.7.8a`, and `0.5.5a` — deep-dive
-> notes live at this path under their git tags; the index is
+> **Previous releases:** `0.8.3a`, `0.8.2a`, `0.7.8a`, and `0.5.5a` —
+> deep-dive notes live at this path under their git tags; the index is
 > [`CHANGELOG.md`](./CHANGELOG.md).
+
+## What's new in 0.8.4a
+
+Repo restructure — no product behavior changes beyond the fixes
+below; existing installs update transparently.
+
+- **Repository renamed `keshm2/ares` → `keshm2/applyr`** to match the
+  product's actual name. Every hardcoded install/update URL updated
+  (installer scripts, the TUI's bootstrap/version constants,
+  `app/package.json`'s `repository.url`), plus the GitHub-tarball
+  extracted-folder-name assumption in `docs/SETUP.md`'s
+  manual-download instructions.
+- **`scripts/` reorganized** from 26 flat files into `install/`,
+  `runtime/`, `state/`, `jobs/`, `validate/` by concern (it had grown
+  unmanageable — this reverses a deliberate 2026-07-09 decision to
+  keep it flat, recorded in `docs/PLAN.md`). Every literal
+  `scripts/<name>` invocation across the TUI, the browser extension,
+  the three agent system prompts (regenerated into `.claude/agents/`
+  and `.opencode/agents/`), this repo's own inter-script calls, and
+  the docs was updated to match. Ten scripts that compute their own
+  project root via `__file__`/`BASH_SOURCE` parent-directory
+  arithmetic needed one more level of unwrapping now that they sit one
+  directory deeper — verified end-to-end with a real `applyr status`
+  run (loads actual historical data through the full subprocess
+  chain) and the full conformance suite (13/13 PASS), not just static
+  checks.
+- **Removed the unimplemented root `resumes/` drop-folder.** Nothing
+  in the codebase ever consumed it — `data/resumes/` is the real,
+  load-bearing location (`resume-tailor.md` reads from it directly).
+  Every installer/doc/uninstaller reference now points at
+  `data/resumes/`, with the actual expected filenames (per role
+  category) documented in `docs/SETUP.md`.
+- **Fixed:** a hardcoded `/Users/keshmuthu/ares` absolute path baked
+  into three `.claude/settings.local.json` Bash permission strings,
+  and `scheduler.py`'s Linux advice message, which hardcoded "every
+  30 min" regardless of `APPLYR_SCHEDULE_INTERVAL_SEC`.
+- **Housekeeping:** purged 59MB of stale `logs/tmp/` scrape scratch,
+  the orphaned `token-optimizer/` cache, and stale `.playwright-mcp/`
+  session artifacts (all gitignored, no tracked-file impact); moved
+  `system_architecture.md` into `docs/`; published the previously
+  skipped `0.8.3-alpha.0` to npm and created its missing GitHub
+  Release page.
 
 ## What's new in 0.8.3a
 
