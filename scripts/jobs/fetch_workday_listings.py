@@ -51,6 +51,7 @@ import re
 import sys
 import urllib.error
 import urllib.request
+from datetime import datetime, timedelta, timezone
 
 DEFAULT_TARGETS = "config/targets.json"
 PLACEHOLDER = "replace_me"
@@ -121,11 +122,33 @@ def strip_html(markup: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
+def parse_posted_on(text: str):
+    """Workday's public job-search API only exposes a bucketed relative-age
+    string ("Posted Today", "Posted 3 Days Ago", "Posted 30+ Days Ago"),
+    never an exact timestamp. Approximate an ISO date from the bucket so the
+    TUI's posted-date column has something to show, on the same footing as
+    the other sources' exact timestamps. Returns None if unparseable."""
+    if not text:
+        return None
+    t = text.strip().lower()
+    if "today" in t:
+        days = 0
+    elif "yesterday" in t:
+        days = 1
+    else:
+        m = re.search(r"(\d+)\+?\s*day", t)
+        if not m:
+            return None
+        days = int(m.group(1))
+    dt = datetime.now(timezone.utc) - timedelta(days=days)
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def to_raw_job(posting: dict, host: str, tenant: str, site: str) -> dict:
     path = str(posting.get("externalPath", "")).strip()
     bullet = posting.get("bulletFields") or []
     external_id = str(bullet[0]).strip() if bullet else path.rsplit("_", 1)[-1]
-    return {
+    job = {
         "source": "workday",
         "company": tenant,
         "title": str(posting.get("title", "")).strip(),
@@ -136,6 +159,10 @@ def to_raw_job(posting: dict, host: str, tenant: str, site: str) -> dict:
         # after role filtering and BEFORE the fit gate (same rule as the
         # SimplifyJobs feeds).
     }
+    posted_at = parse_posted_on(str(posting.get("postedOn", "")))
+    if posted_at:
+        job["posted_at"] = posted_at
+    return job
 
 
 def fetch_jd(url: str, timeout: int) -> dict:

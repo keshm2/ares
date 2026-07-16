@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """seed_vetted_slugs.py — vetted slug auto-seeding (Phase 6).
 
-Seeds the Ashby / Lever company-slug arrays in config/targets.json from
-the project-owned vetted lists (config/ashby_vetted_slugs.json and
-config/lever_vetted_slugs.json) so a fresh clone has real board
+Seeds the Ashby / Lever / Greenhouse company-slug arrays in
+config/targets.json from the project-owned vetted lists
+(config/ashby_vetted_slugs.json, config/lever_vetted_slugs.json,
+config/greenhouse_vetted_slugs.json) so a fresh clone has real board
 coverage on the first run.
 
 Seeding rules (per slug array, independently):
@@ -50,6 +51,7 @@ PLACEHOLDER = "replace_me"
 SOURCES = {
     "ashby_company_slugs": "ashby_vetted_slugs.json",
     "lever_company_slugs": "lever_vetted_slugs.json",
+    "greenhouse_company_slugs": "greenhouse_vetted_slugs.json",
 }
 
 
@@ -115,7 +117,7 @@ def atomic_write_json(path: str, data: dict) -> None:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="seed_vetted_slugs.py",
-        description="Seed placeholder Ashby/Lever slug arrays from vetted lists (Phase 6).",
+        description="Seed placeholder Ashby/Lever/Greenhouse slug arrays from vetted lists (Phase 6).",
     )
     parser.add_argument("--targets", default=DEFAULT_TARGETS)
     args = parser.parse_args(argv)

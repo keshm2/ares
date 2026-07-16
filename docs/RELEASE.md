@@ -1,20 +1,205 @@
-# Release notes — applyr 0.8.43a
+# Release notes — applyr 0.9.0a
 
-> **Build:** `0.8.43a` — alpha.
+> **Build:** `0.9.0a` — alpha.
 > **Branch:** `main`.
-> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.8.43a"`
+> **TUI in-app marker:** `app/src/theme.ts` → `BUILD_MARKER = "0.9.0a"`
 > (visible in the TUI side-panel footer).
-> **npm package:** `@keshm/applyr` version `0.8.43-alpha.0`, published
+> **npm package:** `@keshm/applyr` version `0.9.0-alpha.2`, published
 > to the default `latest` dist-tag — `npm install -g @keshm/applyr`
 > gets it. The unscoped npm name `applyr` belongs to an unrelated
-> package — never `npm install applyr`.
+> package — never `npm install applyr`. `0.9.0-alpha.0`/`alpha.1` were
+> published first, then superseded (npm won't let a version's contents
+> be overwritten in place, so the npm semver keeps bumping while the
+> human-facing build marker/git tag stay `0.9.0a` — same divergence as
+> `0.8.041a`'s `0.8.41-alpha.0`). Anyone who installed before this gets
+> the fix on their next `applyr update`/launch.
 > **Rollout:** clients that installed the updater lineage self-update
 > on their next scheduled run or `applyr` launch; older installs
-> update manually once (`bash scripts/install/update.sh`).
+> update manually once (`bash scripts/install/update.sh` /
+> `powershell scripts\install\update.ps1`).
 > **Browser extension:** unchanged in this build — `0.8.2` / `0.8.2a`.
-> **Previous releases:** `0.8.42a`, `0.8.041a`, `0.8.4a`, `0.8.3a`,
-> `0.8.2a`, `0.7.8a`, and `0.5.5a` — deep-dive notes live at this path
-> under their git tags; the index is [`CHANGELOG.md`](./CHANGELOG.md).
+> **Previous releases:** `0.8.43a`, `0.8.42a`, `0.8.041a`, `0.8.4a`,
+> `0.8.3a`, `0.8.2a`, `0.7.8a`, and `0.5.5a` — deep-dive notes live at
+> this path under their git tags; the index is
+> [`CHANGELOG.md`](./CHANGELOG.md).
+
+## What's new in 0.9.0a
+
+### Guided first-run onboarding wizard
+
+Replaces the old readline-based `wizard.ts` prompt sequence with a full
+Ink UI (`app/src/ui/onboarding/`): a multi-page, multi-field form
+(Basics → Contact → Location → Profiles → Work eligibility →
+Demographics → Roles → Job targets → Resumes) with `Tab`/`Shift+Tab`
+between fields on a page and `Shift+←/→` between pages, live
+autocomplete for home location and target companies, a skip-to-defaults
+flow for roles/locations/companies, and a percentage progress bar in a
+dedicated sidebar (`OnboardingSidePanel`) instead of the normal
+stats panel. Every field commits to `config/targets.json` immediately
+(not just at the end), so quitting mid-wizard and relaunching resumes
+exactly where you left off — `_onboarding.current_page` and
+`_onboarding.committed_fields` drive both the resume point and the
+live percentage. `applyr` auto-launches the wizard on a fresh install
+or an incomplete one; `<App>` (and its own welcome screen) never mounts
+until the wizard finishes.
+
+- **LinkedIn/GitHub now store as a bare username**
+  (`linkedin_username`/`github_username`), not a full URL — a new
+  `app/src/profileLinks.ts` normalizes either shape on read, so an
+  existing config with the old `linkedin_url`/`github_url` keeps
+  working with zero manual migration; the browser extension bridge
+  (`scripts/runtime/extension_bridge.py`) derives the full URL back out
+  at its API boundary, so `extension/` needed no changes.
+- **Settings screen expanded**: a new "Company targets" section makes
+  `role_keywords`/`level_keywords`/`season_keywords`/
+  `preferred_locations`/`ashby_company_slugs`/`lever_company_slugs`/
+  `workday_tenants` live-editable (previously hand-edit-`targets.json`-
+  only); Personal info gained `location`, `zip_code`, `address_line1`,
+  `address_line2`, `ethnicity`, `hispanic_or_latino`, `date_of_birth`.
+- **npm bootstrap no longer asks "install core now? [Y/n]"** — it just
+  installs, with a `--no-core` / `APPLYR_SKIP_CORE=1` opt-out for
+  advanced users who want to skip it.
+- **Resumes**: converting an arbitrarily-named PDF now asks for a short
+  description, recorded in a new gitignored
+  `data/resumes/.resume_meta.json` sidecar and shown in the Resumes tab.
+- **`docs/SETUP.md` trimmed** from ~700 lines to point at the wizard +
+  Settings + `targets.example.json`'s new inline `_help` notes instead
+  of walking through every field by hand.
+
+### Jobs manual search — overhauled
+
+- **Greenhouse joins Ashby/Lever/Workday** as a 4th toggleable source —
+  each is now a real `[x]`/`[✓]` checkbox (press `t` to focus the row,
+  `←/→` to move, `enter`/`space` to toggle), not read-only status text.
+- **Results table redesigned** into fixed, independently-truncating
+  columns (Company/Title/Posted/Location/Fit) so a long title can never
+  overrun the columns after it — the previous single-line-truncate
+  design let exactly that happen.
+- **Posted-date column and default recency sort**: `Xh ago` under a
+  day, `Xd ago` through 5 days, then a plain `mm/dd` (table) or full
+  `mm/dd/yyyy` (detail pane) beyond that. Results always sort
+  most-recent-first (`sortByPostedDesc` in `app/src/jobs.ts`) —
+  previously unsorted/source-order.
+- **Results capped to postings from the last 6 months** — old, likely-
+  filled listings no longer crowd out fresh ones (jobs with no
+  parseable posted date are kept, not dropped, since missing data isn't
+  evidence of staleness).
+- **Configurable results-per-page**: Settings → Environment →
+  "Jobs per page" (`APPLYR_JOBS_PER_PAGE`), 10-75, default 50 — the
+  same tiered-color warning style as the run screen's session-cap
+  picker, with a rainbow "will slow down your search" warning at 75.
+- **Fixed: a fuzzy-matching regression let non-intern postings through
+  an "intern" query** (e.g. "Internal Tools", "International" — a
+  subsequence/substring scorer only needs "intern"'s letters to appear
+  in order, and both those words start with them). Title matching is
+  back to precise per-word matching, with "intern" specifically
+  matched as a whole word (`intern`/`interns`/`internship`/
+  `internships`) so it can never match as a prefix of an unrelated word.
+- **Board-failure messages now name the failing slug(s)** instead of a
+  bare count (`"1/8 failed: acme-co"` vs `"1/8 boards failed"`), and
+  fetches retry once after a short pause before giving up — most
+  transient concurrent-fetch failures now resolve silently.
+- **Detail pane now shows company/source/location/posted-date plus the
+  fit gate** (previously missing the posted date and the plain company
+  name); the narrow-terminal fallback view got the same fields and no
+  longer requires a fit check to show anything.
+- **Sidebar decluttered**: the greeting/name/clock moved to the app
+  header (visible on every tab now, not just when the sidebar showed),
+  and the sidebar itself is hidden on the Jobs tab so the results table
+  gets the full terminal width instead of fighting a fixed side column.
+- **Settings' Personal info values right-aligned** into a clean column
+  instead of packed immediately after each label.
+
+### Fit gate
+
+- **Preferred location is now a soft preference, not a status gate** —
+  `evaluate_job_fit.py` splits its running total into `core_score`
+  (role/level/skills/years/degree — the only thing status thresholds
+  gate on) and a separately-reported `fit_score`
+  (`core_score + location_points` — display/sort only). A strong
+  candidate in a non-preferred location is no longer demoted, and a
+  weak one is no longer promoted purely by a location bonus.
+  `DECISION_VERSION` moved `phase4-v3` → `phase4-v4`; conformance
+  goldens re-pinned in `scripts/validate/run_conformance.py`.
+
+### Fixed — Windows installer
+
+- **The one-line Windows installer (`irm ... | iex`) was broken on a
+  genuinely fresh machine.** After bootstrapping (downloading and
+  unpacking the source tarball), `install.ps1` re-invoked itself at
+  `scripts\install.ps1` — missing the `install\` subdirectory the
+  earlier `0.8.4a` reorg moved it into — so the re-exec failed to find
+  the file. Fixed to `scripts\install\install.ps1`, matching the bash
+  installer's already-correct equivalent.
+
+### Fixed — resume step felt mandatory, installers hard-failed on missing tools
+
+- **The onboarding wizard's resume step wasn't actually mandatory, but
+  felt like it.** `Enter` — the "commit & advance" key on every other
+  page — is intercepted on this one page by the embedded Resumes
+  screen for a different purpose (convert the selected file / show a
+  status message), so the one key every other page trained you to
+  press does nothing that reads as "next." The actual skip (Shift+→)
+  was buried in a generic "prev/next page" hint. Fixed: the step's own
+  text now spells out both choices explicitly ("press `o` to open the
+  folder... or `esc`/`shift+→` to skip"), `Escape` now also skips this
+  one step (a more guessable second key), and the footer hint says
+  "skip for now" instead of "prev/next page." Opening the resumes
+  folder cross-platform (`o`) already worked — it just wasn't visible
+  enough to notice.
+- **Installers no longer hard-fail the moment `jq`/`python3`/`pypdf`
+  is missing.** Both `install.sh` and `install.ps1` now detect
+  everything missing up front, print one combined "not detected, and
+  needed to continue" message, and ask once: yes attempts to install
+  everything (brew/apt/dnf/yum/pacman/apk on POSIX, winget for Python
+  on Windows, `pip install --user` for `pypdf`) before continuing; no
+  prints that the install can't proceed without them and exits. `pypdf`
+  (from `requirements.txt`) is checked because resume PDF conversion
+  silently doesn't work without it, and nothing previously installed
+  it automatically.
+- **Fixed: the Windows installer could crash outright while checking
+  for `pypdf`** — the exact condition it exists to detect. On
+  PowerShell 7.3+ with `$PSNativeCommandUseErrorActionPreference` on
+  (increasingly the default), a native command's non-zero exit under
+  `$ErrorActionPreference = "Stop"` throws instead of just setting
+  `$LASTEXITCODE`; the `import pypdf` probe (and the new winget/pip
+  install calls) had no `try`/`catch` around them, unlike this file's
+  own established `Find-Python` pattern. A user with no `pypdf`
+  installed — normal on a fresh machine — could hit an unhandled
+  exception instead of the intended "not detected, install it?"
+  prompt. All three new native-command calls now wrap the same way
+  `Find-Python` already does.
+
+### Verification
+
+- `npm run typecheck` / `build` / `smoke` and the deterministic
+  conformance leg (`python3 scripts/validate/run_conformance.py`,
+  13/13 PASS) all pass on the full tree.
+- `bash -n` clean on every shipped `.sh` script; every `.ps1` file
+  checked for the em-dash/BOM class of bug from `0.8.3a` (none found).
+- Cross-checked every literal `scripts/...`/`scripts\...` path
+  reference in `install.sh`/`install.ps1`/`update.py`/`uninstall.py`/
+  `scheduler.py` against what actually exists on disk — the Windows
+  installer bug above was the only mismatch found.
+- Confirmed `fetch_workday_listings.py`'s new `posted_at` field is
+  optional/additive and inert to `job_state.py canonicalize` and
+  `evaluate_job_fit.py` (both read named fields explicitly and ignore
+  anything else); confirmed the TUI's manual-search `jobs.ts` has zero
+  callers outside `app/` — the automatic pipeline's own job discovery
+  (driven by `agents/bodies/job-scraper.md`) is unrelated and unaffected.
+- Bash side of the new dependency-detection flow verified in isolation
+  (yes/no/blank-default-yes branching against simulated missing
+  binaries). PTY-verified the resume step's new Escape-skip and folder-
+  open wording in a fresh scratch install.
+- **Not independently re-verified this release**: a live automatic
+  run (would submit real applications), a real install on a physical
+  Windows/Linux machine, and `install.ps1`'s syntax (no `pwsh` on this
+  machine to parse-check it — written by mirroring the file's existing
+  `Find-Python`/`Read-Host`/`Fail` patterns exactly). The installer/
+  pipeline checks above are static (path/syntax/schema) verification,
+  not an end-to-end live run. `generate_agent_definitions.py --check`
+  reports no drift between `agents/bodies/` and the generated
+  per-harness copies.
 
 ## What's new in 0.8.43a
 

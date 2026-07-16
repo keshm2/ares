@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { listResumeFiles, resumesDir, type ResumeFile } from "../resumes.js";
 import { openPath, convertResumePdf, helperError } from "../helpers.js";
 import { theme, statusGlyph } from "../theme.js";
+import { InlineTextInput, deleteBackward, insertAtCursor, moveCursorLeft, moveCursorRight } from "./TextInput.js";
 
 /**
  * Resumes screen: shows what's in data/resumes/ against the 6 filenames
@@ -15,31 +16,88 @@ import { theme, statusGlyph } from "../theme.js";
 export function ResumesScreen({
   root,
   active,
+  onInputActiveChange,
   contentRows = 20,
 }: {
   root: string;
   active: boolean;
+  onInputActiveChange: (active: boolean) => void;
   contentRows?: number;
 }) {
   const [cursor, setCursor] = useState(0);
   const [message, setMessage] = useState("");
   const [messageIsError, setMessageIsError] = useState(false);
   const [nonce, setNonce] = useState(0); // re-scan the folder after open/convert
+  const [descPrompt, setDescPrompt] = useState(false);
+  const [descStem, setDescStem] = useState<string | null>(null);
+  const [descValue, setDescValue] = useState("");
+  const [descCursor, setDescCursor] = useState(0);
 
   const files: ResumeFile[] = listResumeFiles(root);
   const clampedCursor = Math.min(cursor, Math.max(0, files.length - 1));
   const selected = files[clampedCursor];
   const pendingCount = files.filter((f) => f.needsConversion).length;
 
+  // While the description prompt is open this screen owns the keyboard —
+  // otherwise free-typed text (digits, "q", "w", arrows…) would also hit
+  // App's global tab-switch/quit handler.
+  const captures = active && descPrompt;
+  useEffect(() => {
+    onInputActiveChange(captures);
+    return () => onInputActiveChange(false);
+  }, [captures, onInputActiveChange]);
+
   const rowStatus = (f: ResumeFile): { glyph: string; color?: string; text: string } => {
-    if (f.hasMarkdown) return { glyph: statusGlyph.applied, color: theme.good, text: `${f.stem}.md` };
+    if (f.hasMarkdown)
+      return {
+        glyph: statusGlyph.applied,
+        color: theme.good,
+        text: f.description ? `${f.stem}.md — "${f.description}"` : `${f.stem}.md`,
+      };
     if (f.needsConversion)
       return { glyph: statusGlyph.needs_review, color: theme.warn, text: "PDF found — press c to convert" };
     return { glyph: "—", text: "not added yet" };
   };
 
+  const runConversion = (stem: string, description: string) => {
+    setMessage(`Converting ${stem}.pdf…`);
+    setMessageIsError(false);
+    const result = convertResumePdf(root, stem, description);
+    if (result.ok) {
+      setMessage(`Converted — wrote ${stem}.md (${result.chars} chars).`);
+      setMessageIsError(false);
+    } else {
+      setMessage(`Conversion failed: ${result.error}`);
+      setMessageIsError(true);
+    }
+    setNonce((n) => n + 1);
+  };
+
   useInput(
     (input, key) => {
+      if (descPrompt) {
+        if (key.return) {
+          setDescPrompt(false);
+          if (descStem) runConversion(descStem, descValue.trim());
+        } else if (key.escape) {
+          setDescPrompt(false);
+          setMessage("Conversion cancelled.");
+          setMessageIsError(false);
+        } else if (key.leftArrow) {
+          setDescCursor(moveCursorLeft({ value: descValue, cursor: descCursor }).cursor);
+        } else if (key.rightArrow) {
+          setDescCursor(moveCursorRight({ value: descValue, cursor: descCursor }).cursor);
+        } else if (key.backspace || key.delete) {
+          const next = deleteBackward({ value: descValue, cursor: descCursor });
+          setDescValue(next.value);
+          setDescCursor(next.cursor);
+        } else if (!key.ctrl && !key.meta && input && !/\p{C}/u.test(input)) {
+          const next = insertAtCursor({ value: descValue, cursor: descCursor }, input);
+          setDescValue(next.value);
+          setDescCursor(next.cursor);
+        }
+        return;
+      }
       if (key.downArrow || input === "j") {
         setCursor((c) => Math.min(files.length - 1, c + 1));
         return;
@@ -69,17 +127,11 @@ export function ResumesScreen({
           setMessageIsError(false);
           return;
         }
-        setMessage(`Converting ${selected.stem}.pdf…`);
-        setMessageIsError(false);
-        const result = convertResumePdf(root, selected.stem);
-        if (result.ok) {
-          setMessage(`Converted — wrote ${selected.stem}.md (${result.chars} chars).`);
-          setMessageIsError(false);
-        } else {
-          setMessage(`Conversion failed: ${result.error}`);
-          setMessageIsError(true);
-        }
-        setNonce((n) => n + 1);
+        setDescStem(selected.stem);
+        setDescValue("");
+        setDescCursor(0);
+        setDescPrompt(true);
+        setMessage("");
       }
     },
     { isActive: active && Boolean(process.stdin.isTTY) },
@@ -114,11 +166,24 @@ export function ResumesScreen({
         <Text dimColor>Folder: {resumesDir(root)}</Text>
         {selected && !selected.expected ? (
           <Text dimColor wrap="wrap">
-            "{selected.stem}" isn't one of the filenames resume-tailor reads automatically — see docs/SETUP.md for the
-            expected names.
+            "{selected.stem}" isn't one of resume-tailor's auto-matched filenames — give it a description when
+            converting to tell it apart later, or see docs/SETUP.md for the expected names.
           </Text>
         ) : null}
       </Box>
+
+      {descPrompt ? (
+        <Box marginTop={1} flexDirection="column">
+          <Text color={theme.accent}>What's this resume for? (optional — enter to convert)</Text>
+          <InlineTextInput
+            value={descValue}
+            cursor={descCursor}
+            active
+            placeholder="(leave blank to skip)"
+            wrap="truncate-end"
+          />
+        </Box>
+      ) : null}
 
       {message ? (
         <Box marginTop={1}>
@@ -132,3 +197,4 @@ export function ResumesScreen({
 }
 
 export const RESUMES_HINTS = "↑↓ move · o open folder · c convert";
+export const RESUMES_PROMPT_HINTS = "type · enter convert · esc cancel · backspace erase";

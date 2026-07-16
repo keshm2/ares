@@ -20,6 +20,10 @@ Security model:
   - The bridge never auto-submits anything; it records outcomes the
     user reports after submitting a form themselves.
 
+app/src/profileLinks.ts is the TS twin of the extract_username/
+derive_full_url helpers below — kept in sync by hand, same as
+app/src/resumes.ts's EXPECTED_RESUMES.
+
 Usage:
   python scripts/runtime/extension_bridge.py             # start (default port from config)
   python scripts/runtime/extension_bridge.py --port N    # override the port
@@ -37,6 +41,7 @@ import argparse
 import hmac
 import json
 import os
+import re
 import secrets
 import stat
 import subprocess
@@ -60,6 +65,8 @@ SAFE_FIELD_KEYS = {
     "last_name",
     "email",
     "phone",
+    "linkedin_username",
+    "github_username",
     "linkedin_url",
     "github_url",
     "graduation_date",
@@ -69,6 +76,30 @@ SAFE_FIELD_KEYS = {
     "citizenship_status",
     "currently_enrolled",
 }
+
+_HOST_PREFIX = {
+    "linkedin": re.compile(r"^linkedin\.com/in/", re.IGNORECASE),
+    "github": re.compile(r"^github\.com/", re.IGNORECASE),
+}
+
+
+def extract_username(kind: str, raw: str) -> str:
+    value = (raw or "").strip()
+    if not value:
+        return ""
+    value = re.sub(r"^https?://", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"^www\.", "", value, flags=re.IGNORECASE)
+    value = _HOST_PREFIX[kind].sub("", value)
+    value = re.split(r"[?#]", value)[0]
+    return value.rstrip("/")
+
+
+def derive_full_url(kind: str, username: str) -> str:
+    if not username:
+        return ""
+    host = "linkedin.com/in" if kind == "linkedin" else "github.com"
+    return f"https://{host}/{username}"
+
 
 NEW_GRAD_TERMS = (
     "new grad", "new graduate", "entry level", "entry-level", "associate",
@@ -285,6 +316,15 @@ def handle_fit(payload: dict) -> dict:
     }
 
 
+def resolve_profile_url(usable: dict, kind: str) -> str:
+    """Derive a full profile URL for the extension, whichever of
+    `<kind>_username` / `<kind>_url` is actually populated — the extension
+    pastes this verbatim into a field expecting a full URL, so it must
+    never see a bare username."""
+    username = usable.get(f"{kind}_username") or extract_username(kind, usable.get(f"{kind}_url", ""))
+    return derive_full_url(kind, username)
+
+
 def handle_fields(payload: dict) -> dict:
     keys = payload.get("keys")
     if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
@@ -293,7 +333,14 @@ def handle_fields(payload: dict) -> dict:
     if unknown:
         raise ValueError(f"unknown safe_fields keys requested: {unknown}")
     usable = read_safe_fields()
-    served = {k: usable[k] for k in keys if k in usable}
+    served = {}
+    for k in keys:
+        if k in ("linkedin_url", "github_url"):
+            url = resolve_profile_url(usable, k.split("_")[0])
+            if url:
+                served[k] = url
+        elif k in usable:
+            served[k] = usable[k]
     log(f"served safe_fields keys: {sorted(served.keys())}")
     return {"ok": True, "fields": served}
 

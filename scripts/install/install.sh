@@ -37,6 +37,9 @@ fi
 # --- 0. Bootstrap (curl | bash, or run outside the repo) ----------------------
 # When the script is piped, BASH_SOURCE is empty and there is no repo around
 # it. Download the source tarball, unpack, and re-exec from inside it.
+# (The npm-installed `applyr` command mirrors this bootstrap; its own
+# --no-core flag / APPLYR_SKIP_CORE=1 opt-out has no equivalent here since
+# this script IS the install.)
 SELF="${BASH_SOURCE[0]:-}"
 if [ -n "$SELF" ] && [ -f "$(dirname "$SELF")/../../AGENTS.md" ]; then
   SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
@@ -69,8 +72,70 @@ fi
 cd "$PROJECT_ROOT"
 
 # --- 1. Prerequisites --------------------------------------------------------
-command -v jq >/dev/null 2>&1 || fail "jq is required (brew install jq / apt install jq)"
-command -v python3 >/dev/null 2>&1 || fail "python3 is required"
+# Detect everything missing FIRST (tools + the one required Python package,
+# pypdf — resume PDF conversion silently can't work without it) and ask
+# once, rather than hard-failing on the first missing thing: most users
+# running the one-liner have no idea what jq/python3/pypdf even are, and
+# would rather applyr just installed them.
+MISSING_TOOLS=""
+command -v jq      >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS jq"
+command -v python3 >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS python3"
+MISSING_TOOLS="${MISSING_TOOLS# }"
+
+MISSING_PY_PKGS=""
+if command -v python3 >/dev/null 2>&1; then
+  python3 -c "import pypdf" >/dev/null 2>&1 || MISSING_PY_PKGS="pypdf"
+fi
+
+if [ -n "$MISSING_TOOLS" ] || [ -n "$MISSING_PY_PKGS" ]; then
+  echo
+  [ -n "$MISSING_TOOLS" ]  && warn "not detected: $MISSING_TOOLS"
+  [ -n "$MISSING_PY_PKGS" ] && warn "not detected (Python package): $MISSING_PY_PKGS — needed for resume PDF conversion"
+  warn "these are needed to continue installing applyr."
+  INSTALL_DEPS="y"
+  if [ -t 0 ]; then
+    printf "Install them now? [Y/n] "
+    read -r INSTALL_DEPS || INSTALL_DEPS="y"
+    [ -z "$INSTALL_DEPS" ] && INSTALL_DEPS="y"
+  else
+    warn "non-interactive install — proceeding to install them automatically (re-run interactively to be asked first)."
+  fi
+  case "$INSTALL_DEPS" in
+    y|Y) ;;
+    *) fail "cannot continue without: ${MISSING_TOOLS}${MISSING_TOOLS:+, }${MISSING_PY_PKGS}. Install them yourself and re-run." ;;
+  esac
+
+  if [ -n "$MISSING_TOOLS" ]; then
+    SUDO=""
+    [ "$(id -u 2>/dev/null || echo 0)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"
+    if command -v brew >/dev/null 2>&1; then
+      brew install $MISSING_TOOLS || fail "failed to install $MISSING_TOOLS via brew — install manually and re-run."
+    elif command -v apt-get >/dev/null 2>&1; then
+      $SUDO apt-get update && $SUDO apt-get install -y $MISSING_TOOLS \
+        || fail "failed to install $MISSING_TOOLS via apt-get — install manually and re-run."
+    elif command -v dnf >/dev/null 2>&1; then
+      $SUDO dnf install -y $MISSING_TOOLS || fail "failed to install $MISSING_TOOLS via dnf — install manually and re-run."
+    elif command -v yum >/dev/null 2>&1; then
+      $SUDO yum install -y $MISSING_TOOLS || fail "failed to install $MISSING_TOOLS via yum — install manually and re-run."
+    elif command -v pacman >/dev/null 2>&1; then
+      $SUDO pacman -Sy --noconfirm $MISSING_TOOLS || fail "failed to install $MISSING_TOOLS via pacman — install manually and re-run."
+    elif command -v apk >/dev/null 2>&1; then
+      $SUDO apk add $MISSING_TOOLS || fail "failed to install $MISSING_TOOLS via apk — install manually and re-run."
+    else
+      fail "no supported package manager found (brew/apt/dnf/yum/pacman/apk) — install $MISSING_TOOLS manually and re-run."
+    fi
+    say "installed: $MISSING_TOOLS"
+  fi
+
+  if [ -n "$MISSING_PY_PKGS" ]; then
+    python3 -m pip install --user pypdf \
+      || fail "failed to install pypdf via pip — run 'python3 -m pip install --user pypdf' manually and re-run."
+    say "installed: pypdf"
+  fi
+fi
+
+command -v jq      >/dev/null 2>&1 || fail "jq is required and still missing — install it manually and re-run."
+command -v python3 >/dev/null 2>&1 || fail "python3 is required and still missing — install it manually and re-run."
 
 # --- 2. Live configs from examples -------------------------------------------
 if [ -f "config/targets.json" ]; then
@@ -197,58 +262,7 @@ else
 fi
 
 # --- 4. User profile (safe_fields) ---------------------------------------
-# Asked only when the live config still holds placeholders, and only on a
-# real terminal. Every value lands in gitignored local config — nothing
-# leaves this machine.
-profile_placeholder() {
-  local v
-  v="$(jq -r ".safe_fields.$1 // \"\"" config/targets.json 2>/dev/null || echo "")"
-  [ -z "$v" ] || [ "$v" = "REPLACE_ME" ]
-}
-
-if [ -t 0 ] && profile_placeholder "first_name"; then
-  echo
-  echo "${C_NOTICE}🔒  Privacy: everything you enter below is kept LOCALLY ONLY.${C_RESET}"
-  echo "${C_NOTICE}    It is written to gitignored files on this machine (config/, data/resumes/)${C_RESET}"
-  echo "${C_NOTICE}    and is never committed, uploaded, or shared.${C_RESET}"
-  echo
-  echo "Your profile — used only to fill application forms (press enter to skip a field):"
-  # bash 3.2 (macOS default) + set -u: expanding an empty array errors, so
-  # collect the jq assignments as a filter string + parallel --arg list,
-  # tracking the count in a plain counter.
-  JQ_FILTER="."
-  N=0
-  for field in \
-    "first_name:First name" \
-    "last_name:Last name" \
-    "email:Email" \
-    "phone:Phone" \
-    "linkedin_url:LinkedIn URL" \
-    "github_url:GitHub URL" \
-    "graduation_date:Graduation date (Month Year)"; do
-    key="${field%%:*}"; label="${field#*:}"
-    printf "  %s: " "$label"
-    read -r VALUE || VALUE=""
-    if [ -n "$VALUE" ]; then
-      JQ_FILTER="$JQ_FILTER | .safe_fields.$key = \$v$N"
-      eval "JQ_V$N=\$VALUE"
-      N=$((N + 1))
-    fi
-  done
-  if [ "$N" -gt 0 ]; then
-    TMP="$(mktemp)"
-    set --
-    i=0
-    while [ $i -lt "$N" ]; do
-      eval "set -- \"\$@\" --arg \"v$i\" \"\$JQ_V$i\""
-      i=$((i + 1))
-    done
-    jq "$@" "$JQ_FILTER" config/targets.json > "$TMP" && mv "$TMP" config/targets.json
-    say "profile written to config/targets.json (gitignored — run 'applyr setup' to edit the rest)."
-  else
-    say "profile skipped — run 'applyr setup' any time to fill it in."
-  fi
-fi
+say "profile: run 'applyr' (or 'applyr setup') to fill in your name, contact info, and job targets through the guided wizard — or edit config/targets.json by hand (see the _help notes in config/targets.example.json)."
 
 mkdir -p data/resumes
 echo

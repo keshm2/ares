@@ -51,6 +51,18 @@ export function capTier(cap: number): CapTier {
   return { name: "light", color: theme.good };
 }
 
+/** Same shape as capTier, scaled to the Jobs search "results per page"
+ *  setting's 10-75 range — more results per page means more Ashby/Lever/
+ *  Greenhouse/Workday calls and a heavier fuzzy-match/render pass, so the
+ *  top end reads as a cost warning the same way a 25-job run cap does. */
+export function pageSizeTier(size: number): CapTier {
+  if (size >= 75) return { name: "MAX", color: theme.danger };
+  if (size >= 65) return { name: "heavy+", color: HEAVY_PLUS_RED };
+  if (size >= 50) return { name: "heavy", color: theme.warn };
+  if (size >= 30) return { name: "standard", color: theme.accent };
+  return { name: "light", color: theme.good };
+}
+
 /** hsl(hue, 100%, 65%) → #rrggbb — drives the animated MAX-cap warning. */
 export function hueColor(hue: number): string {
   const h = ((hue % 360) + 360) % 360;
@@ -128,10 +140,72 @@ export const BANNER_GRADIENT = [
  *  animations only. */
 export const SPARKLE_GRADIENT = [theme.accent, "#FFFFFF"] as const;
 
+/** Which coding-agent CLI a run uses — mirrors the four harnesses
+ *  scripts/runtime/run_job_agent.py can invoke (config/harness.json /
+ *  APPLYR_HARNESS). "auto" means neither an env override nor
+ *  config/harness.json name a specific one (the Python side then
+ *  auto-detects a CLI on PATH) — there's no single harness to color for,
+ *  so it gets its own combined wave instead of guessing one. */
+export type HarnessId = "claude" | "opencode" | "codex" | "copilot" | "auto";
+
+export const HARNESS_LABELS: Record<HarnessId, string> = {
+  claude: "Claude Code",
+  opencode: "opencode",
+  codex: "Codex",
+  copilot: "Copilot",
+  auto: "Auto (env / harness.json / detect on PATH)",
+};
+
+/** One saturated base color per harness, each reused as a run's live
+ *  "working" wave (RunScreen's running indicator + progress bar) so the
+ *  animation reads as which agent is actually doing the work — Claude
+ *  Code's own light-orange "thinking" shimmer, opencode a light maroon,
+ *  Codex a lavender, Copilot a darker blue. */
+const HARNESS_BASE_COLOR: Record<Exclude<HarnessId, "auto">, string> = {
+  claude: "#FF8A3D",
+  opencode: "#A64B5A",
+  codex: "#B39DDB",
+  copilot: "#1F4E8C",
+};
+
+/** Each harness's own base blended to a paler tint of the same hue
+ *  (rather than SPARKLE_GRADIENT's blend-to-white) so the wave keeps its
+ *  color identity all the way through instead of fading toward neutral.
+ *  Auto has no single identity to blend toward — its wave cycles through
+ *  all four saturated bases directly, a literal "combination of those
+ *  colors" rather than a tint of one. */
+const HARNESS_PALE_TINT: Record<Exclude<HarnessId, "auto">, string> = {
+  claude: "#FFD9B3",
+  opencode: "#E8B9C0",
+  codex: "#E8DFF7",
+  copilot: "#8FB4E0",
+};
+
+export function harnessGradient(id: HarnessId): readonly string[] {
+  if (id === "auto") {
+    return [HARNESS_BASE_COLOR.claude, HARNESS_BASE_COLOR.opencode, HARNESS_BASE_COLOR.codex, HARNESS_BASE_COLOR.copilot];
+  }
+  return [HARNESS_BASE_COLOR[id], HARNESS_PALE_TINT[id]];
+}
+
+/** Slower, smaller-step tuning for every harness-colored wave (RunScreen's
+ *  live "running" indicator, Settings' coding-agent option preview) — a
+ *  deliberately calmer cadence than the default AUTO-badge sparkle
+ *  (AutoSparkleText's own 90ms/0.35 defaults), since a name you're reading
+ *  while it's mid-color-cycle is harder to read than a badge you're just
+ *  glancing at. */
+export const HARNESS_WAVE_TICK_MS = 170;
+export const HARNESS_WAVE_STEP = 0.12;
+
 /** Cycling "working" glyph — the terminal-spinner analog of a color
- *  animation, small dot growing to a starburst and back (". to *" and
- *  a bit beyond), used anywhere text needs to signal live activity. */
-export const SPINNER_FRAMES = [".", "·", "•", "*", "•", "·"] as const;
+ *  animation, a smoothly rotating braille dot cluster (the same family
+ *  of spinner most CLIs, including Claude Code's own "thinking"
+ *  indicator, use) — used anywhere text needs to signal live activity.
+ *  Deliberately no plain "." frame: a flat period breaks the glyph's
+ *  visual weight/alignment against the rounded braille cells around it,
+ *  which is what made the old dot-growing-to-a-star cycle read as a
+ *  stutter rather than smooth rotation. */
+export const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
 
 export const BANNER_WIDTH = BANNER_ROWS[0].length;
 
@@ -143,7 +217,7 @@ export const MIN_COLUMNS = 54;
 export const MIN_ROWS = 12;
 
 /** Build/release marker shown in the side panel footer. */
-export const BUILD_MARKER = "0.8.43a";
+export const BUILD_MARKER = "0.9.0a";
 
 /** Side panel width — narrow enough to coexist with content on 64-col+
  *  terminals. The panel hides below that width (see App showSidebar). */

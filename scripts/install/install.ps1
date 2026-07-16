@@ -7,7 +7,7 @@ that runs natively on PowerShell and cmd.exe - no WSL, no bash, no jq.
   # one-liner (from anywhere):
   irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.ps1 | iex
   # or from a clone/unpacked release:
-  powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+  powershell -ExecutionPolicy Bypass -File scripts\install\install.ps1
 
 Steps mirror scripts/install/install.sh:
   0. Bootstrap when piped/outside the repo: download+unpack the source, re-run.
@@ -40,6 +40,9 @@ function Find-Python {
 }
 
 # --- 0. Bootstrap ------------------------------------------------------------
+# (The npm-installed `applyr` command mirrors this bootstrap; its own
+# --no-core flag / APPLYR_SKIP_CORE=1 opt-out has no equivalent here since
+# this script IS the install.)
 $scriptPath = $PSCommandPath
 $projectRoot = $null
 if ($scriptPath) {
@@ -65,13 +68,89 @@ if (-not $projectRoot) {
   & tar.exe -xzf $tgz --strip-components=1 -C $target
   if ($LASTEXITCODE -ne 0) { Fail "failed to unpack the source tarball (needs Windows 10+ tar.exe)" }
   Remove-Item $tgz -ErrorAction SilentlyContinue
-  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $target "scripts\install.ps1")
+  & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $target "scripts\install\install.ps1")
   exit $LASTEXITCODE
 }
 Set-Location $projectRoot
 
 # --- 1. Prerequisites --------------------------------------------------------
+# Detect everything missing FIRST (Python + the one required Python
+# package, pypdf - resume PDF conversion silently can't work without it)
+# and ask once, rather than hard-failing on the first missing thing: most
+# users running the one-liner have no idea what pypdf even is, and would
+# rather applyr just installed it. No jq here - this path is pure
+# PowerShell/Python by design (see the file header).
 $py = Find-Python
+$missingPython = -not $py
+$missingPypdf = $false
+if ($py) {
+  # try/catch, not just a $LASTEXITCODE check: on PowerShell 7.3+ with
+  # $PSNativeCommandUseErrorActionPreference on (increasingly the
+  # default), a non-zero exit from a native command under
+  # $ErrorActionPreference = "Stop" (set at the top of this script)
+  # throws instead of just setting $LASTEXITCODE — exactly what
+  # happens here when pypdf is genuinely missing (the expected,
+  # common case this check exists to catch), which crashed the whole
+  # installer with a raw exception instead of reaching the code below
+  # that's supposed to offer to install it.
+  try {
+    & $py[0] @($py[1..($py.Length-1)] + @("-c", "import pypdf")) *> $null
+    if ($LASTEXITCODE -ne 0) { $missingPypdf = $true }
+  } catch {
+    $missingPypdf = $true
+  }
+}
+
+if ($missingPython -or $missingPypdf) {
+  Write-Host ""
+  if ($missingPython) { Warn "not detected: Python 3" }
+  if ($missingPypdf)  { Warn "not detected (Python package): pypdf - needed for resume PDF conversion" }
+  Warn "these are needed to continue installing applyr."
+  $installDeps = Read-Host "Install them now? [Y/n]"
+  if (-not $installDeps) { $installDeps = "y" }
+  if ($installDeps -notmatch '^[Yy]') {
+    $missing = @()
+    if ($missingPython) { $missing += "Python 3" }
+    if ($missingPypdf)  { $missing += "pypdf" }
+    Fail "cannot continue without: $($missing -join ', '). Install them yourself and re-run."
+  }
+
+  if ($missingPython) {
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+      Say "installing Python 3 via winget ..."
+      $wingetFailed = $false
+      try {
+        winget install --id Python.Python.3 -e --silent --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -ne 0) { $wingetFailed = $true }
+      } catch {
+        $wingetFailed = $true
+      }
+      if ($wingetFailed) {
+        Fail "failed to install Python via winget - install from https://www.python.org/ (check 'Add to PATH') and re-run."
+      }
+      # winget just installed it into a PATH entry this process started without.
+      $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+      $py = Find-Python
+      if (-not $py) { Fail "Python 3 installed but not found on PATH yet - open a new terminal and re-run." }
+      Say "installed Python 3."
+    } else {
+      Fail "Python 3 is required and winget isn't available to install it automatically. Install from https://www.python.org/ (check 'Add to PATH') and re-run."
+    }
+  }
+
+  if ($missingPypdf) {
+    $pipFailed = $false
+    try {
+      & $py[0] @($py[1..($py.Length-1)] + @("-m", "pip", "install", "--user", "pypdf"))
+      if ($LASTEXITCODE -ne 0) { $pipFailed = $true }
+    } catch {
+      $pipFailed = $true
+    }
+    if ($pipFailed) { Fail "failed to install pypdf - run 'py -3 -m pip install --user pypdf' manually and re-run." }
+    Say "installed: pypdf"
+  }
+}
+
 if (-not $py) { Fail "Python 3 is required. Install from https://www.python.org/ (check 'Add to PATH')." }
 function Py { param([string[]]$a) & $py[0] @($py[1..($py.Length-1)] + $a) }
 
@@ -167,37 +246,7 @@ if (Test-Path "config\harness.json") {
 }
 
 # --- 4. Profile (safe_fields, LOCAL ONLY) -------------------------------
-$targets = Get-Content "config\targets.json" -Raw | ConvertFrom-Json
-$firstName = $null
-if ($targets.safe_fields) { $firstName = $targets.safe_fields.first_name }
-if ((-not $firstName) -or ($firstName -eq "REPLACE_ME")) {
-  Write-Host ""
-  Write-Host "[lock] Privacy: everything you enter below is kept LOCALLY ONLY." -ForegroundColor Cyan
-  Write-Host "       It is written to gitignored files on this machine (config/, data/resumes/)" -ForegroundColor Cyan
-  Write-Host "       and is never committed, uploaded, or shared." -ForegroundColor Cyan
-  Write-Host ""
-  Write-Host "Your profile - used only to fill application forms (press enter to skip a field):"
-  $fields = @(
-    @("first_name","First name"), @("last_name","Last name"), @("email","Email"),
-    @("phone","Phone"), @("linkedin_url","LinkedIn URL"), @("github_url","GitHub URL"),
-    @("graduation_date","Graduation date (Month Year)")
-  )
-  if (-not $targets.safe_fields) { $targets | Add-Member -NotePropertyName safe_fields -NotePropertyValue ([ordered]@{}) -Force }
-  $changed = $false
-  foreach ($f in $fields) {
-    $val = Read-Host ("  " + $f[1])
-    if (-not [string]::IsNullOrWhiteSpace($val)) {
-      $targets.safe_fields | Add-Member -NotePropertyName $f[0] -NotePropertyValue $val -Force
-      $changed = $true
-    }
-  }
-  if ($changed) {
-    $targets | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 "config\targets.json"
-    Say "profile written to config/targets.json (gitignored - run 'applyr setup' to edit the rest)."
-  } else {
-    Say "profile skipped - run 'applyr setup' any time to fill it in."
-  }
-}
+Say "profile: run 'applyr' (or 'applyr setup') to fill in your name, contact info, and job targets through the guided wizard - or edit config/targets.json by hand (see the _help notes in config/targets.example.json)."
 New-Item -ItemType Directory -Force -Path "data\resumes" | Out-Null
 Write-Host ""
 Write-Host "[docs] Resumes: add your base resumes (markdown + matching PDF) to" -ForegroundColor Cyan
@@ -235,10 +284,10 @@ if ((Get-Command claude -ErrorAction SilentlyContinue) -and -not (Test-Path ".cl
 }
 
 # --- 6. Agent definitions ----------------------------------------------------
-Py @("scripts\generate_agent_definitions.py")
+Py @("scripts\validate\generate_agent_definitions.py")
 
 # --- 7. Validate -------------------------------------------------------------
-Py @("scripts\validate_local_config.py")
+Py @("scripts\validate\validate_local_config.py")
 if ($LASTEXITCODE -eq 0) {
   Say "config valid."
 } else {

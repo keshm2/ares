@@ -4,8 +4,9 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import { latestSessionLog, readHeartbeat } from "../state.js";
 import { py, stopProcessTree } from "../platform.js";
-import { theme, statusGlyph, capTier, gradientColor, SPARKLE_GRADIENT } from "../theme.js";
-import { RainbowText, AutoSparkleText, SpinnerGlyph, KeyHints } from "./KeyHints.js";
+import { theme, statusGlyph, capTier, harnessGradient, HARNESS_WAVE_TICK_MS, HARNESS_WAVE_STEP } from "../theme.js";
+import { resolveHarnessId } from "../harness.js";
+import { RainbowText, AutoSparkleText, SpinnerGlyph, GradientProgressBar, KeyHints } from "./KeyHints.js";
 import {
   InlineTextInput,
   deleteBackward,
@@ -137,52 +138,6 @@ function parseCurrentApplication(lines: string[]): { title: string; company: str
     if (m) return { title: m[1] ?? "", company: m[2] ?? "" };
   }
   return null;
-}
-
-// Same ping-pong period math as AutoSparkleText's SPARKLE_PERIOD, kept
-// local since this component doesn't otherwise need KeyHints.tsx's export.
-const BAR_SPARKLE_PERIOD = 2 * (SPARKLE_GRADIENT.length - 1);
-// Always show a few lit cells even at ratio 0 — an all-empty bar reads as
-// "nothing is happening" or "missing", not "just started".
-const MIN_FILLED_CELLS = 3;
-
-/**
- * Animated gradient progress bar for the running-phase view. Filled cells
- * shimmer left-to-right through SPARKLE_GRADIENT (same offset step/
- * interval AutoSparkleText uses — see KeyHints.tsx) so the two animations
- * read as one system. Non-TTY fallback renders a flat accent-colored bar,
- * matching AutoSparkleText/RainbowText's static-on-a-pipe behavior.
- */
-function GradientProgressBar({ ratio, width }: { ratio: number; width: number }) {
-  const animate = Boolean(process.stdout.isTTY);
-  const [offset, setOffset] = useState(0);
-  useEffect(() => {
-    if (!animate) return;
-    const timer = setInterval(() => setOffset((o) => (o + 0.35) % BAR_SPARKLE_PERIOD), 90);
-    return () => clearInterval(timer);
-  }, [animate]);
-  const filled = Math.max(MIN_FILLED_CELLS, Math.min(width, Math.round(ratio * width)));
-  const empty = width - filled;
-  if (!animate) {
-    return (
-      <Text>
-        <Text bold color={theme.accent}>
-          {"█".repeat(filled)}
-        </Text>
-        <Text dimColor>{"░".repeat(empty)}</Text>
-      </Text>
-    );
-  }
-  return (
-    <Text bold>
-      {Array.from({ length: filled }, (_, i) => (
-        <Text key={i} color={gradientColor(offset + i * 0.6, SPARKLE_GRADIENT)}>
-          █
-        </Text>
-      ))}
-      <Text dimColor>{"░".repeat(empty)}</Text>
-    </Text>
-  );
 }
 
 /**
@@ -584,6 +539,10 @@ export function RunScreen({
   const gauge = "█".repeat(gaugeFill) + "░".repeat(GAUGE_WIDTH - gaugeFill);
   const heartbeat = readHeartbeat(root);
   const runClock = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
+  // Which coding agent this run actually invokes doesn't change mid-run —
+  // resolving it fresh each render is a cheap couple of small file reads,
+  // not worth caching in state for a value that only affects a color.
+  const runGradient = harnessGradient(resolveHarnessId(root));
   // Cockpit chrome: title, gauge, prompt, counters, message, log header,
   // margins. What's left belongs to the log tail (only shown via the l
   // toggle while running, or always once a run is done/stopped).
@@ -611,7 +570,10 @@ export function RunScreen({
         Jobs <Text dimColor>automatic run</Text>{" "}
         {phase === "running" ? (
           <Text>
-            <SpinnerGlyph /> <AutoSparkleText>{`running ${runClock}`}</AutoSparkleText>
+            <SpinnerGlyph color={runGradient[0]} />{" "}
+            <AutoSparkleText gradient={runGradient} tickMs={HARNESS_WAVE_TICK_MS} offsetStep={HARNESS_WAVE_STEP}>
+              {`running ${runClock}`}
+            </AutoSparkleText>
           </Text>
         ) : phase === "stopping" ? (
           <Text color={theme.warn}>
@@ -748,7 +710,7 @@ export function RunScreen({
             <Box flexDirection="column">
               <Box>
                 <Text dimColor>[</Text>
-                <GradientProgressBar ratio={progressRatio} width={PROGRESS_BAR_WIDTH} />
+                <GradientProgressBar ratio={progressRatio} width={PROGRESS_BAR_WIDTH} gradient={runGradient} />
                 <Text dimColor>]</Text>
                 <Text>{"  "}</Text>
                 {phaseInfo ? (
@@ -756,7 +718,9 @@ export function RunScreen({
                     {phaseInfo.caption} (phase {phaseInfo.currentIndex + 1} of {phaseInfo.slots.length})
                   </Text>
                 ) : (
-                  <AutoSparkleText>{"run in progress…"}</AutoSparkleText>
+                  <AutoSparkleText gradient={runGradient} tickMs={HARNESS_WAVE_TICK_MS} offsetStep={HARNESS_WAVE_STEP}>
+                    {"run in progress…"}
+                  </AutoSparkleText>
                 )}
               </Box>
               {phaseInfo ? (

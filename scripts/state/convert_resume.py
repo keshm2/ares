@@ -29,6 +29,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 
 DEFAULT_RESUMES_DIR = os.path.join("data", "resumes")
 
@@ -72,7 +73,7 @@ def extract_pdf_text(pdf_path: str) -> str:
     return text
 
 
-def clean_markdown(raw_text: str, title: str) -> str:
+def clean_markdown(raw_text: str, title: str, description: str = "") -> str:
     # Collapse 3+ blank lines to 1, strip trailing whitespace per line.
     lines = [line.rstrip() for line in raw_text.splitlines()]
     collapsed: list = []
@@ -89,9 +90,38 @@ def clean_markdown(raw_text: str, title: str) -> str:
     header = (
         f"<!-- Auto-converted from {title}.pdf by convert_resume.py — "
         "text extraction only, formatting is not preserved. Review and "
-        "clean up for best tailoring results. -->\n\n"
+        "clean up for best tailoring results. -->\n"
     )
+    if description:
+        header += f"<!-- Description: {description} -->\n"
+    header += "\n"
     return header + body + "\n"
+
+
+def load_meta(meta_path: str) -> dict:
+    if not os.path.exists(meta_path):
+        return {}
+    try:
+        with open(meta_path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def write_meta_entry(resumes_dir: str, stem: str, description: str) -> None:
+    """Read-modify-write data/resumes/.resume_meta.json for one stem, atomically."""
+    meta_path = os.path.join(resumes_dir, ".resume_meta.json")
+    meta = load_meta(meta_path)
+    meta[stem] = {
+        "description": description,
+        "converted_at": datetime.now(timezone.utc).isoformat(),
+    }
+    tmp_path = f"{meta_path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as fh:
+        json.dump(meta, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    os.replace(tmp_path, meta_path)
 
 
 def main(argv: "list[str] | None" = None) -> int:
@@ -106,9 +136,13 @@ def main(argv: "list[str] | None" = None) -> int:
     parser.add_argument(
         "--force", action="store_true", help="overwrite an existing .md file"
     )
+    parser.add_argument(
+        "--description", default="", help="short human label for this resume, e.g. \"SWE internships\""
+    )
     args = parser.parse_args(argv)
 
     stem = args.stem.strip()
+    description = args.description.strip()
     if not stem or not re.fullmatch(r"[A-Za-z0-9_-]+", stem):
         return error(f"invalid stem {stem!r} — expected a plain filename with no path separators")
 
@@ -132,7 +166,7 @@ def main(argv: "list[str] | None" = None) -> int:
             pdf_path=pdf_path,
         )
 
-    markdown = clean_markdown(raw_text, stem)
+    markdown = clean_markdown(raw_text, stem, description)
     tmp_path = f"{md_path}.tmp"
     try:
         with open(tmp_path, "w", encoding="utf-8") as fh:
@@ -144,6 +178,12 @@ def main(argv: "list[str] | None" = None) -> int:
         except OSError:
             pass
         return error(f"could not write {md_path}: {exc}")
+
+    if description:
+        try:
+            write_meta_entry(args.resumes_dir, stem, description)
+        except OSError as exc:
+            return error(f"could not write resume metadata: {exc}")
 
     emit(
         {

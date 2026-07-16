@@ -26,7 +26,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 
 DEFAULT_TARGETS = "config/targets.json"
-DECISION_VERSION = "phase4-v3"
+DECISION_VERSION = "phase4-v4"
 
 
 # Candidate skills derived from the two shipped base resumes. The fit helper
@@ -350,6 +350,13 @@ def evaluate_fit(job: dict, targets: dict) -> dict:
 
     role_keywords = [str(v) for v in targets.get("role_keywords", [])]
     level_keywords = [str(v) for v in targets.get("level_keywords", [])]
+    # Opt-in, defaults to False so an operator who has never touched the
+    # Settings Levels submenu keeps today's exact intern/new-grad-only
+    # behavior. Set by the "Full time (3+ yrs exp)" level checkbox — see
+    # app/src/data/levelCategories.ts. Relaxes the two experience-based
+    # hard rejects below; every other gate (role match, US location,
+    # advanced degree, clearance, visa) still applies unchanged.
+    allow_experienced_roles = bool(targets.get("allow_experienced_roles", False))
 
     title_lower = title.lower()
     jd_lower = jd_text.lower()
@@ -383,7 +390,7 @@ def evaluate_fit(job: dict, targets: dict) -> dict:
         )
 
     welcoming = has_welcoming_language(title, jd_text, role_type, internship_term)
-    if years_required is not None and years_required >= 3 and not welcoming:
+    if years_required is not None and years_required >= 3 and not welcoming and not allow_experienced_roles:
         fit_reasons.append(f"JD requires {years_required}+ years of experience without clear intern/new-grad language.")
         return build_result(
             fit_status="skipped_unfit",
@@ -444,8 +451,17 @@ def evaluate_fit(job: dict, targets: dict) -> dict:
         )
 
     # If the role matched but there is no level signal at all, this is still
-    # likely not an internship/new-grad role in the current pipeline.
-    if not matched_level_keyword and not role_type and not internship_term and not welcoming:
+    # likely not an internship/new-grad role in the current pipeline —
+    # UNLESS the operator has opted into experienced/full-time roles
+    # (allow_experienced_roles), in which case a role is allowed through
+    # without needing an explicit junior/level signal at all.
+    if (
+        not matched_level_keyword
+        and not role_type
+        and not internship_term
+        and not welcoming
+        and not allow_experienced_roles
+    ):
         fit_reasons.append("No internship/new-grad signal was found in the title or JD.")
         return build_result(
             fit_status="skipped_unfit",
@@ -476,8 +492,12 @@ def evaluate_fit(job: dict, targets: dict) -> dict:
         score += 6
         fit_reasons.append("Intern/new-grad intent is implied, but not stated with a configured level keyword.")
 
+    # Location is a preference signal only: it contributes to the reported
+    # fit_score (used for sorting/display) but never to core_score, which
+    # is what the status thresholds below gate on. A strong candidate in a
+    # non-preferred location shouldn't be demoted, and a weak candidate
+    # shouldn't be promoted, purely by a location bonus/penalty.
     location_points, location_reason = infer_location_signal(location, location_tier)
-    score += location_points
     fit_reasons.append(location_reason + ".")
 
     matched_skill_list = matched_skills(jd_text)
@@ -504,18 +524,19 @@ def evaluate_fit(job: dict, targets: dict) -> dict:
     else:
         score += 3
 
-    score = max(0, min(100, int(score)))
+    core_score = max(0, min(100, int(score)))
+    fit_score = max(0, min(100, int(score + location_points)))
 
-    if score < 70:
+    if core_score < 70:
         status = "skipped_unfit"
-    elif score < 75:
+    elif core_score < 75:
         status = "needs_review"
     else:
         status = "candidate"
 
     # Ambiguous but promising: if role match is only in JD body or level is only implied,
     # prefer manual review unless the score is very strong.
-    if status == "candidate" and score < 75:
+    if status == "candidate" and core_score < 75:
         weak_role = role_source == "jd"
         weak_level = not matched_level_keyword
         if weak_role or weak_level:
@@ -527,7 +548,7 @@ def evaluate_fit(job: dict, targets: dict) -> dict:
 
     return build_result(
         fit_status=status,
-        fit_score=score,
+        fit_score=fit_score,
         fit_reasons=fit_reasons,
         matched_role_keyword=matched_role_keyword,
         matched_level_keyword=matched_level_keyword,

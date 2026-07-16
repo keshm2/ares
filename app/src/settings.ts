@@ -48,6 +48,59 @@ export function displayName(root: string): string | undefined {
   return readSafeField(root, "preferred_name") || readSafeField(root, "first_name") || undefined;
 }
 
+// --- Top-level targets.json arrays (role_keywords, preferred_locations, ...) --
+
+export function readTargetsArray(root: string, key: string): string {
+  const targets = readJson(targetsPath(root));
+  const arr = Array.isArray(targets[key]) ? (targets[key] as unknown[]) : [];
+  return arr.map((v) => String(v)).join(", ");
+}
+
+export function writeTargetsArray(root: string, key: string, value: string): void {
+  const file = targetsPath(root);
+  const targets = readJson(file);
+  targets[key] = value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  writeJson(file, targets);
+}
+
+/** List-native counterparts of readTargetsArray/writeTargetsArray. The
+ *  comma-string versions above are lossy for any array whose entries
+ *  themselves contain a comma — e.g. "Seattle, WA" round-tripped through
+ *  a join(", ")+split(",") silently becomes two entries, "Seattle" and
+ *  "WA". Every caller that already holds (or produces) a real string[]
+ *  — the itemized add/remove editors, the location/company autocomplete
+ *  fields — must use these instead so an entry's own commas are never
+ *  mistaken for the array's join delimiter. */
+export function readTargetsArrayList(root: string, key: string): string[] {
+  const targets = readJson(targetsPath(root));
+  const arr = Array.isArray(targets[key]) ? (targets[key] as unknown[]) : [];
+  return arr.map((v) => String(v));
+}
+
+export function writeTargetsArrayList(root: string, key: string, values: string[]): void {
+  const file = targetsPath(root);
+  const targets = readJson(file);
+  targets[key] = values.map((v) => v.trim()).filter(Boolean);
+  writeJson(file, targets);
+}
+
+/** Top-level targets.json booleans (e.g. allow_experienced_roles) — a
+ *  missing key reads as `false`, matching every such flag's documented
+ *  default in targets.example.json's _help notes. */
+export function readTargetsBool(root: string, key: string): boolean {
+  return Boolean(readJson(targetsPath(root))[key]);
+}
+
+export function writeTargetsBool(root: string, key: string, value: boolean): void {
+  const file = targetsPath(root);
+  const targets = readJson(file);
+  targets[key] = value;
+  writeJson(file, targets);
+}
+
 // --- Discord (config/discord_config.json) ----------------------------------
 
 const discordPath = (root: string) => path.join(root, "config", "discord_config.json");

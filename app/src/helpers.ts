@@ -146,8 +146,9 @@ export interface ConvertResumeResult {
  *  via scripts/state/convert_resume.py (pypdf text extraction — Python
  *  owns this, not a TS PDF-parsing dependency). Never throws; failures
  *  come back as { ok: false, error }. */
-export function convertResumePdf(root: string, stem: string, force = false): ConvertResumeResult {
+export function convertResumePdf(root: string, stem: string, description = "", force = false): ConvertResumeResult {
   const args = ["scripts/state/convert_resume.py", stem];
+  if (description) args.push("--description", description);
   if (force) args.push("--force");
   const conv = py(args);
   const res = spawnSync(conv.cmd, conv.args, { cwd: root, encoding: "utf8" });

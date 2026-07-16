@@ -7,6 +7,63 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.9.0a] — 2026-07-15
+
+npm package: `@keshm/applyr` version `0.9.0-alpha.0`. Full notes:
+[`RELEASE.md`](./RELEASE.md).
+
+### Added
+
+- Guided first-run onboarding wizard (`app/src/ui/onboarding/`) —
+  multi-page form, live autocomplete, per-field write-through with
+  resume-in-place, replaces the old readline `wizard.ts` prompts.
+- Settings gained a "Company targets" section (roles/levels/seasons/
+  locations/company slugs now live-editable) and new Personal info
+  fields (location, zip, address, ethnicity, demographics).
+- Greenhouse as a 4th toggleable Jobs-search source, alongside Ashby/
+  Lever/Workday.
+- Jobs search: posted-date column + default recency sort, 6-month
+  results cutoff, configurable results-per-page (10-75,
+  `APPLYR_JOBS_PER_PAGE`), redesigned fixed-column results table,
+  fuller detail pane (company/source/location/posted + fit gate).
+
+### Changed
+
+- LinkedIn/GitHub profile fields store as a bare username, not a full
+  URL (auto-migrates existing configs on read).
+- Preferred location is now a sort/display preference in the fit gate,
+  not a status-threshold input (`DECISION_VERSION` → `phase4-v4`).
+- Sidebar: greeting/clock moved to the app header (all tabs); sidebar
+  itself hidden on the Jobs tab for more table width.
+- npm bootstrap installs the core automatically, no Y/n prompt
+  (`--no-core`/`APPLYR_SKIP_CORE=1` to opt out).
+- `docs/SETUP.md` trimmed to point at the wizard/Settings instead of a
+  full field-by-field walkthrough.
+
+### Fixed
+
+- Jobs search title matching: a fuzzy-matching regression let
+  "Internal"/"International" postings match an "intern" query.
+- Windows installer: `install.ps1`'s post-bootstrap self-re-invoke used
+  the wrong path (`scripts\install.ps1` instead of
+  `scripts\install\install.ps1`), breaking the one-line installer on a
+  genuinely fresh machine.
+- Board-fetch failures now name the failing slug(s) instead of a bare
+  count, and retry once before giving up.
+- Results table: a long job title could overrun the posted/location/fit
+  columns after it.
+- Onboarding wizard's resume step: `Enter` is intercepted there for
+  conversion, not "next," so the actual skip (`Shift+→`) went
+  unnoticed; `Escape` now also skips, and the hints/step text spell
+  out both "open folder" and "skip for now" explicitly.
+- Installers (`install.sh`/`install.ps1`) no longer hard-fail the
+  instant `jq`/`python3`/`pypdf` is missing — they now offer to install
+  everything missing (or exit cleanly if declined).
+- Windows installer: the new `pypdf` detection check could itself crash
+  the installer with an unhandled exception on newer PowerShell
+  versions (missing `try`/`catch` around a native command expected to
+  fail exactly when `pypdf` is absent).
+
 ## [0.8.43a] — 2026-07-14
 
 npm package: `@keshm/applyr` version `0.8.43-alpha.0`.

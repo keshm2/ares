@@ -64,6 +64,7 @@
   ],
   "fallback_scope": "United States",
   "graduation_date": "June 2027",
+  "allow_experienced_roles": false,
   "boards": [
     "linkedin",
     "indeed",
@@ -81,6 +82,9 @@
   "lever_company_slugs": [
     "REPLACE_ME"
   ],
+  "greenhouse_company_slugs": [
+    "REPLACE_ME"
+  ],
   "simplify_feeds": [
     "REPLACE_ME"
   ],
@@ -90,15 +94,32 @@
   "safe_fields": {
     "first_name": "YOUR_FIRST_NAME",
     "last_name": "YOUR_LAST_NAME",
+    "preferred_name": "YOUR_PREFERRED_NAME",
     "email": "your.email@example.com",
     "phone": "555-555-5555",
-    "linkedin_url": "https://linkedin.com/in/your-profile",
-    "github_url": "https://github.com/your-username",
+    "linkedin_username": "your-username",
+    "github_username": "your-username",
+    "location": "City, ST",
+    "zip_code": "REPLACE_ME",
+    "address_line1": "REPLACE_ME",
+    "address_line2": "REPLACE_ME",
     "graduation_date": "Month Year",
     "gpa": "0.0",
     "authorized_to_work": "REPLACE_ME",
     "require_sponsorship": "REPLACE_ME",
     "citizenship_status": "REPLACE_ME",
-    "currently_enrolled": "Yes"
-  }
+    "currently_enrolled": "Yes",
+    "ethnicity": "REPLACE_ME",
+    "hispanic_or_latino": "REPLACE_ME",
+    "date_of_birth": "REPLACE_ME"
+  },
+  "_help": {
+    "allow_experienced_roles": "false = only intern/new-grad/entry-level postings pass the fit gate (today's default). true = the fit gate also allows postings requiring 3+ years of experience — set by checking \"Full time (3+ yrs exp)\" in the Settings Levels submenu.",
+    "ashby_company_slugs": "Company slugs (from an Ashby job-board URL, e.g. jobs.ashbyhq.com/<slug>) to scrape directly via the Ashby API.",
+    "lever_company_slugs": "Company slugs (from a Lever job-board URL, e.g. jobs.lever.co/<slug>) to scrape directly via the Lever API.",
+    "greenhouse_company_slugs": "Company slugs (from a Greenhouse job-board URL, e.g. boards.greenhouse.io/<slug>) to scrape directly via the Greenhouse jobs API.",
+    "simplify_feeds": "Named SimplifyJobs GitHub listing feeds to pull from — see docs/SETUP.md for the supported feed names.",
+    "workday_tenants": "Workday tenant identifiers to scrape in review-only mode — see docs/SETUP.md for how to find a tenant string."
+  },
+  "_onboarding": { "completed": false, "committed_fields": [], "current_page": 0 }
 }

@@ -7,11 +7,11 @@ import { HistoryScreen, HISTORY_HINTS } from "./HistoryScreen.js";
 import { RunScreen, RUN_HINTS, RUN_EDIT_HINTS } from "./RunScreen.js";
 import { SearchScreen, SEARCH_HINTS, SEARCH_EDIT_HINTS } from "./SearchScreen.js";
 import { SettingsScreen, SETTINGS_HINTS, SETTINGS_SECTION_HINTS } from "./SettingsScreen.js";
-import { ResumesScreen, RESUMES_HINTS } from "./ResumesScreen.js";
+import { ResumesScreen, RESUMES_HINTS, RESUMES_PROMPT_HINTS } from "./ResumesScreen.js";
 import { HelpOverlay } from "./HelpOverlay.js";
 import { WelcomeScreen, type WelcomeOption } from "./WelcomeScreen.js";
 import { KeyHints, AutoSparkleText } from "./KeyHints.js";
-import { SidePanel } from "./SidePanel.js";
+import { SidePanel, TopStatusBar } from "./SidePanel.js";
 import { UpdateBox } from "./UpdateBox.js";
 import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "../state.js";
 import { displayName } from "../settings.js";
@@ -265,7 +265,11 @@ export function App({
   // only appears once the content band keeps at least ~48 cols beside it —
   // below that the two columns collided and wrapped, corrupting the frame
   // on resize.
-  const showSidebar = columns >= 72 && rows >= 18;
+  // Never on the Jobs tab: its results table wants the full content width
+  // (posted/location/fit columns) more than the sidebar's stats do, and
+  // the greeting/clock that used to live only in the sidebar now show in
+  // the header on every tab (TopStatusBar, below) so nothing is lost.
+  const showSidebar = columns >= 72 && rows >= 18 && tab !== "jobs";
   const sideOverhead = showSidebar ? SIDE_PANEL_WIDTH + 2 : 0; // panel + gutter
   // On very wide terminals, center a readable content column instead of
   // leaving the right half of the screen empty: the horizontal padding
@@ -299,6 +303,8 @@ export function App({
     else tabHints = mode === "manual" ? SEARCH_HINTS : RUN_HINTS;
   } else if (tab === "settings" && childInputActive) {
     tabHints = SETTINGS_SECTION_HINTS;
+  } else if (tab === "resumes" && childInputActive) {
+    tabHints = RESUMES_PROMPT_HINTS;
   } else {
     tabHints = TAB_HINTS[tab];
   }
@@ -319,21 +325,30 @@ export function App({
   return (
     <Box flexDirection="column" height={tty ? rows : undefined} overflow="hidden">
       <Banner columns={columns} rows={rows} />
-      <Box paddingX={pad} justifyContent="flex-end">
-        <Text dimColor>MODE </Text>
-        {mode === "manual" ? (
-          <Text bold color={theme.accent}>
-            MANUAL
-          </Text>
-        ) : (
-          <AutoSparkleText>AUTO</AutoSparkleText>
-        )}
+      <Box paddingX={pad} justifyContent="space-between">
+        <TopStatusBar firstName={displayName(root)} />
+        <Box>
+          <Text dimColor>MODE </Text>
+          {mode === "manual" ? (
+            <Text bold color={theme.accent}>
+              MANUAL
+            </Text>
+          ) : (
+            <AutoSparkleText>AUTO</AutoSparkleText>
+          )}
+        </Box>
       </Box>
       {/* Tab row */}
       <Box paddingX={pad} marginTop={1}>
         {TABS.map((t, i) => (
           <Box key={t} marginRight={2}>
-            <Text dimColor>{i + 1} </Text>
+            {t === tab && !welcome ? (
+              <Text bold color="white">
+                {i + 1}{" "}
+              </Text>
+            ) : (
+              <Text dimColor>{i + 1} </Text>
+            )}
             {t === tab && !welcome ? (
               <Text bold color={theme.accent}>
                 {SELECT_MARKER} {TAB_LABEL[t]}
@@ -439,6 +454,7 @@ export function App({
                   <ResumesScreen
                     root={root}
                     active={tab === "resumes" && !helpOpen}
+                    onInputActiveChange={setChildInputActive}
                     contentRows={contentRows}
                   />
                 ) : (
@@ -467,7 +483,6 @@ export function App({
             borderColor={theme.rule}
           >
             <SidePanel
-              firstName={displayName(root)}
               applied={counts.applied}
               pending={unresolved}
               failed={counts.failed}

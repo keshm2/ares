@@ -20,6 +20,8 @@ export interface ResumeFile {
   needsConversion: boolean;
   /** True for the 6 stems resume-tailor.md actually reads by name. */
   expected: boolean;
+  /** Short label set at convert time for arbitrarily-named resumes, from .resume_meta.json. */
+  description?: string;
 }
 
 // Source of truth: agents/bodies/resume-tailor.md "Step 1 — Select base
@@ -36,6 +38,16 @@ const EXPECTED_RESUMES: Array<{ stem: string; category: string }> = [
 
 export function resumesDir(root: string): string {
   return path.join(root, "data", "resumes");
+}
+
+function readResumeMeta(root: string): Record<string, { description?: string }> {
+  try {
+    const raw = fs.readFileSync(path.join(resumesDir(root), ".resume_meta.json"), "utf8");
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 export function listResumeFiles(root: string): ResumeFile[] {
@@ -64,6 +76,7 @@ export function listResumeFiles(root: string): ResumeFile[] {
 
   const labelByStem = new Map(EXPECTED_RESUMES.map((e) => [e.stem, e.category]));
   const expectedOrder = new Map(EXPECTED_RESUMES.map((e, i) => [e.stem, i]));
+  const meta = readResumeMeta(root);
 
   return [...byStem.entries()]
     .map(([stem, { md, pdf }]) => ({
@@ -73,6 +86,7 @@ export function listResumeFiles(root: string): ResumeFile[] {
       hasPdf: pdf,
       needsConversion: pdf && !md,
       expected: labelByStem.has(stem),
+      description: meta[stem]?.description || undefined,
     }))
     .sort((a, b) => {
       const ai = expectedOrder.get(a.stem);

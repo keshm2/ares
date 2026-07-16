@@ -4,26 +4,28 @@ import { render } from "ink";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import readline from "node:readline/promises";
 import { spawnSync } from "node:child_process";
 import { findProjectRoot } from "./project.js";
 import { py } from "./platform.js";
 import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "./state.js";
 import { App, type Tab } from "./ui/App.js";
 import { StatusScreen } from "./ui/StatusScreen.js";
+import { OnboardingWizard } from "./ui/onboarding/OnboardingWizard.js";
 import { runWizard } from "./wizard.js";
 import { runAgent } from "./run.js";
+import { withAltScreen } from "./altScreen.js";
 
 const HELP = `applyr — persistent TUI for the applyr job-application agent
 
 Usage: applyr [command]
 
-  (no command)      open the app (status · jobs · review · history)
+  (no command)      open the app (status · jobs · review · history) —
+                    runs the setup wizard first if onboarding isn't done
   review | history  open the app on that screen
   resumes           open the app on the Resumes screen
   status            one-shot pipeline overview (scripting/CI friendly)
   run               trigger a run in the current terminal (no app shell)
-  setup [--check]   interactive config wizard; --check only validates
+  setup [--check]   (re)open the guided setup wizard; --check only validates
   update            check upstream and self-update now
   uninstall         remove the schedule, command, and (after confirming) the install
   help              show this help
@@ -31,6 +33,10 @@ Usage: applyr [command]
 Updates are checked on every app launch (the TUI asks before
 installing) and auto-install on scheduled runs
 (APPLYR_AUTO_UPDATE=0 disables).
+
+With no core checkout found, applyr installs it automatically
+(--no-core or APPLYR_SKIP_CORE=1 skips this and prints the manual
+install command instead).
 
 Inside the app, press ? for the full key reference.
 
@@ -84,11 +90,16 @@ function installUpdate(root: string): void {
   }
 }
 
-/** No core checkout found: offer to install it right here (one-command
- *  promise), falling back to printed instructions on a non-TTY. */
+/** No core checkout found: install it right here (one-command promise),
+ *  unless the user opted out with --no-core / APPLYR_SKIP_CORE=1, in
+ *  which case just print the manual one-liner. */
 async function bootstrapCore(): Promise<string | null> {
   const target = process.env.APPLYR_HOME ?? path.join(os.homedir(), "applyr");
   const oneLiner = bootstrapOneLiner();
+  if (process.argv.includes("--no-core") || process.env.APPLYR_SKIP_CORE === "1") {
+    console.log(`Skipped. Install later with: ${oneLiner}`);
+    return null;
+  }
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error(
       "applyr: no applyr core found. Install it with one command:\n\n" +
@@ -96,17 +107,6 @@ async function bootstrapCore(): Promise<string | null> {
         `(installs to ${target}; set APPLYR_HOME to change, or APPLYR_ROOT to point\n` +
         "at an existing checkout), then re-run applyr.",
     );
-    return null;
-  }
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  let answer: string;
-  try {
-    answer = (await rl.question(`applyr: no core found. Download it to ${target} now? [Y/n] `)).trim();
-  } finally {
-    rl.close();
-  }
-  if (answer.toLowerCase() === "n") {
-    console.log(`Skipped. Install later with: ${oneLiner}`);
     return null;
   }
   const r =
@@ -134,8 +134,7 @@ function flushStdout(): Promise<void> {
   });
 }
 
-/** Alternate screen: full-screen app without scrollback pollution, and
- * the terminal restored on any exit path (quit, error, Ctrl-C). */
+/** Full-screen app render, alt-screen managed by `withAltScreen`. */
 async function openApp(root: string, initialTab: Tab, updateVersion?: string): Promise<number> {
   const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   if (!interactive) {
@@ -147,17 +146,12 @@ async function openApp(root: string, initialTab: Tab, updateVersion?: string): P
     await flushStdout();
     return 0;
   }
-  const enter = "\x1b[?1049h\x1b[H";
-  const leave = "\x1b[?1049l";
-  process.stdout.write(enter);
-  const restore = () => process.stdout.write(leave);
-  process.on("exit", restore);
   // The UpdateBox calls this when the user accepts the update; we run
   // scripts/install/update.py AFTER the alt screen is restored below so its
   // stdio-inherit output lands on the normal screen, not inside the TUI.
   let installAfterExit = false;
-  try {
-    const instance = render(
+  await withAltScreen(() =>
+    render(
       <App
         root={root}
         initialTab={initialTab}
@@ -166,26 +160,39 @@ async function openApp(root: string, initialTab: Tab, updateVersion?: string): P
           installAfterExit = true;
         }}
       />,
-    );
-    // On resize, Ink diffs against the frame it drew for the OLD terminal
-    // size, leaving artifacts (stale rows on shrink, misaligned lines on
-    // reflow). Clearing Ink's frame forces a clean full repaint at the new
-    // size; the App's own resize listener re-derives the layout.
-    const onResize = () => instance.clear();
-    process.stdout.on("resize", onResize);
-    try {
-      await instance.waitUntilExit();
-    } finally {
-      process.stdout.off("resize", onResize);
-    }
-  } finally {
-    process.off("exit", restore);
-    restore();
-  }
+    ),
+  );
   // Alt screen is now left; a user-accepted update runs here so the
   // updater's stdio-inherit output is visible on the normal screen.
   if (installAfterExit) installUpdate(root);
   return 0;
+}
+
+/** First-run (and not-yet-onboarded) auto-launch: a fresh or incomplete
+ * `_onboarding` block means `<App>` must not mount yet — render the wizard
+ * first and only fall through once its `onDone` fires. Only applies to a
+ * plain `applyr` invocation on a real TTY; every other command/context
+ * behaves exactly as before. */
+async function maybeRunOnboarding(root: string): Promise<void> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return;
+  const targetsPath = path.join(root, "config", "targets.json");
+  let completed = false;
+  if (fs.existsSync(targetsPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(targetsPath, "utf8")) as {
+        _onboarding?: { completed?: boolean };
+      };
+      completed = parsed._onboarding?.completed === true;
+    } catch {
+      completed = false;
+    }
+  }
+  if (completed) return;
+  await withAltScreen(() => {
+    let instance: ReturnType<typeof render>;
+    instance = render(<OnboardingWizard root={root} onDone={() => instance.unmount()} />);
+    return instance;
+  });
 }
 
 async function main(): Promise<number> {
@@ -215,6 +222,11 @@ async function main(): Promise<number> {
     if (!installed) return 1;
     root = installed;
   }
+
+  // Plain `applyr` with no core config yet (or an unfinished wizard run):
+  // run the wizard first so <App>'s WelcomeScreen/SidePanel never mount
+  // ahead of onboarding. Every other command/context is untouched.
+  if (command === "") await maybeRunOnboarding(root);
 
   // Auto-update only on a plain app open — one-shot commands
   // (status/run/review) stay instant and scriptable. The probe reuses

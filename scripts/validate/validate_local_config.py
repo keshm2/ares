@@ -29,9 +29,17 @@ WEBHOOK_RE = re.compile(
 )
 
 SAFE_KEYS = [
-    "first_name", "last_name", "email", "phone", "linkedin_url", "github_url",
+    "first_name", "last_name", "email", "phone",
     "graduation_date", "gpa", "authorized_to_work", "require_sponsorship",
     "citizenship_status", "currently_enrolled",
+]
+
+# linkedin/github moved to a username-or-legacy-url OR-check (see
+# check_safe_field_either below): either the new `<kind>_username` or the
+# legacy `<kind>_url` must be a non-empty string.
+SAFE_KEY_PAIRS = [
+    ("linkedin_username", "linkedin_url"),
+    ("github_username", "github_url"),
 ]
 
 
@@ -111,6 +119,14 @@ def main(argv: list) -> None:
         if not (isinstance(sf, dict) and isinstance(sf.get(key), str) and len(sf[key]) > 0):
             fail(f"{targets_path}: safe_fields.{key} must be a non-empty string")
 
+    def has_safe_field(key):
+        sf = targets.get("safe_fields")
+        return isinstance(sf, dict) and isinstance(sf.get(key), str) and len(sf[key]) > 0
+
+    def check_safe_field_either(key_a, key_b):
+        if not (has_safe_field(key_a) or has_safe_field(key_b)):
+            fail(f"{targets_path}: safe_fields.{key_a} or safe_fields.{key_b} must be a non-empty string")
+
     check_array_nonempty("role_keywords")
     check_array_nonempty("level_keywords")
     check_array("preferred_locations")
@@ -124,6 +140,8 @@ def main(argv: list) -> None:
 
     for k in SAFE_KEYS:
         check_safe_field(k)
+    for key_a, key_b in SAFE_KEY_PAIRS:
+        check_safe_field_either(key_a, key_b)
 
     # --- discord_config.json field validation ------------------------------
     if discord_enabled and discord is not None:
@@ -199,7 +217,7 @@ def main(argv: list) -> None:
     sheets_path = os.path.join(project_root, "config", "google_sheets_config.json")
     if not os.path.isfile(sheets_path):
         warn(f"Google Sheets sync config not found ({sheets_path}) — Sheets sync "
-             "will be skipped. See docs/SETUP.md section 4.")
+             "will be skipped. See docs/SETUP.md section 3.")
     else:
         try:
             with open(sheets_path, "r", encoding="utf-8") as fh:
@@ -234,7 +252,7 @@ def main(argv: list) -> None:
                         key_abs = os.path.join(project_root, key_abs)
                     if not os.path.isfile(key_abs):
                         warn(f"{sheets_path}: service-account key file not found at {sheets_key} — "
-                             "Sheets sync will be skipped until the key is placed. See docs/SETUP.md section 4.3.")
+                             "Sheets sync will be skipped until the key is placed. See docs/SETUP.md section 3.3.")
 
     print("validate_local_config: OK")
 

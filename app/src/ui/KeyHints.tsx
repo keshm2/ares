@@ -35,7 +35,13 @@ export function KeyHints({ hints }: { hints: string }) {
  * through the hue wheel. Animates only on a real TTY (a piped one-frame
  * render gets a static warning color so CI output stays deterministic).
  */
-export function RainbowText({ children }: { children: string }) {
+export function RainbowText({
+  children,
+  wrap,
+}: {
+  children: string;
+  wrap?: React.ComponentProps<typeof Text>["wrap"];
+}) {
   const animate = Boolean(process.stdout.isTTY);
   const [offset, setOffset] = useState(0);
   useEffect(() => {
@@ -45,13 +51,13 @@ export function RainbowText({ children }: { children: string }) {
   }, [animate]);
   if (!animate) {
     return (
-      <Text bold color={theme.danger}>
+      <Text bold color={theme.danger} wrap={wrap}>
         {children}
       </Text>
     );
   }
   return (
-    <Text bold>
+    <Text bold wrap={wrap}>
       {Array.from(children).map((ch, i) => (
         <Text key={i} color={hueColor(offset + i * 16)}>
           {ch}
@@ -61,27 +67,39 @@ export function RainbowText({ children }: { children: string }) {
   );
 }
 
-// Ping-pong period for SPARKLE_GRADIENT (5 stops -> 2*(5-1) = 8) — offset
-// wraps here purely to keep the float from growing unbounded over a long
-// session; gradientColor's own modulo makes the exact value harmless.
-const SPARKLE_PERIOD = 2 * (SPARKLE_GRADIENT.length - 1);
-
 /**
  * Animated sparkle text for AUTO mode: each character cycles through a
  * purple → white blend (SPARKLE_GRADIENT, the same two colors UpdateBox's
  * traveling border ring uses — see theme.ts) rather than the full hue
- * wheel, so "AUTO" reads as calm/purposeful instead of alarming. Same
+ * wheel, so "AUTO" reads as calm/purposeful instead of alarming. Pass
+ * `gradient` to reuse this for a different wave — e.g. RunScreen's live
+ * "running" indicator colors itself by the configured coding-agent
+ * harness (see theme.ts's harnessGradient) instead of the default purple.
+ * `tickMs`/`offsetStep` default to the original AUTO-badge tuning (90ms,
+ * 0.35/tick); callers that want a slower, smoother wave — the harness
+ * gradient — pass a longer tick and a smaller step. Same
  * animate-only-on-a-real-TTY fallback as RainbowText — a piped one-frame
  * render gets a static warn color.
  */
-export function AutoSparkleText({ children }: { children: string }) {
+export function AutoSparkleText({
+  children,
+  gradient = SPARKLE_GRADIENT,
+  tickMs = 90,
+  offsetStep = 0.35,
+}: {
+  children: string;
+  gradient?: readonly string[];
+  tickMs?: number;
+  offsetStep?: number;
+}) {
   const animate = Boolean(process.stdout.isTTY);
   const [offset, setOffset] = useState(0);
+  const period = 2 * (gradient.length - 1);
   useEffect(() => {
     if (!animate) return;
-    const timer = setInterval(() => setOffset((o) => (o + 0.35) % SPARKLE_PERIOD), 90);
+    const timer = setInterval(() => setOffset((o) => (o + offsetStep) % period), tickMs);
     return () => clearInterval(timer);
-  }, [animate]);
+  }, [animate, period, tickMs, offsetStep]);
   if (!animate) {
     return (
       <Text bold color={theme.warn}>
@@ -92,7 +110,7 @@ export function AutoSparkleText({ children }: { children: string }) {
   return (
     <Text bold>
       {Array.from(children).map((ch, i) => (
-        <Text key={i} color={gradientColor(offset + i * 0.6, SPARKLE_GRADIENT)}>
+        <Text key={i} color={gradientColor(offset + i * 0.6, gradient)}>
           {ch}
         </Text>
       ))}
@@ -101,24 +119,92 @@ export function AutoSparkleText({ children }: { children: string }) {
 }
 
 /**
- * Cycling "working" glyph (SPINNER_FRAMES: . -> · -> • -> * -> • -> ·),
- * the Claude-Code-style activity indicator — a symbol that visibly
- * changes on its own, not just a color animation, so "something is
- * happening" reads even for someone not looking closely at hue shifts.
- * Non-TTY fallback renders the first frame statically, matching the
- * other animated components' pattern.
+ * Cycling "working" glyph (SPINNER_FRAMES: the braille rotation), the
+ * Claude-Code-style activity indicator — a symbol that visibly changes
+ * on its own, not just a color animation, so "something is happening"
+ * reads even for someone not looking closely at hue shifts. 80ms is the
+ * conventional braille-spinner cadence (matches most CLI "thinking"
+ * indicators of this family). Non-TTY fallback renders the first frame
+ * statically, matching the other animated components' pattern.
  */
 export function SpinnerGlyph({ color }: { color?: string } = {}) {
   const animate = Boolean(process.stdout.isTTY);
   const [frame, setFrame] = useState(0);
   useEffect(() => {
     if (!animate) return;
-    const timer = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), 140);
+    const timer = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), 80);
     return () => clearInterval(timer);
   }, [animate]);
   return (
     <Text bold color={color ?? theme.accent}>
       {SPINNER_FRAMES[animate ? frame : 0]}
+    </Text>
+  );
+}
+
+// Always show a few lit cells even at ratio 0 — an all-empty bar reads as
+// "nothing is happening" or "missing", not "just started".
+const MIN_FILLED_CELLS = 3;
+
+/**
+ * Animated gradient progress bar. Filled cells shimmer left-to-right
+ * through `gradient` (default SPARKLE_GRADIENT) so the animation reads as
+ * one system with AutoSparkleText — pass a different gradient (e.g.
+ * theme.ts's harnessGradient) to recolor it for a specific context, as
+ * RunScreen's live run-progress bar does by configured harness.
+ * `minFilled`/`tickMs`/`offsetStep` default to the original run-progress-
+ * view tuning (3 cells always lit — "something is happening" — ticking
+ * every 90ms by 0.35); callers that need an honest 0%-means-empty bar
+ * (e.g. onboarding, before anything has been answered) or a slower/
+ * smoother shimmer pass their own values rather than changing the shared
+ * defaults. Non-TTY fallback renders a flat accent-colored bar, matching
+ * AutoSparkleText/RainbowText's static-on-a-pipe behavior. Originally the
+ * run-progress view's own private helper (RunScreen.tsx); moved here and
+ * exported so the onboarding wizard's sidebar can reuse it.
+ */
+export function GradientProgressBar({
+  ratio,
+  width,
+  minFilled = MIN_FILLED_CELLS,
+  tickMs = 90,
+  offsetStep = 0.35,
+  gradient = SPARKLE_GRADIENT,
+}: {
+  ratio: number;
+  width: number;
+  minFilled?: number;
+  tickMs?: number;
+  offsetStep?: number;
+  gradient?: readonly string[];
+}) {
+  const animate = Boolean(process.stdout.isTTY);
+  const [offset, setOffset] = useState(0);
+  const period = 2 * (gradient.length - 1);
+  useEffect(() => {
+    if (!animate) return;
+    const timer = setInterval(() => setOffset((o) => (o + offsetStep) % period), tickMs);
+    return () => clearInterval(timer);
+  }, [animate, tickMs, offsetStep, period]);
+  const filled = Math.max(minFilled, Math.min(width, Math.round(ratio * width)));
+  const empty = width - filled;
+  if (!animate) {
+    return (
+      <Text>
+        <Text bold color={theme.accent}>
+          {"█".repeat(filled)}
+        </Text>
+        <Text dimColor>{"░".repeat(empty)}</Text>
+      </Text>
+    );
+  }
+  return (
+    <Text bold>
+      {Array.from({ length: filled }, (_, i) => (
+        <Text key={i} color={gradientColor(offset + i * 0.6, gradient)}>
+          █
+        </Text>
+      ))}
+      <Text dimColor>{"░".repeat(empty)}</Text>
     </Text>
   );
 }

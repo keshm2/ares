@@ -4,226 +4,136 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
-> **Build:** this document ships with release `0.8.43a`. The
-> full release notes are in [`RELEASE.md`](./RELEASE.md); the
-> project changelog is in [`CHANGELOG.md`](./CHANGELOG.md).
+> **Build:** this document ships with release `0.8.43a`. Full release
+> notes: [`RELEASE.md`](./RELEASE.md). Changelog: [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## 0. Universal install (recommended)
 
-One command from a fresh GitHub download handles sections 1 and 3,
-detects your coding agent, asks for your profile, and builds the
-optional TUI + browser extension:
+One command from a fresh GitHub download detects your coding agent and
+builds the optional TUI + browser extension. Your profile, job
+targets, and resumes are filled in by a guided wizard the first time
+you run `applyr` — see section 1.
 
 ```bash
-# Easiest — one command: downloads into ~/applyr, runs the installer,
-# and puts the `applyr` command on your PATH (~/.local/bin):
 curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.sh | bash
 
 # Or from an unpacked release archive (no git clone required):
 bash scripts/install/install.sh
 
 # Or via npm (installs the `applyr` TUI command; on first run with no
-# core it offers to download the core for you):
+# core checkout found it installs one automatically — opt out with
+# --no-core or APPLYR_SKIP_CORE=1):
 npm install -g @keshm/applyr
 ```
 
 ```powershell
-# Windows PowerShell (native, no WSL): downloads into %USERPROFILE%\applyr,
-# runs the installer, and puts the `applyr` command on your PATH.
+# Windows PowerShell (native, no WSL):
 irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.ps1 | iex
-
 # Or from an unpacked release archive:
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
-**Automatic updates.** Every scheduled run and every `applyr` launch
-checks the `VERSION` file on GitHub `main` and self-updates when a
-newer build was pushed (fail-open — no network just means no update).
-Git checkouts fast-forward pull; archive installs overlay the new
-tarball; live config, `data/`, and `logs/` are never touched. Run one
-manually with `applyr update` (or `bash scripts/install/update.sh`); opt out
-with `APPLYR_AUTO_UPDATE=0`.
+**Automatic updates.** Every scheduled run and `applyr` launch checks
+GitHub `main`'s `VERSION` file and self-updates on a newer build
+(fail-open); config/`data/`/`logs/` are never touched. Run one
+manually with `applyr update`, or opt out with `APPLYR_AUTO_UPDATE=0`.
+The installer also creates a `data/resumes/` folder for your base
+resumes — everything you enter (wizard, Settings, or by hand) stays in
+gitignored local files and never leaves your machine.
 
-The installer also prompts for your profile (the `safe_fields` used to
-fill application forms) and creates a `data/resumes/` folder — add your
-base resumes there as markdown files with a matching PDF, named by
-category: `base_resume_swe.md`/`.pdf` (pure software roles),
-`base_resume_ai_ml.md`/`.pdf` (AI/ML), `base_resume_cyber.md`/`.pdf`
-(security), `base_resume_networking_cyber.md`/`.pdf` (networking),
-`base_resume_balanced.md`/`.pdf` (the default, used when a job doesn't
-clearly match one category), plus `base_cover_letter.md` as the voice
-and structure reference for tailored cover letters. applyr picks one
-base resume per job and tailors it. Everything you enter is written
-only to gitignored local files (`config/`, `data/resumes/`) and never
-leaves your machine.
-
-**Only have PDFs?** Open the TUI's **Resumes** screen (`applyr resumes`,
-or press `5`/select it from the welcome menu) — it shows which of the
-categories above are missing their `.md`, lets you open `data/resumes/`
-directly in Finder/Explorer, and converts a PDF you've dropped in to
-markdown on the spot (`scripts/state/convert_resume.py`, text
-extraction via `pypdf` — `pip3 install pypdf` if it's not already
-installed). Extraction only, not OCR: a scanned image with no text
-layer needs a hand-written `.md` instead.
-
-**Downloading the release archive.**
+**Release archive:**
 
 ```bash
-# zip
-curl -L -o applyr-0.8.43a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.8.43a.zip
-unzip applyr-0.8.43a.zip && cd applyr-0.8.43a
-
-# or tarball
-curl -L -o applyr-0.8.43a.tar.gz https://github.com/keshm2/applyr/archive/refs/tags/0.8.43a.tar.gz
-tar -xzf applyr-0.8.43a.tar.gz && cd applyr-0.8.43a
+curl -L -o applyr-0.8.43a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.8.43a.zip && \
+  unzip applyr-0.8.43a.zip && cd applyr-0.8.43a   # or the release page's "Source code" assets
 ```
-
-The release page also exposes the standard
-"Source code (zip)" / "Source code (tar.gz)" assets directly — pick
-whichever works behind your network.
 
 **Uninstall.** `applyr uninstall` (or `bash scripts/install/uninstall.sh`)
-removes the launchd schedule and the `applyr` command, then asks
-before deleting the install directory (it holds your config, data,
-and resumes). `--keep-data` keeps the directory; `--yes` skips the
-prompt. npm installs also run `npm uninstall -g @keshm/applyr`.
+removes the schedule and `applyr` command, then asks before deleting
+the install directory (config/data/resumes); `--keep-data` keeps it,
+`--yes` skips the prompt. npm installs also run
+`npm uninstall -g @keshm/applyr`.
 
-applyr runs under your choice of coding agent — all four majors are
-supported: **opencode**, **Claude Code** (full capability), **Codex
-CLI**, and **GitHub Copilot CLI** (degraded path — see §3.8). The
-installer detects what you have installed — and when more than one
-supported agent is found, it **asks which one you'd prefer** — then
-writes the choice to `config/harness.json` (change it any time by
-editing that file, re-running the installer, or per-run with
-`APPLYR_HARNESS=opencode|claude|codex|copilot`). Then fill in the
-placeholders (section 2, or `applyr setup`) and start a run with
-`bash scripts/runtime/run_job_agent.sh`.
+applyr runs under your choice of coding agent — **opencode**,
+**Claude Code** (full), **Codex CLI**, and **GitHub Copilot CLI**
+(degraded — see §2.8). The installer detects what you have and asks
+which you'd prefer if more than one is present, writing the choice to
+`config/harness.json` (change any time by editing that file or setting
+`APPLYR_HARNESS=opencode|claude|codex|copilot`). Then set up your
+profile (section 1, or just run `applyr`) and start a run with
+`bash scripts/runtime/run_job_agent.sh`. Per-harness specifics are in
+§2.8; every harness's agent definitions are generated from `agents/`
+(see `agents/README.md`) — edit sources there, never the generated
+files.
 
-Per-harness notes:
+## 1. Set up your profile, job targets, and resumes
 
-- **opencode** — agents load from `.opencode/agents/`; models come from
-  `opencode.jsonc`.
-- **Claude Code** — agents load from `.claude/agents/` (`model:
-  inherit`, so runs use your session's model); Playwright MCP comes
-  from `.mcp.json`. Headless runs need pre-approved permissions in
-  `.claude/settings.json` — the installer offers to create it and asks
-  first, because it grants Claude broad repo-local tool access.
-- Agent definitions for both harnesses are generated from `agents/`
-  (see `agents/README.md`) — edit sources there, never the generated
-  files.
+The easiest path: run `applyr`. A fresh install auto-launches a guided
+wizard covering personal info, work eligibility, job targets (roles,
+locations, target companies), and resumes — each answer saves as you
+go, so quitting partway through and relaunching resumes right where
+you left off, at the same completion percentage. Reopen it any time
+with `applyr setup`. (The wizard creates `config/targets.json` from
+`config/targets.example.json` for you; copy
+`config/discord_config.example.json` to `config/discord_config.json`
+by hand only if you want to configure Discord before ever opening the
+TUI.)
 
-## 1. Copy the example configs
+Everything the wizard writes stays editable afterward from the
+running app's **Config** tab (`applyr` → tab 5, see §2.9): personal
+info, company targets (`role_keywords`, `level_keywords`,
+`season_keywords`, `preferred_locations`, Ashby/Lever slugs,
+`workday_tenants`), Discord webhooks, and environment overrides. Prefer
+hand-editing `config/targets.json` directly? `config/targets.example.json`
+carries an inert `_help` object with doc strings for the less obvious
+fields, right next to the fields themselves.
 
-```bash
-cp config/targets.example.json config/targets.json
-cp config/discord_config.example.json config/discord_config.json
-```
+**Resumes.** Drop any file into `data/resumes/` — no required filename
+anymore. The TUI's **Resumes** screen (`applyr resumes`, or press `5`)
+lists everything and converts a PDF to markdown on the spot (press
+`c`), prompting for an optional short description so non-standard
+resumes stay distinguishable later. `resume-tailor.md`'s category
+matcher still auto-recognizes five conventional base-resume names plus
+a cover-letter reference file; anything else just needs a description.
+Extraction is text-only, not OCR — a scanned PDF with no text layer
+needs a hand-written `.md`.
 
-## 2. Replace the placeholders
+**Discord is optional.** The installer asks whether you want status
+updates; declining leaves every outcome local. Opting in, choose one
+webhook for everything or a separate one per outcome (success / needs
+review / failed / summary — each needs its own webhook link). Set it
+up during install, or later from the Config tab's Discord section.
 
-In `config/targets.json`:
-
-- `safe_fields` — replace every placeholder with your real values:
-  - `YOUR_FIRST_NAME`, `YOUR_LAST_NAME`
-  - `your.email@example.com`, `555-555-5555`
-  - `https://linkedin.com/in/your-profile`, `https://github.com/your-username`
-  - `graduation_date` (`Month Year`), `gpa` (`0.0`)
-  - `authorized_to_work`, `require_sponsorship`, `citizenship_status` — each
-    is `REPLACE_ME`; set to the real answer (e.g. `Yes`/`No` for the first
-    two, your citizenship status for the third)
-  - `currently_enrolled` — set to `Yes` or `No` as appropriate
-- `ashby_company_slugs`, `lever_company_slugs` — replace `REPLACE_ME` with
-  real company slugs, or leave as `REPLACE_ME` to have the validator
-  auto-seed them from the project's vetted lists (see section 3.1). To
-  skip a board entirely, you must remove the placeholder and keep the
-  board out of your slug list after seeding (delete the seeded slugs).
-- `workday_tenants` — replace `REPLACE_ME` with `"<host>/<site>"`
-  strings for the Workday tenants you want watched (e.g.
-  `"nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"` — find the
-  host and site name in any posting URL on the company's careers
-  site), or leave the placeholder to skip the board. Workday is
-  **review-only**: promising postings land in the review queue and
-  Discord for you to apply manually — the agent never submits a
-  Workday application.
-- `simplify_feeds` — replace `REPLACE_ME` with one or both of the known
-  feed names `summer_internships` and `new_grad`, or leave as
-  `REPLACE_ME` to skip the SimplifyJobs board. The feeds are the
-  community-maintained SimplifyJobs listing files fetched read-only from
-  GitHub (`SimplifyJobs/Summer2026-Internships` and
-  `SimplifyJobs/New-Grad-Positions`) — no account or API key is needed.
-- `preferred_locations`, `fallback_scope`, `graduation_date` — review and
-  personalize.
-
-In `config/discord_config.json` — **Discord is optional.** The
-installer (and `applyr setup`) asks whether you want Discord status
-updates at all; answering no writes `{"enabled": false}` and every
-outcome simply stays local (state files + TUI). Opting in, you choose:
-
-- **One channel for all updates** — one webhook URL, written to every
-  route.
-- **Separate channels per status** — ⚠ Discord binds each webhook to
-  exactly ONE channel, so **each channel needs its own webhook link**
-  (up to 4).
-
-Fields, when enabled (`"enabled": true`, or the field absent — legacy
-configs are treated as enabled):
-
-- `webhooks.success` — required when enabled
-  (`https://discord.com/api/webhooks/<numeric_id>/<token>`); also the
-  fallback for the optional summary route.
-- `webhooks.needs_review` — required when enabled.
-- `webhooks.failed` — required when enabled.
-- `webhooks.summary` — optional; absent falls back to
-  `webhooks.success` at runtime.
-
-## 3. Validate
+## 2. Validate
 
 ```bash
 bash scripts/validate/validate_local_config.sh
 ```
 
-- Prints `validate_local_config: OK` on success — config is ready.
-- Any `ERROR` line names the file and field to fix (exit code 1).
-- Placeholder Ashby/Lever slugs are auto-seeded (section 3.1); other
-  placeholder state (e.g. `simplify_feeds`) prints a `WARNING` but does
-  not block the run.
+Prints `validate_local_config: OK` on success; any `ERROR` line names
+the file/field to fix (exit 1). Placeholder Ashby/Lever slugs are
+auto-seeded (2.1); other placeholder state (e.g. `simplify_feeds`)
+warns but doesn't block the run.
 
-### 3.1 Vetted slug auto-seeding (Phase 6)
+### 2.1 Vetted slug auto-seeding
 
-When `ashby_company_slugs` or `lever_company_slugs` is **unset, empty,
-or placeholder-only** (`["REPLACE_ME"]`), the validator seeds it from
-the project-owned vetted lists so a fresh clone has real Ashby/Lever
-coverage on the first run:
+When `ashby_company_slugs`/`lever_company_slugs` is unset, empty, or
+placeholder-only, the validator seeds it from the project-owned vetted
+lists (`config/ashby_vetted_slugs.json`, `config/lever_vetted_slugs.json`)
+so a fresh clone has real coverage on the first run. Never overwrites
+a non-placeholder value; deterministic and idempotent (one atomic
+write, a second run does nothing); prints a visible `WARNING` so
+you're not surprised. Run directly with
+`python3 scripts/validate/seed_vetted_slugs.py`.
 
-- `config/ashby_vetted_slugs.json`
-- `config/lever_vetted_slugs.json`
+**Provenance.** The vetted lists are trust-bearing and project-owned —
+every slug hand-verified against the public board APIs on the
+`verified_at` date in each file. Additions are code changes reviewed
+in a PR; nothing is pulled remotely at run time.
 
-Behavior:
+### 2.2 TUI overlay (optional)
 
-- Seeding never overwrites a non-placeholder value — if even one entry
-  in your array is a real slug, the array is treated as a deliberate
-  choice and left untouched.
-- Seeding is deterministic and idempotent: it writes the vetted list
-  verbatim in one atomic JSON write of `config/targets.json`; a second
-  run does nothing.
-- Every seeded array prints a visible `WARNING` at run start
-  (`auto-seeded from vetted list …`) so you are not surprised — review
-  the change in `config/targets.json` and edit or revert if unwanted.
-- The seeder can also be run directly:
-  `python3 scripts/validate/seed_vetted_slugs.py`
-
-**Provenance.** The vetted lists are trust-bearing, project-owned
-artifacts committed to the repo. Every slug was hand-verified against
-the public board APIs (`api.ashbyhq.com/posting-api/job-board/{slug}`,
-`api.lever.co/v0/postings/{slug}?mode=json` — HTTP 200 with a
-non-empty postings array) on the `verified_at` date recorded in each
-file. Additions are code changes: verify the endpoint by hand, update
-`verified_at`, and review in a PR. Nothing is ever pulled from a
-remote source at run time.
-
-### 3.2 TUI overlay (Phase 13, optional)
-
-A terminal UI over the same configs and helpers, in `app/`. It never
+A terminal UI over the same configs and helpers, in `app/`. Never
 writes state JSON directly — every mutation goes through the repo's
 helpers.
 
@@ -234,228 +144,148 @@ npm run build
 node dist/cli.js help      # or: npm link && applyr help
 ```
 
-Commands:
+Commands: `applyr setup` (reopens the guided wizard that auto-launches
+on a fresh run, then validates; `--check` validates only), `applyr
+status` (outcome counts, review queue, last run), `applyr review`
+(triage: open posting, mark applied, or dismiss), `applyr history`
+(browse outcomes), `applyr run` (trigger a run, stream the session log).
 
-- `applyr setup` — interactive wizard that writes `config/targets.json`
-  and `config/discord_config.json` (the same files sections 1–2
-  create by hand), then runs the validator. `applyr setup --check`
-  validates only.
-- `applyr status` — outcome counts, pending review queue, last run.
-- `applyr review` — triage the review queue: open the posting, mark
-  applied, or dismiss (recorded via the state helpers).
-- `applyr history` — browse recorded outcomes.
-- `applyr run` — trigger `scripts/runtime/run_job_agent.sh` and stream the
-  session log.
+The app opens on a **welcome menu** (`w` returns any time, `?` shows
+the full key reference). The Jobs screen always opens **browsing,
+never typing**: `/` types a search query (`e` for the run cap in
+automatic mode), `Esc` stops typing (never quits); quit with `q`
+(confirms mid-run).
 
-The app opens on a **welcome menu** that lets you choose where to go
-first; press `w` any time to come back to it. Inside the app, press
-`?` at any time for the complete keyboard reference. The Jobs
-screen always opens **browsing, never typing**: press `/` to type a
-search query (or `e` in automatic mode to type the run cap), and
-`Esc` to stop typing — `Esc` never quits the app; quit with `q`
-(asks for confirmation while a run is active). The banner and all
-lists resize with the terminal.
+**Modes.** Always launches in **manual mode**; `m` toggles to
+automatic (shown in the shell).
 
-**Modes.** The app always launches in **manual mode**. Press `m` to
-toggle between manual and automatic; the active mode is always visible
-in the shell.
+- **Manual** — Search screen fetches live postings, filters by typed
+  query, opens a posting in the browser, runs the fit gate, saves to
+  the review queue (the only state write).
+- **Automatic** — agent-driven: before a run starts you set this
+  cycle's cap (1–25, `APPLYR_SESSION_CAP`), which can only lower, never
+  raise, the 25-per-session max (`run_job_agent.sh` clamps/falls back
+  accordingly); tier-colored by cost, with an animated **MAX** warning
+  at 25. `p` adds an optional extra prompt (`APPLYR_EXTRA_PROMPT`,
+  500-char cap) that focuses a run without overriding `AGENTS.md` or
+  the session cap.
 
-- **Manual mode (default on launch)** — human-driven job search: a
-  Search screen fetches live postings from the configured boards, lets
-  you filter by a typed query, open a posting in the browser, run the
-  fit gate on a selected posting, and save it to the review queue.
-  The only state writes are the save action (needs_review records
-  through the helpers).
-- **Automatic mode** — agent-driven cycle: before a run can start you
-  must enter how many applications this cycle may submit (1–25). The
-  runner receives the count as `APPLYR_SESSION_CAP` and the run prompt
-  carries the per-cycle cap. The cap can lower, never raise, the
-  25-per-session maximum; `run_job_agent.sh` clamps any value above
-  25 down to 25 and falls back to 25 on invalid or below-1 input.
-  The cap is tier-colored by cost (light / standard / heavy) and 25
-  shows an animated **MAX** warning — a full-cap run eats through
-  your token budget. Press `p` to add an optional extra prompt for
-  the agent (sent as `APPLYR_EXTRA_PROMPT`, 500-char cap); empty
-  means the standard workflow. It can focus a run but never overrides
-  `AGENTS.md`, the state-write discipline, or the session cap.
+**Small test cycle (recommended first run):** `applyr` → any key → `2`
+(Jobs) → `m` (AUTO) → `e` → `5` → `enter` → optionally `p` → `s`.
+Outcomes land in Status/Review/History and Discord as usual.
 
-**Small test cycle (recommended first run):** open `applyr`, press
-any key, then `2` (Jobs) → `m` (AUTO) → `e` → type `5` → `enter` →
-optionally `p` for an instruction → `s`. The run streams its session
-log into the screen; outcomes land in Status / Review / History and
-Discord as usual.
+## 2.5 Always-on schedule (optional)
 
-npm publication (`npx`-based first run) is deferred until the package
-name and scope are settled — for now install from the repo as above.
-
-## 3.5 Always-on schedule (Phase 8, optional)
-
-Run the agent every 30 minutes, 24/7, via a launchd user agent
-(macOS). Overlap protection lives in `run_job_agent.sh` itself: a tick
-that lands while a run is in flight logs `skipped_overlap` and exits 0
-(no second agent), a dead holder's lock is reclaimed immediately, and
-a hung run older than 60 minutes (`APPLYR_LOCK_MAX_AGE_MIN`) is
-terminated and reclaimed so a wedged run never blocks the schedule.
+Runs the agent every 30 minutes, 24/7, via a launchd user agent
+(macOS). Overlap protection lives in `run_job_agent.sh`: a tick landing
+mid-run logs `skipped_overlap` and exits 0; a dead holder's lock is
+reclaimed immediately; a hung run older than 60 minutes
+(`APPLYR_LOCK_MAX_AGE_MIN`) is terminated and reclaimed.
 
 ```bash
-bash scripts/runtime/scheduler.sh install     # write + load the plist (a run starts immediately)
-bash scripts/runtime/scheduler.sh status      # loaded? + current heartbeat
+bash scripts/runtime/scheduler.sh install     # write + load the plist (runs immediately)
+bash scripts/runtime/scheduler.sh status      # loaded? + heartbeat
 bash scripts/runtime/scheduler.sh uninstall   # stop the schedule
 bash scripts/runtime/scheduler.sh plist       # print the plist without installing
 ```
 
 On Linux, create the equivalent systemd user timer by hand
-(`OnUnitActiveSec=30min`, `WorkingDirectory=` the repo root, command
+(`OnUnitActiveSec=30min`, repo root as `WorkingDirectory=`, command
 `/bin/bash scripts/runtime/run_job_agent.sh`).
 
-**What to check first when something looks wrong:**
+**What to check first:** `logs/heartbeat.json` (timestamp, exit code,
+outcome counts, restart-loop signal); `logs/run_job_agent.log` (one
+line per tick, incl. the `complete <ISO> applied=<n> needs_review=<n>
+failed=<n> skipped_unfit=<n>` marker plus `skipped_overlap`/
+`stale_lock_reclaimed`/`FAILED`); `logs/session_<timestamp>.log` (full
+transcript, newest 30 kept).
 
-1. `logs/heartbeat.json` — last run's timestamp, exit code, per-run
-   outcome counts, and `consecutive_nonzero_exits` (a growing streak
-   means a restart loop; the schedule keeps ticking either way).
-2. `logs/run_job_agent.log` — one line per tick: the machine-parseable
-   `run_job_agent: complete <ISO> applied=<n> needs_review=<n>
-   failed=<n> skipped_unfit=<n>` health marker, plus
-   `skipped_overlap` / `stale_lock_reclaimed` / `FAILED` entries.
-3. `logs/session_<timestamp>.log` — the full transcript of a specific
-   run (start line, harness, transcript, end marker). Only the newest
-   30 are kept (`APPLYR_KEEP_SESSION_LOGS`).
+The 25-per-session cap is unchanged — the schedule changes how often
+runs happen, never how much one run may apply.
 
-The 25-applications-per-session cap is unchanged — the cadence changes
-how often runs happen, never how much one run may apply.
-
-## 3.6 Browser extension — hybrid mode (Phase 10, optional)
+## 2.6 Browser extension — hybrid mode (optional)
 
 A Chrome (Manifest V3) extension for user-driven applications: you
 browse postings yourself; the extension autofills forms from your
 `safe_fields`, shows the deterministic fit verdict as a badge, and
-records outcomes into the same local state as the agent — so manual
-and automatic applications dedupe against each other.
+records outcomes into the same local state as the agent, so manual and
+automatic applications dedupe against each other.
 
-**Safety model (how it is wired, not a suggestion):**
-
-- The extension **never submits a form**. Autofill stops at a filled
-  form; you review and click submit yourself.
-- Values come **only** from `config/targets.json "safe_fields"`.
-  Fields the profile cannot answer are highlighted amber — never
-  invented.
-- All reads/writes go through a **localhost-only bridge**
-  (`scripts/runtime/extension_bridge.py`) authenticated by a per-install token;
-  the bridge only shells out to the repo's standard state helpers.
-
-**1. Start the bridge** (from the repo root):
+**Safety model:** never submits a form (you click submit yourself);
+values come only from `safe_fields` (unanswerable fields amber, never
+invented); reads/writes go through a **localhost-only bridge**
+(`scripts/runtime/extension_bridge.py`), token-authenticated, shelling
+out only to the repo's standard state helpers.
 
 ```bash
-python3 scripts/runtime/extension_bridge.py
+# 1. Start the bridge:
+python3 scripts/runtime/extension_bridge.py     # or: py -3 scripts\extension_bridge.py
+
+# 2. Build and load the extension:
+cd extension && npm install && npm run build
 ```
 
-```powershell
-py -3 scripts\extension_bridge.py
-```
+First bridge start generates `config/extension_bridge.json`
+(gitignored, `chmod 600`, token + default port `8377`; print it with
+`--show-token`). In Chrome: `chrome://extensions` → **Developer mode**
+→ **Load unpacked** → `extension/dist/`. Then open the extension's
+**Options** page, paste the token, and click **Test connection**.
 
-The first start generates `config/extension_bridge.json` (gitignored,
-`chmod 600`) with the per-install token and default port `8377`.
-Print the token any time with
-`python3 scripts/runtime/extension_bridge.py --show-token` (Windows:
-`py -3 scripts\extension_bridge.py --show-token`). Leave the bridge
-running while you use the extension.
+**Use it:** on a Greenhouse/Lever/Ashby/Workday posting, a small
+**applyr** panel appears (bottom-right) — **Fit check** (verdict +
+score + duplicate warning), **Autofill from profile** (fills mapped
+empty fields, amber for unanswerable ones, never overwrites), **Save
+for review** (`needs_review` entry), and **I submitted this — record
+it** (`applied` outcome, dedup-guarded, syncs the Sheet tracker).
+"Bridge unreachable" means the bridge isn't running.
 
-**2. Build and load the extension:**
-
-```bash
-cd extension
-npm install
-npm run build
-```
-
-Then in Chrome: `chrome://extensions` → enable **Developer mode** →
-**Load unpacked** → select `extension/dist/`. (Web-store distribution
-is deliberately deferred.)
-
-**3. Connect it:** open the extension's **Options** page, paste the
-bridge token, and click **Test connection**.
-
-**4. Use it:** on a posting hosted by Greenhouse, Lever, Ashby, or
-Workday, a small **applyr** panel appears (bottom-right):
-
-- **Fit check** — extracts the posting and shows the phase 4 verdict
-  (`candidate` / `needs_review` / `skipped_unfit` + score), plus a
-  warning if you already applied to this job.
-- **Autofill from profile** — fills mapped, empty fields (green
-  outline) and highlights required fields it can't answer (amber).
-  It never overwrites anything you typed.
-- **Save for review** — records a `needs_review` entry (applied log +
-  review queue + event), same as saving from the TUI search.
-- **I submitted this — record it** — after you actually submit,
-  records an `applied` outcome (dedup-guarded) and best-effort syncs
-  the Google Sheet tracker.
-
-If the panel reports "bridge unreachable", start the bridge (step 1).
-
-## 3.7 Two users on one machine (Phase 9)
+## 2.7 Two users on one machine
 
 applyr is **single-user by design**: everything personal lives in the
 clone (`config/`, `data/` incl. resumes, `logs/`, `.playwright-mcp/`).
-To run applyr for two people on one machine, use **two separate
-clones** (e.g. `~/applyr-alice` and `~/applyr-bob`), each with its own
-configs, state, and resumes — point the TUI at the right one with
-`APPLYR_ROOT`. One caveat: the 30-minute launchd schedule (§3.5) uses
-the fixed label `com.applyr.job-agent`, so only **one** clone per
-macOS user account can have the always-on schedule installed; run the
-second clone on demand (`bash scripts/runtime/run_job_agent.sh`) or from
-another OS user account. Profile-based multi-user (one install, many
-profiles) is deliberately deferred to a future phase — see the
-"Single-user deployment" section of `AGENTS.md` for the seams a
-future migration would use.
+For two people on one machine, use **two separate clones** (e.g.
+`~/applyr-alice`, `~/applyr-bob`), pointing the TUI at the right one
+with `APPLYR_ROOT`. Caveat: the launchd schedule (§2.5) uses the fixed
+label `com.applyr.job-agent`, so only **one** clone per macOS user
+account can have it installed — run the second on demand or under
+another OS user account. Profile-based multi-user is deferred — see
+`AGENTS.md`'s "Single-user deployment" section.
 
-## 3.8 Per-agent quickstarts (Phase 16)
+## 2.8 Per-agent quickstarts
 
-applyr runs under any of the four major coding agents. Pick one,
-install it, run `bash scripts/install/install.sh`, and the installer detects
-it and writes `config/harness.json` (asking when more than one is
-present). Change agents any time by editing that file or setting
-`APPLYR_HARNESS=opencode|claude|codex|copilot` per run. The business
-logic is identical under every agent — only the thin adapter in
-`scripts/runtime/run_job_agent.sh` differs; capability differences and the
-degraded paths are defined in `AGENTS.md` "Harness capability
-matrix".
+Pick one of the four agents, install it, run
+`bash scripts/install/install.sh` — the installer detects it and
+writes `config/harness.json` (asking if more than one is present).
+Change any time via that file or
+`APPLYR_HARNESS=opencode|claude|codex|copilot`. Business logic is
+identical under every agent — only the thin adapter in
+`scripts/runtime/run_job_agent.sh` differs; see `AGENTS.md`'s "Harness
+capability matrix" for the degraded paths.
 
-- **opencode** (full capability) — install per
-  [opencode.ai](https://opencode.ai). Agents load from
-  `.opencode/agents/`, models from `opencode.jsonc`, Playwright MCP
-  is configured there. Runs `opencode run --agent job-scraper`.
-- **Claude Code** (full capability) — install per
-  [claude.com/claude-code](https://claude.com/claude-code). Subagents
-  load from `.claude/agents/`, Playwright MCP from `.mcp.json`.
-  Headless runs need pre-approved permissions in
-  `.claude/settings.json` — the installer offers to create it (asks
-  first; it grants broad repo-local tool access). Runs `claude -p`.
-- **Codex CLI** (degraded path) — install per
-  [developers.openai.com/codex/cli](https://developers.openai.com/codex/cli).
-  Codex reads `AGENTS.md` natively. No subagent registry (the run
-  prompt tells it to perform the subagent roles inline from
-  `agents/bodies/`) and no browser automation by default — the run
-  covers API-fed boards (Ashby, Lever, SimplifyJobs, Workday CXS) and
-  routes browser-only applications to the review queue. Headless runs
-  execute shell helpers: set your approval/sandbox policy in
-  `~/.codex/config.toml` (e.g. workspace-write) so `codex exec` can
-  run `scripts/` and write `data/` inside the repo. Runs `codex exec`.
-- **GitHub Copilot CLI** (degraded path) — install per
-  [docs.github.com/copilot](https://docs.github.com/copilot) (the
-  `copilot` command). Same inline-subagent and API-boards degraded
-  path as Codex. Runs `copilot -p … --allow-all-tools` — that flag
-  lets the headless run execute the repo's helpers without a TTY
-  approval; review what that means for your machine before
-  scheduling it.
+- **opencode** (full) — install per opencode.ai. Agents in
+  `.opencode/agents/`, models from `opencode.jsonc`. Runs `opencode run
+  --agent job-scraper`.
+- **Claude Code** (full) — install per claude.com/claude-code. Agents
+  in `.claude/agents/`, Playwright MCP from `.mcp.json`. Headless runs
+  need pre-approved `.claude/settings.json` permissions (installer
+  offers to create it, asks first). Runs `claude -p`.
+- **Codex CLI** / **GitHub Copilot CLI** (both degraded) — install per
+  developers.openai.com/codex/cli / docs.github.com/copilot. Both read
+  `AGENTS.md` natively with no subagent registry (roles run inline
+  from `agents/bodies/`) and no browser automation by default —
+  API-fed boards only, browser-only applications route to review.
+  Codex needs a `~/.codex/config.toml` sandbox policy (e.g.
+  workspace-write) to run `scripts/` (runs `codex exec`); Copilot's
+  `-p … --allow-all-tools` does the equivalent for headless runs
+  (review what that grants before scheduling it).
 
 ### Conformance results (scripts/validate/run_conformance.py)
 
-The conformance suite pushes a golden job batch through
-canonicalize → fit gate → state writes against temp files (13
-deterministic checks, no LLM), and `--harness <name>` additionally
-drives the named CLI headlessly through one helper invocation and
-asserts the golden `job_key` lands in the transcript. A missing CLI
-reports `SKIP`, never a false pass. Re-run any time:
+Pushes a golden job batch through canonicalize → fit gate → state
+writes against temp files (13 deterministic checks, no LLM);
+`--harness <name>` additionally drives that CLI headlessly and asserts
+the golden `job_key` lands in the transcript. A missing CLI reports
+`SKIP`, never a false pass.
 
 ```bash
 python3 scripts/validate/run_conformance.py                 # deterministic core
@@ -470,108 +300,71 @@ python3 scripts/validate/run_conformance.py --harness all   # + installed CLIs (
 | Harness: Codex CLI | PENDING — CLI not installed on the verification machine | — |
 | Harness: Copilot CLI | PENDING — CLI not installed on the verification machine | — |
 
-## 3.9 Settings screen (TUI Config tab)
+## 2.9 Settings screen (TUI Config tab)
 
 `applyr` → tab 5 (**Config**) shows every setting's current value
-before you change it, in three sections:
+before you change it, in four sections:
 
-- **Personal info** — the `safe_fields` in `config/targets.json`,
-  plus **Preferred name**: how the TUI greets you in the sidebar
-  (falls back to your first name when empty).
+- **Personal info** — the `safe_fields` in `config/targets.json`, plus
+  **Preferred name** (sidebar greeting; falls back to first name).
+- **Company targets** — `role_keywords`, `level_keywords`,
+  `season_keywords`, `preferred_locations`, Ashby/Lever slugs,
+  `workday_tenants` — the job-matching fields that used to be
+  hand-edit-only, now live-editable the same way as personal info.
 - **Discord webhooks** — the enabled switch (enter toggles) and the
   four per-outcome webhook URLs.
 - **Environment** — persisted `APPLYR_*` overrides saved to
-  `config/env.json` (gitignored) and exported by every run; a
-  variable set in your real shell environment always wins, and
-  clearing a value returns it to the default. Includes
-  `APPLYR_LOG_DIR` (where run/session logs and the heartbeat live —
-  the agent's fetch-scratch stays in the project's `logs/tmp`),
-  `APPLYR_SESSION_CAP`, `APPLYR_KEEP_SESSION_LOGS`,
-  `APPLYR_LOCK_MAX_AGE_MIN`, `APPLYR_AUTO_UPDATE`, and
-  `APPLYR_HARNESS`.
+  `config/env.json` (gitignored) and exported by every run; a real
+  shell env var always wins, clearing returns to default. Includes
+  `APPLYR_LOG_DIR`, `APPLYR_SESSION_CAP`, `APPLYR_KEEP_SESSION_LOGS`,
+  `APPLYR_LOCK_MAX_AGE_MIN`, `APPLYR_AUTO_UPDATE`, `APPLYR_HARNESS`.
 
-## 4. Google Sheets sync (Phase 3, optional)
+## 3. Google Sheets sync (optional)
 
 The agent can append every successful application to a Google Sheet
-internship tracker. This is optional: if it is not configured, the agent
-skips the sync and local job state (`data/applied_jobs.json`,
-`data/job_registry.json`) remains the source of truth.
+internship tracker. Optional: unconfigured, the agent skips the sync
+and local job state (`data/applied_jobs.json`, `data/job_registry.json`)
+stays the source of truth.
 
-### 4.1 Copy the example config
+### 3.1 Configure
 
 ```bash
 cp config/google_sheets_config.example.json config/google_sheets_config.json
-```
-
-`config/google_sheets_config.json` is gitignored — it holds the sheet id
-and the path to the service-account key. Edit it:
-
-- `spreadsheet_id` — the long id from your sheet URL
-  (`https://docs.google.com/spreadsheets/d/<spreadsheet_id>/edit`).
-- `worksheet_title` — the tab name to append to (default
-  `Internship Tracker`).
-- `service_account_key_path` — local path to the service-account JSON
-  key (default `config/service-account-key.json`).
-- `enabled` — set to `false` to turn sync off without deleting the file.
-- `header_range`, `value_input_option`, `insert_data_option` — optional
-  append parameters with sensible defaults (`A1:H`, `USER_ENTERED`,
-  `INSERT_ROWS`). Leave them as-is unless the sheet needs different
-  settings.
-
-### 4.2 Install the Python dependencies
-
-```bash
 pip3 install -r requirements.txt
 ```
 
-This installs the official Google Python client and auth libraries needed
-for service-account Sheets writes.
+`config/google_sheets_config.json` is gitignored — edit `spreadsheet_id`
+(from your sheet URL), `worksheet_title` (default `Internship Tracker`),
+`service_account_key_path` (default `config/service-account-key.json`),
+and `enabled` (`false` turns sync off without deleting the file).
+`header_range`, `value_input_option`, `insert_data_option` are optional
+append params with sensible defaults — leave as-is unless needed.
 
-### 4.3 Create the service account and download the key
+### 3.2 Service account
 
-1. Open the Google Cloud Console → **APIs & Services → Library** and
-   enable the **Google Sheets API** for your project.
-2. Go to **APIs & Services → Credentials → Create credentials →
-   Service account**. Give it any name (e.g. `applyr-tracker-sync`).
-3. Open the new service account → **Keys → Add key → Create new key →
-   JSON**. A JSON key file downloads.
-4. Move the downloaded key to the repo:
+Cloud Console → **APIs & Services → Library** → enable **Google
+Sheets API** → **Credentials → Create credentials → Service account**
+(any name) → open it → **Keys → Add key → Create new key → JSON**
+(downloads), then:
 
-   ```bash
-   mv ~/Downloads/<downloaded-key>.json config/service-account-key.json
-   chmod 600 config/service-account-key.json
-   ```
+```bash
+mv ~/Downloads/<downloaded-key>.json config/service-account-key.json
+chmod 600 config/service-account-key.json
+```
 
-   `config/service-account-key.json` is gitignored.
+Copy `client_email` from that JSON. Sheet → **Share** → paste it →
+**Editor** access — the helper can't write until the sheet is shared.
 
-### 4.4 Share the Google Sheet with the service account
-
-Open the service-account key JSON and copy the `client_email` value
-(e.g. `applyr-tracker-sync@your-project.iam.gserviceaccount.com`). Open
-your Google Sheet → **Share** → paste that email → give it **Editor**
-access. The helper cannot write until the sheet is shared with this
-email.
-
-### 4.5 Validate
+### 3.3 Validate and test
 
 ```bash
 bash scripts/validate/validate_local_config.sh
-```
-
-The Sheets config is validated in a Phase 3-appropriate way:
-
-- If `config/google_sheets_config.json` is absent, the validator warns
-  and continues — job-board runs are not blocked.
-- If present and `enabled: true`, required fields and the
-  service-account key path shape are checked. Missing key file or
-  placeholder values produce `WARNING` lines but do not break the run.
-
-### 4.6 Test a single append manually
-
-```bash
 python3 scripts/jobs/sync_internship_tracker.py '{"title":"Test Role","company":"Test Co","date_applied":"2026-07-01","internship_term":"Summer 2026"}'
 ```
 
-A successful sync prints a JSON result with `"synced": true` and the
-appended row. If sync is disabled or unconfigured, the helper prints a
-`"skipped": true` result and exits 0 so the application run continues.
+If the config file is absent, the validator warns and continues
+(job-board runs aren't blocked); if `enabled: true`, required fields
+and the key path shape are checked (missing key/placeholder values
+warn, don't block). A successful sync test prints `"synced": true` and
+the appended row; disabled/unconfigured prints `"skipped": true` and
+exits 0 so the run continues.

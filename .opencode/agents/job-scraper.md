@@ -24,7 +24,7 @@ Determine what your harness can actually do, then follow the
   perform that role inline, following it exactly.
 - **No browser-automation tools** (no Playwright/browser tools in your
   toolset): fetch and process API-fed boards only (Ashby, Lever,
-  SimplifyJobs, Workday CXS). Route any job whose application would
+  Greenhouse, SimplifyJobs, Workday CXS). Route any job whose application would
   require a browser to `needs_review` with reasoning
   "harness lacks browser automation: <title> at <company>; user to
   apply manually" — the standard needs_review flow (applied_jobs
@@ -76,16 +76,21 @@ not optional narration, and never bundle them into a larger sentence.
      to process every fetched posting in one session.
    - Print at most ~30 shortlist lines (company · title · url) into the
      transcript when reviewing candidates.
-1. For Ashby and Lever boards: use bash/curl to call the public JSON API
-   directly. No authentication required.
+1. For Ashby, Lever, and Greenhouse boards: use bash/curl to call the
+   public JSON API directly. No authentication required.
    - Ashby: GET https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true
      for each slug in config/targets.json "ashby_company_slugs".
    - Lever: GET https://api.lever.co/v0/postings/{slug}?mode=json
      for each slug in config/targets.json "lever_company_slugs".
-   - If "ashby_company_slugs" or "lever_company_slugs" is empty, missing,
-     or contains only placeholder values (e.g. "REPLACE_ME"), skip that
-     board for this run and log a single warning to the session output —
-     do not abort the run. Continue with the remaining boards normally.
+   - Greenhouse: GET https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true
+     for each slug in config/targets.json "greenhouse_company_slugs". The
+     `content` field carries the full JD HTML — no separate per-job fetch
+     is needed the way SimplifyJobs/Workday require.
+   - If "ashby_company_slugs", "lever_company_slugs", or
+     "greenhouse_company_slugs" is empty, missing, or contains only
+     placeholder values (e.g. "REPLACE_ME"), skip that board for this run
+     and log a single warning to the session output — do not abort the
+     run. Continue with the remaining boards normally.
 2. For SimplifyJobs: run the deterministic fetch helper — never scrape
    GitHub with Playwright:
    `python3 scripts/jobs/fetch_simplify_listings.py`
@@ -98,8 +103,8 @@ not optional narration, and never bundle them into a larger sentence.
      warning, skip the board, continue the run.
    - SimplifyJobs listings carry NO JD text. After role filtering
      (step 8) and BEFORE the fit gate (step 10), fetch the JD body from
-     each surviving candidate's `url`: Ashby/Lever URLs via their
-     public JSON APIs, everything else via Playwright. Re-canonicalize
+     each surviving candidate's `url`: Ashby/Lever/Greenhouse URLs via
+     their public JSON APIs, everything else via Playwright. Re-canonicalize
      and upsert the record with the fetched jd_text. Never run the fit
      gate on a SimplifyJobs job with empty jd_text.
    - The `sponsorship` field is informational only — do not filter on
@@ -132,9 +137,11 @@ not optional narration, and never bundle them into a larger sentence.
      apply manually". Never invoke @resume-tailor or any form-filling
      for a Workday job. needs_review items are not applications and do
      not count against the 25-per-session cap.
-4. For LinkedIn, Indeed, Handshake, Greenhouse, Wellfound: use Playwright
-   MCP to navigate to the board with role/location filters and scrape job
-   listings, full JD text, and application URLs.
+4. For LinkedIn, Indeed, Handshake, Wellfound: use Playwright MCP to
+   navigate to the board with role/location filters and scrape job
+   listings, full JD text, and application URLs. (Greenhouse moved to
+   step 1's deterministic API path above — vetted Greenhouse companies
+   are no longer scraped via Playwright.)
 5. Canonicalize each raw job that survived the step 0 prefilter into one
    internal record:
    `python3 scripts/state/job_state.py canonicalize '<raw-job-json>'`
@@ -284,6 +291,11 @@ For each job with ats_score >= 60:
    jobs sourced via Ashby/Lever API if no browser apply step is needed —
    use the applyUrl field directly).
 3. Fill form fields using config/targets.json "safe_fields" only.
+   "linkedin_username"/"github_username" are bare usernames, not full URLs —
+   construct `https://linkedin.com/in/<linkedin_username>` or
+   `https://github.com/<github_username>` before filling a field that
+   expects a URL; if only the legacy "linkedin_url"/"github_url" keys are
+   present, use them as-is (already a full URL).
 4. Attach the matching resume PDF from data/resumes/
    (base_resume_<resume_used>.pdf — e.g. base_resume_swe.pdf,
    base_resume_ai_ml.pdf, base_resume_balanced.pdf,

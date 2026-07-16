@@ -10,39 +10,13 @@ type Mode = "manual" | "automatic";
 const GREETINGS = ["Hello,", "Welcome,", "Nice to see you,", "Hey there,"] as const;
 
 /**
- * Persistent right-side status panel. Shown beside the content region
- * when the terminal is wide and tall enough (see App's showSidebar); on
- * narrower/shorter terminals it hides and the content takes the full
- * width. The panel owns its own 1 s clock state so only it re-renders —
- * the parent App and active screen are unaffected. The parent wraps the
- * panel in a bordered Box whose left border is the separator between
- * main content and sidebar; paddingLeft here pads content away from it.
- *
- * The rainbow greeting shows the user's first name once setup has
- * written safe_fields.first_name; before that it falls back to the
- * placeholder. The clock is local time, 12-hour, with the time zone.
+ * Compact greeting + name + clock, meant for the app shell's top header
+ * band (always visible, every tab) rather than the right sidebar — freed
+ * up so screens that need more horizontal room (the Jobs list) can hide
+ * the sidebar without losing this. Owns its own 1 s clock tick so only
+ * this small component re-renders, not the whole header.
  */
-export function SidePanel({
-  firstName,
-  applied,
-  pending,
-  failed,
-  seen,
-  heartbeat,
-  screen,
-  mode,
-}: {
-  firstName?: string;
-  applied: number;
-  pending: number;
-  failed: number;
-  seen: number;
-  heartbeat?: Heartbeat;
-  screen: string;
-  mode: Mode;
-}) {
-  // One greeting per app open — chosen when the panel mounts, stable for
-  // the whole session so it doesn't flicker on re-renders.
+export function TopStatusBar({ firstName }: { firstName?: string }) {
   const [greeting] = useState(
     () => GREETINGS[Math.floor(Math.random() * GREETINGS.length)],
   );
@@ -51,21 +25,52 @@ export function SidePanel({
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const dateStr = now.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-  // Local 12-hour clock with the zone abbreviation (e.g. "03:07:09 PM EDT").
   const timeStr = now.toLocaleTimeString("en-US", {
     hour12: true,
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
     timeZoneName: "short",
   });
+  const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
+  return (
+    <Box>
+      <Text dimColor>{greeting} </Text>
+      <RainbowText wrap="truncate-end">{firstName ?? "Test User"}</RainbowText>
+      <Text dimColor>  {dateStr} · {timeStr}</Text>
+    </Box>
+  );
+}
+
+/**
+ * Persistent right-side status panel: current screen/mode plus outcome
+ * counts. Shown beside the content region when the terminal is wide and
+ * tall enough (see App's showSidebar) and never on the Jobs tab (that
+ * screen wants the width for its results table instead); on narrower/
+ * shorter terminals it also hides and the content takes the full width.
+ * The parent wraps the panel in a bordered Box whose left border is the
+ * separator between main content and sidebar; paddingLeft here pads
+ * content away from it. The greeting/name/clock that used to live here
+ * moved to `TopStatusBar` (above), shown in the app shell's header on
+ * every tab instead, so hiding this panel loses nothing.
+ */
+export function SidePanel({
+  applied,
+  pending,
+  failed,
+  seen,
+  heartbeat,
+  screen,
+  mode,
+}: {
+  applied: number;
+  pending: number;
+  failed: number;
+  seen: number;
+  heartbeat?: Heartbeat;
+  screen: string;
+  mode: Mode;
+}) {
   const health = heartbeat
     ? heartbeat.last_run_exit_code === 0
       ? { label: "healthy", color: theme.good }
@@ -91,17 +96,7 @@ export function SidePanel({
 
   return (
     <Box flexDirection="column" width={SIDE_PANEL_WIDTH} paddingLeft={1}>
-      <Text dimColor>{greeting}</Text>
-      <RainbowText>{firstName ?? "Test User"}</RainbowText>
-
-      <Box marginTop={1} flexDirection="column">
-        <Text bold>{dateStr}</Text>
-        <Text bold color={theme.accent} wrap="truncate-end">
-          {timeStr}
-        </Text>
-      </Box>
-
-      <Box marginTop={1} flexDirection="column">
+      <Box flexDirection="column">
         <Row label="Screen" value={screen} color={theme.accent} />
         <Row
           label="Mode"

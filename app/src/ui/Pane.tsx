@@ -56,7 +56,10 @@ export function PaneRow({
 }) {
   return (
     <Box>
-      <Box width={8} flexShrink={0}>
+      {/* 9, not 8: "location" (SearchScreen's detail pane) is exactly 8
+          chars, and a label filling its box edge-to-edge left no gap
+          before the value — "locationSingapore" ran together. */}
+      <Box width={9} flexShrink={0}>
         <Text dimColor>{label}</Text>
       </Box>
       <Box flexGrow={1}>

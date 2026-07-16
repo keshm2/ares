@@ -89,6 +89,16 @@ check_safe_field() {
     || fail "$file: safe_fields.$key must be a non-empty string"
 }
 
+# linkedin/github moved to a username-or-legacy-url OR-check: either the new
+# `<kind>_username` or the legacy `<kind>_url` must be a non-empty string.
+check_safe_field_either() {
+  local file="$1" key_a="$2" key_b="$3"
+  jq -e --arg a "$key_a" --arg b "$key_b" \
+    '.safe_fields | type == "object" and (((.[$a] // "") | type == "string" and length > 0) or ((.[$b] // "") | type == "string" and length > 0))' \
+    "$file" >/dev/null 2>&1 \
+    || fail "$file: safe_fields.$key_a or safe_fields.$key_b must be a non-empty string"
+}
+
 check_array_nonempty "$TARGETS" role_keywords
 check_array_nonempty "$TARGETS" level_keywords
 check_array         "$TARGETS" preferred_locations
@@ -102,13 +112,15 @@ check_object        "$TARGETS" safe_fields
 
 # Required safe_fields keys for form filling.
 SAFE_KEYS=(
-  first_name last_name email phone linkedin_url github_url
+  first_name last_name email phone
   graduation_date gpa authorized_to_work require_sponsorship
   citizenship_status currently_enrolled
 )
 for k in "${SAFE_KEYS[@]}"; do
   check_safe_field "$TARGETS" "$k"
 done
+check_safe_field_either "$TARGETS" linkedin_username linkedin_url
+check_safe_field_either "$TARGETS" github_username github_url
 
 # --- discord_config.json field validation ----------------------------------
 # Phase 2: per-outcome webhook routing. Routes live under a `webhooks` object.
@@ -218,7 +230,7 @@ fi
 SHEETS="$PROJECT_ROOT/config/google_sheets_config.json"
 
 if [ ! -f "$SHEETS" ]; then
-  warn "Google Sheets sync config not found ($SHEETS) — Sheets sync will be skipped. See docs/SETUP.md section 4."
+  warn "Google Sheets sync config not found ($SHEETS) — Sheets sync will be skipped. See docs/SETUP.md section 3."
 else
   if ! jq -e . "$SHEETS" >/dev/null 2>&1; then
     warn "$SHEETS: invalid JSON — Sheets sync will be skipped."
@@ -259,7 +271,7 @@ else
           *) KEY_ABS="$PROJECT_ROOT/$KEY_ABS" ;;
         esac
         if [ ! -f "$KEY_ABS" ]; then
-          warn "$SHEETS: service-account key file not found at $SHEETS_KEY — Sheets sync will be skipped until the key is placed. See docs/SETUP.md section 4.3."
+          warn "$SHEETS: service-account key file not found at $SHEETS_KEY — Sheets sync will be skipped until the key is placed. See docs/SETUP.md section 3.3."
         fi
       fi
     fi

@@ -3,12 +3,34 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { py } from "./platform.js";
+import { effectiveEnv } from "./settings.js";
 
 const execFileAsync = promisify(execFile);
 const FETCH_TIMEOUT_MS = 15_000;
-const RESULT_CAP = 50;
+// User-configurable via Settings > Environment > "Jobs per page"
+// (APPLYR_JOBS_PER_PAGE) — how many results one manual search keeps.
+export const MIN_PAGE_SIZE = 10;
+export const MAX_PAGE_SIZE = 75;
+export const DEFAULT_PAGE_SIZE = 50;
 
-export type JobSource = "ashbyhq" | "lever" | "workday";
+function resolvePageSize(root: string): number {
+  const raw = Number.parseInt(effectiveEnv(root, "APPLYR_JOBS_PER_PAGE", String(DEFAULT_PAGE_SIZE)).value, 10);
+  if (!Number.isFinite(raw)) return DEFAULT_PAGE_SIZE;
+  return Math.max(MIN_PAGE_SIZE, Math.min(MAX_PAGE_SIZE, raw));
+}
+
+/** Most-recently-posted first — the manual search's default (only) sort.
+ *  Jobs with no parseable posted_at sort last, never first, so an
+ *  unknown date never masquerades as "newest". */
+export function sortByPostedDesc(jobs: SearchJob[]): SearchJob[] {
+  const postedTime = (job: SearchJob) => {
+    const t = job.posted_at ? new Date(job.posted_at).getTime() : NaN;
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return [...jobs].sort((a, b) => postedTime(b) - postedTime(a));
+}
+
+export type JobSource = "ashbyhq" | "lever" | "workday" | "greenhouse";
 
 export interface SearchJob {
   source: JobSource;
@@ -19,6 +41,10 @@ export interface SearchJob {
   external_job_id?: string;
   location?: string;
   jd_text?: string;
+  /** ISO 8601 when known. Ashby/Lever/Greenhouse give an exact timestamp;
+   *  Workday's public API only exposes a bucketed relative-age string
+   *  ("Posted 3 Days Ago"), approximated to an ISO date on the Python side. */
+  posted_at?: string;
 }
 
 export interface SourceResult {
@@ -41,6 +67,7 @@ export interface FitResult {
 interface Targets {
   ashby_company_slugs?: string[];
   lever_company_slugs?: string[];
+  greenhouse_company_slugs?: string[];
   preferred_locations?: string[];
 }
 
@@ -73,22 +100,43 @@ async function readTargets(root: string): Promise<Targets> {
   return JSON.parse(await fs.readFile(path.join(root, "config", "targets.json"), "utf8")) as Targets;
 }
 
-async function fetchJson(url: string): Promise<unknown> {
+/** One retry on any failure (timeout, network blip, transient 5xx/429) —
+ *  hitting 8+ boards concurrently occasionally trips a board's rate
+ *  limiter or a slow DNS/TLS handshake, and a single retry after a short
+ *  pause clears most of those without masking a genuinely dead/renamed
+ *  slug (which fails the retry too, and is what should still surface). */
+async function fetchJson(url: string, attempt = 0): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
+  } catch (err) {
+    if (attempt < 1) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return fetchJson(url, attempt + 1);
+    }
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-function sourceSummary(total: number, failed: number, count: number): SourceResult {
+function isoOrUndefined(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const d = typeof value === "number" ? new Date(value) : new Date(String(value));
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+const SLUG_NAME_MAX = 14;
+
+function sourceSummary(total: number, failedSlugs: string[], count: number): SourceResult {
   if (total === 0) return { state: "skipped", count: 0, detail: "not configured" };
-  if (failed > 0) {
-    return { state: "warning", count, detail: `${failed}/${total} boards failed` };
+  if (failedSlugs.length > 0) {
+    const short = (s: string) => (s.length > SLUG_NAME_MAX ? `${s.slice(0, SLUG_NAME_MAX)}…` : s);
+    const names = failedSlugs.slice(0, 2).map(short).join(", ") + (failedSlugs.length > 2 ? "…" : "");
+    return { state: "warning", count, detail: `${failedSlugs.length}/${total} failed: ${names}` };
   }
   return { state: "ready", count };
 }
@@ -112,13 +160,14 @@ async function fetchAshby(slugs: string[]): Promise<{ jobs: SearchJob[]; source:
           external_job_id: displayText(job.id) || undefined,
           location: displayText(job.location) || undefined,
           jd_text: String(job.descriptionPlain ?? "").trim() || undefined,
+          posted_at: isoOrUndefined(job.publishedAt),
         }];
       });
     }),
   );
   const jobs = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
-  const failed = results.filter((result) => result.status === "rejected").length;
-  return { jobs, source: sourceSummary(slugs.length, failed, jobs.length) };
+  const failedSlugs = slugs.filter((_, i) => results[i].status === "rejected");
+  return { jobs, source: sourceSummary(slugs.length, failedSlugs, jobs.length) };
 }
 
 async function fetchLever(slugs: string[]): Promise<{ jobs: SearchJob[]; source: SourceResult }> {
@@ -141,13 +190,43 @@ async function fetchLever(slugs: string[]): Promise<{ jobs: SearchJob[]; source:
           external_job_id: displayText(job.id) || undefined,
           location: displayText(categories.location) || undefined,
           jd_text: String(job.descriptionPlain ?? "").trim() || undefined,
+          posted_at: isoOrUndefined(job.createdAt),
         }];
       });
     }),
   );
   const jobs = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
-  const failed = results.filter((result) => result.status === "rejected").length;
-  return { jobs, source: sourceSummary(slugs.length, failed, jobs.length) };
+  const failedSlugs = slugs.filter((_, i) => results[i].status === "rejected");
+  return { jobs, source: sourceSummary(slugs.length, failedSlugs, jobs.length) };
+}
+
+async function fetchGreenhouse(slugs: string[]): Promise<{ jobs: SearchJob[]; source: SourceResult }> {
+  const results = await Promise.allSettled(
+    slugs.map(async (slug) => {
+      const payload = (await fetchJson(
+        `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(slug)}/jobs?content=true`,
+      )) as { jobs?: Array<Record<string, unknown>> };
+      return (payload.jobs ?? []).flatMap((job): SearchJob[] => {
+        const title = displayText(job.title);
+        const url = webUrl(job.absolute_url);
+        if (!title || !url) return [];
+        const location = (job.location ?? {}) as Record<string, unknown>;
+        return [{
+          source: "greenhouse",
+          company: slug,
+          title,
+          url,
+          external_job_id: displayText(job.id) || undefined,
+          location: displayText(location.name) || undefined,
+          jd_text: String(job.content ?? "").replace(/<[^>]+>/g, " ").trim() || undefined,
+          posted_at: isoOrUndefined(job.updated_at),
+        }];
+      });
+    }),
+  );
+  const jobs = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+  const failedSlugs = slugs.filter((_, i) => results[i].status === "rejected");
+  return { jobs, source: sourceSummary(slugs.length, failedSlugs, jobs.length) };
 }
 
 async function runJson(root: string, command: string, args: string[]): Promise<unknown> {
@@ -166,9 +245,9 @@ function runPyJson(root: string, args: string[]): Promise<unknown> {
   return runJson(root, p.cmd, p.args);
 }
 
-async function fetchWorkday(root: string, query: string): Promise<{ jobs: SearchJob[]; source: SourceResult }> {
+async function fetchWorkday(root: string, query: string, pageSize: number): Promise<{ jobs: SearchJob[]; source: SourceResult }> {
   try {
-    const wd = py(["scripts/jobs/fetch_workday_listings.py", "--search", query, "--limit", String(RESULT_CAP), "--timeout", "15"]);
+    const wd = py(["scripts/jobs/fetch_workday_listings.py", "--search", query, "--limit", String(pageSize), "--timeout", "15"]);
     const { stdout, stderr } = await execFileAsync(
       wd.cmd,
       wd.args,
@@ -195,29 +274,85 @@ async function fetchWorkday(root: string, query: string): Promise<{ jobs: Search
   }
 }
 
-export async function searchJobs(root: string, query: string): Promise<SearchResult> {
+const DISABLED_SOURCE: SourceResult = { state: "skipped", count: 0, detail: "disabled" };
+
+export async function searchJobs(
+  root: string,
+  query: string,
+  enabled: Partial<Record<JobSource, boolean>> = {},
+): Promise<SearchResult> {
   const targets = await readTargets(root);
-  const ashbySlugs = configured(targets.ashby_company_slugs);
-  const leverSlugs = configured(targets.lever_company_slugs);
-  const [ashby, lever, workday] = await Promise.all([
+  const pageSize = resolvePageSize(root);
+  const isOn = (source: JobSource) => enabled[source] !== false;
+  const ashbySlugs = isOn("ashbyhq") ? configured(targets.ashby_company_slugs) : [];
+  const leverSlugs = isOn("lever") ? configured(targets.lever_company_slugs) : [];
+  const greenhouseSlugs = isOn("greenhouse") ? configured(targets.greenhouse_company_slugs) : [];
+  const [ashby, lever, greenhouse, workday] = await Promise.all([
     fetchAshby(ashbySlugs),
     fetchLever(leverSlugs),
-    fetchWorkday(root, query),
+    fetchGreenhouse(greenhouseSlugs),
+    isOn("workday") ? fetchWorkday(root, query, pageSize) : Promise.resolve({ jobs: [], source: DISABLED_SOURCE }),
   ]);
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const seen = new Set<string>();
-  const jobs = [...ashby.jobs, ...lever.jobs, ...workday.jobs]
-    .filter((job) => {
-      const title = job.title.toLowerCase();
-      return terms.every((term) => title.includes(term));
-    })
-    .filter((job) => {
-      if (seen.has(job.url)) return false;
-      seen.add(job.url);
-      return true;
-    })
-    .slice(0, RESULT_CAP);
-  return { jobs, sources: { ashbyhq: ashby.source, lever: lever.source, workday: workday.source } };
+  const deduped = [...ashby.jobs, ...lever.jobs, ...greenhouse.jobs, ...workday.jobs].filter((job) => {
+    if (seen.has(job.url)) return false;
+    seen.add(job.url);
+    return true;
+  });
+  // Cut stale postings — old listings that are probably already filled or
+  // pulled crowd out genuinely fresh ones, and a bounded window is also
+  // what makes the table's year-less short date display unambiguous (see
+  // SearchScreen's formatPosted). Unknown-age jobs (no posted_at) are kept
+  // rather than dropped — missing data isn't evidence of staleness.
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const recent = deduped.filter((job) => {
+    if (!job.posted_at) return true;
+    const t = new Date(job.posted_at).getTime();
+    return Number.isNaN(t) || t >= sixMonthsAgo.getTime();
+  });
+  // Strict substring match on the TITLE only, every query word required —
+  // NOT fuzzy/subsequence matching (a subsequence scorer treats "intern"
+  // as satisfied by scattered letters inside e.g. "identity", which is
+  // even worse). But plain substring has its own trap for this specific
+  // word: "intern" is also a literal prefix of "Internal"/"International"/
+  // "Internet", so title.includes("intern") kept letting senior/full-time
+  // "Internal Tools"/"International" postings through. "intern" is common
+  // enough as a search term (the whole point of this screen, for many
+  // users) to special-case: matched only as the whole word "intern"/
+  // "interns", or the whole word "internship"/"internships" — never as a
+  // prefix of a longer unrelated word.
+  const INTERN_RE = /\bintern(s|ship|ships)?\b/i;
+  const termMatches = (term: string, titleLower: string): boolean =>
+    term === "intern" ? INTERN_RE.test(titleLower) : titleLower.includes(term);
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matched = terms.length
+    ? recent.filter((job) => {
+        const title = job.title.toLowerCase();
+        return terms.every((term) => termMatches(term, title));
+      })
+    : recent;
+  const jobs = sortByPostedDesc(matched).slice(0, pageSize);
+
+  // Counts reflect postings that actually matched the query, not the raw
+  // firehose fetched from each board — a lone "2260" next to Ashby told
+  // the user nothing about their search and mostly just cluttered the row.
+  const matchedCountBySource: Partial<Record<JobSource, number>> = {};
+  for (const job of matched) {
+    matchedCountBySource[job.source] = (matchedCountBySource[job.source] ?? 0) + 1;
+  }
+  const withMatchedCount = (source: SourceResult, key: JobSource): SourceResult =>
+    source.state === "skipped" ? source : { ...source, count: matchedCountBySource[key] ?? 0 };
+
+  return {
+    jobs,
+    sources: {
+      ashbyhq: withMatchedCount(ashby.source, "ashbyhq"),
+      lever: withMatchedCount(lever.source, "lever"),
+      greenhouse: withMatchedCount(greenhouse.source, "greenhouse"),
+      workday: withMatchedCount(workday.source, "workday"),
+    },
+  };
 }
 
 async function canonicalize(root: string, job: SearchJob): Promise<CanonicalJob> {

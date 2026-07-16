@@ -4,7 +4,7 @@
 - **Last completed phase:** Phase 16 — multi coding-agent support
   (2026-07-13: codex/copilot adapters in run_job_agent.sh, 4-agent
   installer detection, capability matrix + degraded paths below,
-  scripts/run_conformance.py with results in docs/SETUP.md §3.8;
+  scripts/run_conformance.py with results in docs/SETUP.md §2.8;
   codex/copilot live conformance runs pending on a machine with
   those CLIs). Phases 0–10 and 16 are DONE (phase 10's live autofill
   pass pending); phases 13 and 15 are partially done.
@@ -502,7 +502,7 @@ the helpers or prompts.
 - The production cadence is a launchd user agent (macOS) running
   scripts/runtime/run_job_agent.sh every 30 minutes, 24/7 — managed by
   scripts/runtime/scheduler.sh (install|uninstall|status|plist); Linux
-  equivalent documented in docs/SETUP.md 3.5. The runner owns overlap
+  equivalent documented in docs/SETUP.md 2.5. The runner owns overlap
   protection (skip-on-overlap, dead-lock reclaim, 60-min hung-run
   threshold), writes the machine-parseable
   "run_job_agent: complete ..." health marker, and updates
