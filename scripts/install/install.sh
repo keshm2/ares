@@ -331,10 +331,40 @@ build_node_surface() {
 }
 
 if command -v npm >/dev/null 2>&1; then
+  # packages/core has no install/prepare hook that builds it automatically —
+  # app/'s and desktop/'s own `tsc` builds both need its dist/ already
+  # present to resolve `@applyr/core/*` imports, which is never true on a
+  # fresh clone. Build it first so both surfaces build clean below.
+  npm run build:core --silent || warn "core build failed — the TUI build below will likely fail too. See docs/SETUP.md."
   build_node_surface app "the TUI"
   build_node_surface extension "the browser extension"
 else
   say "node/npm not found — skipping the optional TUI and browser extension (docs/SETUP.md)."
+fi
+
+# --- 8b. Desktop app (optional, early preview) ----------------------------------
+# Ships ALONGSIDE the TUI at this stage, not in place of it (that flips
+# later). Building it needs Rust + OS-native GUI deps on top of Node — real
+# prerequisites the TUI doesn't have — so this is opt-in and its own script
+# (install_desktop.sh), and a failure here never fails this installer: the
+# TUI install above already succeeded and stays fully usable either way.
+if [ -f "desktop/package.json" ] && command -v npm >/dev/null 2>&1; then
+  echo
+  echo "applyr also has an early-preview desktop app (Tauri), alongside the TUI."
+  echo "Building it needs a Rust toolchain and some OS build tools — this script"
+  echo "offers to install anything missing, and first-time compiling can take"
+  echo "several minutes."
+  INSTALL_APP="n"
+  if [ -t 0 ]; then
+    printf "Install the desktop app too? [y/N] "
+    read -r INSTALL_APP || INSTALL_APP="n"
+  else
+    say "non-interactive install — skipping the desktop app (opt-in only; run 'bash scripts/install/install_desktop.sh' any time to add it)."
+  fi
+  if [ "$INSTALL_APP" = "y" ] || [ "$INSTALL_APP" = "Y" ]; then
+    bash "$PROJECT_ROOT/scripts/install/install_desktop.sh" \
+      || warn "desktop app install failed (see above) — the TUI is unaffected. Fix the issue and retry any time with: bash scripts/install/install_desktop.sh"
+  fi
 fi
 
 # --- 9. `applyr` command on PATH ------------------------------------------------

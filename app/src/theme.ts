@@ -221,8 +221,10 @@ export const BANNER_WIDTH = BANNER_ROWS[0].length;
 export const MIN_COLUMNS = 76;
 export const MIN_ROWS = 12;
 
-/** Build/release marker shown in the side panel footer. */
-export const BUILD_MARKER = "0.9.1a";
+/** Build/release marker shown in the side panel footer. Re-exported from
+ *  @applyr/core so the TUI and the desktop app's Settings screen always
+ *  report the same build from one source (see packages/core/src/version.ts). */
+export { BUILD_MARKER } from "@applyr/core/version.js";
 
 /** Side panel width — narrow enough to coexist with content on 64-col+
  *  terminals. The panel hides below that width (see App showSidebar). */

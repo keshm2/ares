@@ -2,8 +2,8 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { py } from "./platform.js";
-import { effectiveEnv, readTargetsArrayList } from "./settings.js";
+import { py } from "@applyr/core/platform.js";
+import { effectiveEnv, readTargetsArrayList } from "@applyr/core/settings.js";
 
 const execFileAsync = promisify(execFile);
 const FETCH_TIMEOUT_MS = 15_000;

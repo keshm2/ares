@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { openUrl } from "../helpers.js";
+import { openUrl } from "@applyr/core/helpers.js";
 import {
   checkJobFit,
   errorMessage,

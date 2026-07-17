@@ -254,6 +254,34 @@ def main(argv: list) -> None:
                         warn(f"{sheets_path}: service-account key file not found at {sheets_key} — "
                              "Sheets sync will be skipped until the key is placed. See docs/SETUP.md section 3.3.")
 
+    # --- Phase 11: hosted Supabase backend config (optional) ---------------
+    # Hosted/signed-in mode is opt-in from the desktop app
+    # (docs/app-integration-plan.md) — a local-only setup never needs this
+    # file. Same warn-and-continue contract as the Sheets check above:
+    # absence or a placeholder value only means "Sign in" isn't usable yet
+    # on this machine, never a failing run.
+    supabase_path = os.path.join(project_root, "config", "supabase.json")
+    if not os.path.isfile(supabase_path):
+        warn(f"Hosted backend config not found ({supabase_path}) — hosted sign-in "
+             "will be unavailable in the desktop app. See config/supabase.example.json.")
+    else:
+        try:
+            with open(supabase_path, "r", encoding="utf-8") as fh:
+                supabase_cfg = json.load(fh)
+            if not isinstance(supabase_cfg, dict):
+                raise ValueError
+        except (OSError, json.JSONDecodeError, ValueError):
+            warn(f"{supabase_path}: invalid JSON — hosted sign-in will be unavailable.")
+            supabase_cfg = None
+
+        if isinstance(supabase_cfg, dict):
+            url = supabase_cfg.get("url") or ""
+            anon_key = supabase_cfg.get("anonKey") or ""
+            if not url or "YOUR_PROJECT_REF" in url:
+                warn(f"{supabase_path}: url is missing or still the placeholder — hosted sign-in will be unavailable.")
+            if not anon_key or anon_key == "YOUR_SUPABASE_ANON_KEY":
+                warn(f"{supabase_path}: anonKey is missing or still the placeholder — hosted sign-in will be unavailable.")
+
     print("validate_local_config: OK")
 
 

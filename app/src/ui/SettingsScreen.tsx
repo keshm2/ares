@@ -15,17 +15,17 @@ import {
   writeSafeField,
   writeTargetsArrayList,
   writeTargetsBool,
-} from "../settings.js";
-import { readProfileUsername, writeProfileUsername } from "../profileLinks.js";
-import { openPath } from "../helpers.js";
+} from "@applyr/core/settings.js";
+import { readProfileUsername, writeProfileUsername } from "@applyr/core/profileLinks.js";
+import { openPath } from "@applyr/core/helpers.js";
 import { resumesDir } from "../resumes.js";
 import { detectHarnessOnPath } from "../harness.js";
-import { readCommittedCompanyDisplays, writeCommittedCompanyDisplays } from "../companyTargets.js";
-import { loadCompanyDirectory, companyWeight, type CompanyEntry } from "../data/companyDirectory.js";
-import { US_CITIES } from "../data/usCities.js";
-import { ROLE_CATEGORIES } from "../data/roleCategories.js";
-import { LEVEL_CATEGORIES } from "../data/levelCategories.js";
-import { SEASON_CATEGORIES } from "../data/seasonCategories.js";
+import { readCommittedCompanyDisplays, writeCommittedCompanyDisplays } from "@applyr/core/companyTargets.js";
+import { loadCompanyDirectory, companyWeight, type CompanyEntry } from "@applyr/core/data/companyDirectory.js";
+import { US_CITIES } from "@applyr/core/data/usCities.js";
+import { ROLE_CATEGORIES } from "@applyr/core/data/roleCategories.js";
+import { LEVEL_CATEGORIES } from "@applyr/core/data/levelCategories.js";
+import { SEASON_CATEGORIES } from "@applyr/core/data/seasonCategories.js";
 import { selectedCategoryIds, keywordsForSelectedCategories, type KeywordCategory } from "../categorySelection.js";
 import { filterSuggestions } from "./autocomplete.js";
 import { MultiEntryAutocomplete } from "./MultiEntryAutocomplete.js";

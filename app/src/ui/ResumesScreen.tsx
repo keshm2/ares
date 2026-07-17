@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { listResumeFiles, resumesDir, type ResumeFile } from "../resumes.js";
-import { openPath, convertResumePdf, helperError } from "../helpers.js";
+import { openPath, convertResumePdf, helperError } from "@applyr/core/helpers.js";
 import { theme, statusGlyph } from "../theme.js";
 import { InlineTextInput, deleteBackward, insertAtCursor, moveCursorLeft, moveCursorRight } from "./TextInput.js";
 

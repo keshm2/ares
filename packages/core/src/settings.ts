@@ -28,6 +28,39 @@ function writeJson(file: string, data: Json): void {
 
 const targetsPath = (root: string) => path.join(root, "config", "targets.json");
 
+/** A truly fresh install has no config/targets.json yet. Seed it from the
+ *  committed example template before the first field write, so a
+ *  read-modify-write that only knows about one key doesn't silently drop
+ *  role_keywords/preferred_locations/target_companies defaults. Shared by
+ *  the TUI onboarding wizard and the desktop app's bridge — one seeding
+ *  implementation, not two. */
+export function ensureTargetsFile(root: string): void {
+  const file = targetsPath(root);
+  if (fs.existsSync(file)) return;
+  try {
+    fs.copyFileSync(path.join(root, "config", "targets.example.json"), file);
+  } catch {
+    // best-effort — subsequent reads/writes still degrade gracefully via
+    // readJson's own try/catch
+  }
+}
+
+/** True once onboarding has been completed at least once — the same
+ *  targets.json `_onboarding.completed` flag the TUI's OnboardingWizard
+ *  writes, so either surface finishing onboarding is recognized by both. */
+export function readOnboardingCompleted(root: string): boolean {
+  const raw = readJson(targetsPath(root))._onboarding as { completed?: unknown } | undefined;
+  return raw?.completed === true;
+}
+
+export function writeOnboardingCompleted(root: string, completed: boolean): void {
+  const file = targetsPath(root);
+  const data = readJson(file);
+  const existing = (data._onboarding as Json | undefined) ?? {};
+  data._onboarding = { ...existing, completed };
+  writeJson(file, data);
+}
+
 export function readSafeField(root: string, key: string): string {
   const safe = (readJson(targetsPath(root)).safe_fields ?? {}) as Json;
   const val = String(safe[key] ?? "").trim();

@@ -6,6 +6,9 @@
 /config/google_sheets_config.json
 /config/service-account-key.json
 
+# Phase 11: hosted Supabase backend — live project URL + anon key.
+/config/supabase.json
+
 # Runtime state
 /data/applied_jobs.json
 /data/review_queue.json
@@ -57,6 +60,15 @@ system_architecture.md
 # Phase 13: TUI package build artifacts
 /app/node_modules/
 /app/dist/
+
+# Shared TS core package build artifacts (packages/core)
+/packages/core/node_modules/
+/packages/core/dist/
+
+# Phase 14: Tauri desktop app build artifacts
+/desktop/node_modules/
+/desktop/dist/
+/desktop/src-tauri/target/
 
 # Phase 15: per-machine harness selection
 /config/harness.json

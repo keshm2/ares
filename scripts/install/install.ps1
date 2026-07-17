@@ -312,10 +312,58 @@ function Build-NodeSurface {
 }
 
 if (Get-Command npm -ErrorAction SilentlyContinue) {
+  # packages/core has no install/prepare hook that builds it automatically -
+  # app/'s and desktop/'s own `tsc` builds both need its dist/ already
+  # present to resolve `@applyr/core/*` imports, which is never true on a
+  # fresh clone. Build it first so both surfaces build clean below.
+  # try/catch, not just a $LASTEXITCODE check - same native-command-under-
+  # Stop gotcha noted by the Python check above; this step must only warn,
+  # never abort the rest of the installer.
+  try {
+    npm run build:core --silent
+    if ($LASTEXITCODE -ne 0) { Warn "core build failed - the TUI build below will likely fail too. See docs/SETUP.md." }
+  } catch {
+    Warn "core build failed - the TUI build below will likely fail too. See docs/SETUP.md."
+  }
   Build-NodeSurface "app" "the TUI"
   Build-NodeSurface "extension" "the browser extension"
 } else {
   Say "node/npm not found - skipping the optional TUI and browser extension (docs/SETUP.md)."
+}
+
+# --- 8b. Desktop app (optional, early preview) --------------------------------
+# Ships ALONGSIDE the TUI at this stage, not in place of it (that flips
+# later). Building it needs Rust + Visual C++ Build Tools on top of Node -
+# real prerequisites the TUI doesn't have - so this is opt-in and its own
+# script (install_desktop.ps1), and a failure here never fails this
+# installer: the TUI install above already succeeded and stays fully
+# usable either way.
+if ((Test-Path "desktop\package.json") -and (Get-Command npm -ErrorAction SilentlyContinue)) {
+  Write-Host ""
+  Write-Host "applyr also has an early-preview desktop app (Tauri), alongside the TUI."
+  Write-Host "Building it needs a Rust toolchain and Visual C++ Build Tools - this script"
+  Write-Host "offers to install anything missing, and first-time compiling can take"
+  Write-Host "several minutes."
+  $installApp = Read-Host "Install the desktop app too? [y/N]"
+  if ($installApp -eq "y" -or $installApp -eq "Y") {
+    # try/catch, not just a $LASTEXITCODE check: on PowerShell 7.3+ with
+    # $PSNativeCommandUseErrorActionPreference on (increasingly the
+    # default), a non-zero exit from a native command under
+    # $ErrorActionPreference = "Stop" throws instead of just setting
+    # $LASTEXITCODE — same gotcha as the Python check above. This step is
+    # opt-in and must never abort the rest of this installer.
+    $desktopFailed = $false
+    try {
+      & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $projectRoot "scripts\install\install_desktop.ps1")
+      if ($LASTEXITCODE -ne 0) { $desktopFailed = $true }
+    } catch {
+      $desktopFailed = $true
+    }
+    if ($desktopFailed) {
+      Warn "desktop app install failed (see above) - the TUI is unaffected. Fix the issue and retry any time with:"
+      Warn "  powershell -ExecutionPolicy Bypass -File scripts\install\install_desktop.ps1"
+    }
+  }
 }
 
 # --- 9. `applyr` command on PATH ---------------------------------------------

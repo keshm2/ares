@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import type { ApplyrState } from "../state.js";
-import { openUrl, helperError } from "../helpers.js";
+import type { ApplyrState } from "@applyr/core/state.js";
+import { openUrl, helperError } from "@applyr/core/helpers.js";
 import { statusColor, statusGlyph, theme, SELECT_MARKER } from "../theme.js";
 import { DetailPane, PaneRow, PaneRule, paneLayout } from "./Pane.js";
 

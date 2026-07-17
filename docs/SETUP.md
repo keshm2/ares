@@ -4,7 +4,7 @@ The live configs (`config/targets.json`, `config/discord_config.json`) are
 gitignored — they hold personal data and secrets. Start from the shipped
 examples before running the agent.
 
-> **Build:** this document ships with release `0.8.43a`. Full release
+> **Build:** this document ships with release `0.9.7a`. Full release
 > notes: [`RELEASE.md`](./RELEASE.md). Changelog: [`CHANGELOG.md`](./CHANGELOG.md).
 
 ## 0. Universal install (recommended)
@@ -30,7 +30,7 @@ npm install -g @keshm/applyr
 # Windows PowerShell (native, no WSL):
 irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.ps1 | iex
 # Or from an unpacked release archive:
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
 ```
 
 **Automatic updates.** Every scheduled run and `applyr` launch checks
@@ -44,9 +44,28 @@ gitignored local files and never leaves your machine.
 **Release archive:**
 
 ```bash
-curl -L -o applyr-0.8.43a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.8.43a.zip && \
-  unzip applyr-0.8.43a.zip && cd applyr-0.8.43a   # or the release page's "Source code" assets
+curl -L -o applyr-0.9.7a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.9.7a.zip && \
+  unzip applyr-0.9.7a.zip && cd applyr-0.9.7a   # or the release page's "Source code" assets
 ```
+
+**Desktop app (early preview, optional).** Near the end of the install,
+the installer offers to also build and install a native desktop app
+(macOS/Linux/Windows) alongside the TUI — a graphical alternative
+that's still catching up in features. It's opt-in and defaults to no,
+since it needs a Rust toolchain and OS-native GUI build tools on top of
+what the TUI needs, and a first build can take several minutes. Answer
+`y` when asked, or run it any time after the fact:
+
+```bash
+bash scripts/install/install_desktop.sh        # macOS / Linux
+powershell -ExecutionPolicy Bypass -File scripts\install\install_desktop.ps1   # Windows
+```
+
+It installs to `/Applications` (macOS, falling back to `~/Applications`
+if that's not writable), via `apt`/`dnf`/an AppImage + app-launcher
+entry (Linux), or a per-user installer with no admin prompt (Windows).
+A failure here never affects the TUI — retry any time with the same
+command. `applyr uninstall` removes it too, if present.
 
 **Uninstall.** `applyr uninstall` (or `bash scripts/install/uninstall.sh`)
 removes the schedule and `applyr` command, then asks before deleting

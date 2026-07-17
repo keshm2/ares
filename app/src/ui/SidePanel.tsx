@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text } from "ink";
 import { RainbowText, AutoSparkleText } from "./KeyHints.js";
-import type { Heartbeat } from "../state.js";
+import type { Heartbeat } from "@applyr/core/state.js";
 import { theme, BUILD_MARKER, SIDE_PANEL_WIDTH } from "../theme.js";
 
 type Mode = "manual" | "automatic";

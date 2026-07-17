@@ -14,10 +14,10 @@ import { WelcomeScreen, type WelcomeOption } from "./WelcomeScreen.js";
 import { KeyHints, AutoSparkleText } from "./KeyHints.js";
 import { SidePanel, TopStatusBar } from "./SidePanel.js";
 import { UpdateBox } from "./UpdateBox.js";
-import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "../state.js";
-import { displayName } from "../settings.js";
+import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "@applyr/core/state.js";
+import { displayName } from "@applyr/core/settings.js";
 import { pendingConversionCount } from "../resumes.js";
-import type { ApplyrState } from "../state.js";
+import type { ApplyrState } from "@applyr/core/state.js";
 import { theme, MIN_COLUMNS, MIN_ROWS, SELECT_MARKER, SIDE_PANEL_WIDTH } from "../theme.js";
 
 export type Tab = "status" | "jobs" | "review" | "letters" | "history" | "resumes" | "settings";

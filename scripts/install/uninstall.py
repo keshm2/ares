@@ -12,6 +12,9 @@ Removes, in order:
   1. The schedule (scheduler.py uninstall — launchd/schtasks).
   2. The `applyr` command on PATH — only applyr's own wrapper/shim pointing
      at THIS install.
+  2b. The desktop app (early preview), if it was installed alongside the
+      TUI via scripts/install/install_desktop.sh|ps1 — best-effort, never
+      fails the uninstall.
   3. The install directory (live config, data/ incl. resumes, logs/ — PII),
      only after an explicit confirmation (or --yes).
 
@@ -91,6 +94,74 @@ def _remove_windows_wrapper() -> None:
             say(f"{shim} points at a different install — left alone.")
 
 
+def _remove_desktop_app() -> None:
+    """Best-effort removal of the early-preview desktop app (Tauri), installed
+    by scripts/install/install_desktop.sh|ps1 alongside the TUI. Every branch
+    is best-effort and silent on failure — a leftover desktop app is a minor
+    annoyance, not worth failing the whole uninstall over."""
+    if sys.platform == "darwin":
+        for base in ("/Applications", os.path.join(os.path.expanduser("~"), "Applications")):
+            app = os.path.join(base, "applyr.app")
+            if os.path.isdir(app):
+                subprocess.run(["osascript", "-e", 'quit app "applyr"'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try:
+                    shutil.rmtree(app)
+                    say(f"removed the desktop app ({app}).")
+                except OSError:
+                    say(f"couldn't remove the desktop app ({app}) — delete it manually.")
+    elif IS_WINDOWS:
+        # Tauri's NSIS template (the installer scripts/install/install_desktop.ps1
+        # prefers) registers a per-user uninstaller here; run it silently if found.
+        # No registry access without pywin32, so this shells out to reg.exe's
+        # query output rather than importing winreg's ambiguous 32/64-bit views.
+        try:
+            key = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\applyr"
+            result = subprocess.run(["reg", "query", key, "/v", "UninstallString"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    if "UninstallString" in line:
+                        uninstall_cmd = line.split("REG_SZ", 1)[-1].strip()
+                        if uninstall_cmd:
+                            subprocess.run(f'{uninstall_cmd} /S', shell=True,
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            say("removed the desktop app.")
+                        break
+        except OSError:
+            pass
+    else:
+        # Linux: whichever install path install_desktop.sh took.
+        home = os.path.expanduser("~")
+        appdir = os.path.join(home, ".local", "share", "applyr")
+        desktop_entry = os.path.join(home, ".local", "share", "applications", "applyr.desktop")
+        symlink = os.path.join(home, ".local", "bin", "applyr-app")
+        removed_any = False
+        for path in (appdir, desktop_entry, symlink):
+            if os.path.exists(path) or os.path.islink(path):
+                try:
+                    if os.path.isdir(path) and not os.path.islink(path):
+                        shutil.rmtree(path)
+                    else:
+                        os.remove(path)
+                    removed_any = True
+                except OSError:
+                    pass
+        if removed_any:
+            say("removed the AppImage-installed desktop app.")
+        # Package-manager installs (.deb/.rpm) — best-effort, needs sudo, so
+        # just ask rather than silently invoking a privileged command.
+        for pkg_mgr, query, remove in (
+            ("dpkg", ["dpkg", "-s", "applyr"], ["apt-get", "remove", "-y", "applyr"]),
+            ("rpm", ["rpm", "-q", "applyr"], ["dnf", "remove", "-y", "applyr"]),
+        ):
+            if shutil.which(pkg_mgr) and subprocess.run(
+                query, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            ).returncode == 0:
+                say(f"the desktop app is also installed as a system package — remove it with:")
+                say(f"  sudo {' '.join(remove)}")
+
+
 def main(argv) -> int:
     yes = keep_data = False
     for arg in argv:
@@ -116,6 +187,10 @@ def main(argv) -> int:
         _remove_windows_wrapper()
     else:
         _remove_unix_wrapper()
+
+    # 2b. The desktop app (early preview, opt-in install — see
+    # scripts/install/install_desktop.sh|ps1), if present.
+    _remove_desktop_app()
 
     # npm-installed TUI reminder.
     npm = shutil.which("npm")

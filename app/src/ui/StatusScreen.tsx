@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { ApplyrState, Heartbeat } from "../state.js";
+import type { ApplyrState, Heartbeat } from "@applyr/core/state.js";
 import { theme, statusGlyph, statusColor } from "../theme.js";
 import { DetailPane, paneLayout } from "./Pane.js";
 

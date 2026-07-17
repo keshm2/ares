@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { Heartbeat } from "../state.js";
+import type { Heartbeat } from "@applyr/core/state.js";
 import { theme } from "../theme.js";
 
 function DetailRow({ label, value, color }: { label: string; value: string; color?: string }) {

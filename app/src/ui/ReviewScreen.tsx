@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { loadState, isResolved, isDismissed, registryByJobId, hasAppliedOrFailed, todayIso } from "../state.js";
-import type { ApplyrState, QueueEntry, AppliedJob } from "../state.js";
-import { appendAppliedJob, recordEvent, syncInternshipTracker, openUrl, helperError } from "../helpers.js";
+import { loadState, isResolved, isDismissed, registryByJobId, hasAppliedOrFailed, todayIso } from "@applyr/core/state.js";
+import type { ApplyrState, QueueEntry, AppliedJob } from "@applyr/core/state.js";
+import { appendAppliedJob, recordEvent, syncInternshipTracker, openUrl, helperError } from "@applyr/core/helpers.js";
 import { theme, statusGlyph, SELECT_MARKER } from "../theme.js";
 import { DetailPane, PaneRow, PaneRule, paneLayout } from "./Pane.js";
 

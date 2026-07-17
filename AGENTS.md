@@ -1,14 +1,108 @@
 # applyr — Job Application Agent — Core Rules
 
 ## Phase status (keep in sync with docs/PLAN.md's Phase Status Pointer)
-- **Last completed phase:** Phase 16 — multi coding-agent support
+- **Last completed phase:** Phase 14A polish on top of the hosted
+  backend + desktop app shell below — 2026-07-17, operator-directed.
+  Released as **0.9.7a**: all three installers (`install.sh`/`.ps1`)
+  now offer the desktop app as an opt-in step alongside the TUI, via
+  new standalone `scripts/install/install_desktop.{sh,ps1}` (detects
+  Rust + OS-native build deps, asks before installing anything
+  missing, builds in release mode, installs the platform-native way —
+  `/Applications` on macOS, apt/dnf/AppImage on Linux, a no-elevation
+  NSIS installer on Windows); `uninstall.py` removes it too, if
+  present. Fixed a real latent bug found along the way: `packages/core`
+  had no build hook, so both the TUI's and desktop's installer build
+  steps silently depended on a prior build already having happened —
+  never true on a fresh clone. Desktop app: fixed the hosted+local
+  wizards replaying on every sign-in/launch instead of once (new
+  `profiles.onboarding_completed` column + `SupabaseAdapter` methods,
+  `AuthContext` resolves it on every session change; a persisted
+  Supabase session now resumes straight into the app on relaunch
+  instead of re-showing the entry chooser); real brand logo (block
+  lowercase "a", traced from the operator's image) replacing the
+  placeholder mark, TUI-matched violet/pink palette with a beige light
+  theme, Settings gained theme (system/light/dark) and font
+  (system/Geist, bundled) pickers, tag-style search-and-chips for
+  company/location preferences (shared `packages/core/src/
+  autocomplete.ts`, moved from the TUI so both surfaces use one fuzzy
+  matcher), and coding-agent detection now probes common install paths
+  beyond `$PATH` (Homebrew/nvm/volta/etc.) since a Finder-launched .app
+  inherits launchd's minimal PATH. `BUILD_MARKER` moved to
+  `packages/core/src/version.ts` so the TUI's side-panel footer and
+  the desktop app's Settings screen (new, faded "build 0.9.7a" line)
+  read the same one constant. Before this: Phase 11 (hosted Supabase
+  backend) + Phase 14A (Tauri desktop app shell) — 2026-07-16, built
+  together and out of the originally suggested order (ahead of phase
+  12) because the operator wanted "Sign in" real from day one instead
+  of stubbed. See the "Phase 11 + 14A" entry below and docs/PLAN.md
+  §3.12/§3.15 for what shipped, including two deliberate deviations
+  from those phases' original text: password auth (not magic-link
+  first) and profile PII synced to the hosted `profiles` table (not
+  kept local-only). Before that, Phase 16 — multi coding-agent support
   (2026-07-13: codex/copilot adapters in run_job_agent.sh, 4-agent
   installer detection, capability matrix + degraded paths below,
   scripts/run_conformance.py with results in docs/SETUP.md §2.8;
   codex/copilot live conformance runs pending on a machine with
-  those CLIs). Phases 0–10 and 16 are DONE (phase 10's live autofill
-  pass pending); phases 13 and 15 are partially done.
-- **Completed work items:** interest letters + 0.9.1a (2026-07-16 —
+  those CLIs). Phases 0–10, 11, and 16 are DONE (phase 10's live
+  autofill pass pending); phases 13, 14A, and 15 are partially done.
+- **Completed work items:** Phase 11 + 14A — hosted backend + desktop
+  app shell (2026-07-16, operator-directed. **Shared core extracted:**
+  `app/src/{state,helpers,settings,platform,project,harness,
+  profileLinks,companyTargets,data/*}.ts` and the onboarding field
+  schema (`ui/onboarding/pages.ts` → `packages/core/src/onboarding/
+  fields.ts`) moved into a new npm-workspace package `@applyr/core`
+  (root `package.json` gained `workspaces`); `app/` imports them
+  unchanged via `@applyr/core/*` — verified byte-behavior-identical by
+  `npm run smoke --workspace=app` passing unchanged. New `Adapter`
+  interface (`packages/core/src/adapter.ts`) with `LocalAdapter`
+  (wraps the existing Python-helper calls) and `SupabaseAdapter` (pure
+  `@supabase/supabase-js`, no Node APIs — runs directly in a Tauri
+  webview) implementations; `onboarding/hostedFields.ts` split out
+  from `onboarding/profile.ts` so importing `SupabaseAdapter` never
+  transitively pulls in `node:fs` (verified via a clean Vite build with
+  no externalization warnings). **Supabase schema:**
+  `supabase/migrations/0001_init.sql` — `profiles`/`jobs`/`job_events`/
+  `applied_jobs`/`review_queue` tables + a private `resumes` storage
+  bucket, every table/bucket RLS-scoped to `auth.uid()`, plus a
+  status-transition-guard trigger on `jobs` mirroring
+  `job_state.py record-event`'s never-downgrade rule.
+  `config/supabase.example.json` + gitignored `config/supabase.json`
+  follow the existing config convention; `validate_local_config.{sh,py}`
+  both gained a non-fatal warn-and-continue check for it (mirrors the
+  Google Sheets check). **Desktop app** (`desktop/`, Tauri v2 + React
+  19 + Vite, scaffolded via `create-tauri-app`): local mode's frontend
+  never touches `node:fs`/`child_process` directly — it calls narrow
+  `#[tauri::command]`s in `desktop/src-tauri/src/lib.rs`, which spawn
+  `packages/core/dist/bridge.js <cmd> <jsonArgs>` over stdio (a
+  subprocess, not a localhost server) and reuse the exact
+  `LocalAdapter`/helper functions the TUI already uses; hosted mode's
+  frontend calls Supabase directly. Screens: a landing-style entry
+  screen (Run locally / Sign in, both real), a local onboarding wizard
+  (Welcome → Environment checks → coding-agent detect/select → the 8
+  shared profile field-pages → resume import+convert → Discord
+  notifications → browser-extension folder → review/finish, writing
+  through `LocalAdapter`), a hosted onboarding wizard (sign-in
+  confirmation → import-from-local-or-start-fresh → the same 8 shared
+  field-pages via `SupabaseAdapter` → resume upload to Supabase
+  Storage → finish), and an app shell (Home + Settings real; Jobs/
+  Review queue/History/Resumes render an explicit "coming in the next
+  update" placeholder — Phase 14B). Hand-authored SVG logo (a
+  three-arc "signal" mark, `desktop/src/assets/logo-mark.svg`) rasterized
+  and run through `tauri icon` for the full icon set; design tokens in
+  `desktop/src/styles/tokens.css` (warm neutral canvas, one violet-plum
+  accent, system-font stack — no bundled/CDN fonts — light+dark via
+  `prefers-color-scheme` and an explicit `data-theme` override).
+  **Not done here (Phase 14B, separate follow-up):** the real Jobs/
+  Review/History/Resumes screens; hosted↔local pipeline-state sync
+  (`SupabaseAdapter.loadState()` intentionally returns `undefined` until
+  then). **Operator actions still needed:** create a real Supabase
+  project + Google Cloud OAuth client and populate `config/
+  supabase.json` (config/supabase.example.json documents the shape;
+  docs/PLAN.md §3.12 has the click-through steps) — until then hosted
+  sign-in shows a graceful "not configured" state rather than erroring;
+  a Rust toolchain (`rustup`) is required to build `desktop/` and was
+  installed via Homebrew on the dev machine during this work.);
+  interest letters + 0.9.1a (2026-07-16 —
   work item #4: a run that meets a "why do you want to work here?"
   question now PARKS the job (scripts/state/interest_letter.py) instead
   of inventing an answer, records nothing, and moves on; the user writes
@@ -95,11 +189,14 @@
   with an APPLYR_/ARES_ prefix filter; APPLYR_LOG_DIR honored by
   runner/heartbeat/TUI).
 - **Implement next:** phase 12 — multi-agent cost tiering
-  (docs/PLAN.md §3.13), the second beta build item. Phase 13 remains
-  partial (npm publish pending `npm login`; provider-setup and
-  hosted storage deferred); phase 15's full-run parity check remains
-  an operator action (the 2026-07-13 conformance legs are the first
-  live signal).
+  (docs/PLAN.md §3.13) remains the next full phase unless the operator
+  redirects again. Phase 14B (the real Jobs/Review/History/Resumes
+  desktop screens, at parity with the TUI) is the natural follow-up to
+  the Phase 11 + 14A work above and needs its own go-ahead before
+  starting, per the one-phase-at-a-time rule. Phase 13 remains partial
+  (npm publish pending `npm login`; provider-setup and hosted storage
+  deferred); phase 15's full-run parity check remains an operator
+  action (the 2026-07-13 conformance legs are the first live signal).
 - Whoever closes a phase or work item MUST update this block and the
   matching pointer at the top of docs/PLAN.md before stopping.
 

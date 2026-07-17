@@ -7,6 +7,78 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.9.7a] — 2026-07-17
+
+npm package: `@keshm/applyr` version `0.9.7-alpha.0`.
+
+### Added
+
+- **Desktop app (early preview) — Tauri + React, macOS/Linux/Windows.**
+  A graphical alternative to the TUI, opt-in during install, still
+  catching up on features (Jobs/Review/History/Resumes are
+  placeholders — Home and Settings are real). Local mode shells out to
+  the same Python helpers the TUI uses (no state written directly from
+  TypeScript); hosted mode talks to a new Supabase backend directly.
+  Landing chooser (Run locally / Sign in), a local setup wizard sharing
+  the TUI's 8-page onboarding schema, a hosted wizard with
+  email/password + Google sign-in, and an app shell with a Settings
+  screen (account, local-install status, theme, font).
+- **Hosted accounts (optional, Supabase-backed).** Sign in to sync your
+  profile across devices. `supabase/migrations/0001_init.sql` +
+  `0002_onboarding_completed.sql` — every table RLS-scoped to
+  `auth.uid()`, a status-transition guard mirroring the local engine's
+  never-downgrade rule, a private per-user resume storage bucket.
+  `applyr://auth-callback` deep link handles both the email-confirmation
+  and Google OAuth redirects, since a desktop app can't sit at a
+  `localhost` URL to receive them.
+- **All three installers can now also install the desktop app**, opt-in
+  alongside the TUI. New `scripts/install/install_desktop.{sh,ps1}`:
+  detects Rust and OS-native GUI build dependencies, asks before
+  installing anything missing, builds in release mode, and installs
+  the platform-native way — `/Applications` on macOS (falling back to
+  `~/Applications` rather than requiring sudo), `apt`/`dnf`/an AppImage
+  + app-launcher entry on Linux, a no-admin-prompt NSIS installer on
+  Windows. Never fails the main install — the TUI stays the reliable
+  baseline either way. `applyr uninstall` removes the desktop app too,
+  if present.
+- Settings (both TUI and the new desktop app) show a small, faded
+  `build <version>` marker — one shared constant
+  (`packages/core/src/version.ts`) so both surfaces always agree.
+- Company/location preference fields (both onboarding wizards) are now
+  search-and-tag: fuzzy search over a suggestion pool, selections
+  render as removable chips that wrap into rows instead of overflowing.
+
+### Fixed
+
+- **The hosted and local onboarding wizards replayed on every sign-in
+  or launch**, even for a fully set-up returning user — local mode
+  already tracked a completion flag but nothing read it; hosted mode
+  had no tracking at all. Both now skip straight to the dashboard for
+  a returning user, and a persisted hosted session resumes into the
+  app on relaunch instead of re-showing the landing chooser.
+- **Coding-agent detection was flaky (~50% miss rate)** for a
+  Finder/Dock-launched desktop app — it only searched `$PATH`, which is
+  minimal for a GUI-launched process (no Homebrew/nvm/volta entries).
+  Now also probes the common install locations directly.
+- **`packages/core` had no build hook** — the TUI's own installer build
+  step silently depended on it already being built from a prior run,
+  which is never true on a fresh clone. Both installers now build it
+  explicitly first.
+- Supabase's built-in mailer is unreliable/rate-limited by design (not
+  meant for production); retrying a signup for an already-registered,
+  unconfirmed email silently did nothing. Surfaced clearly now, with a
+  working resend action.
+
+### Changed
+
+- Desktop app's palette reworked to match the TUI's violet/pink
+  identity (was an unrelated warm-orange placeholder scheme); light
+  theme is a warm beige, dark matches the app icon's near-black plum.
+  Real brand logo (block lowercase "a") replacing the placeholder mark.
+- The TUI's fuzzy-match autocomplete (`app/src/ui/autocomplete.ts`)
+  moved to `packages/core/src/autocomplete.ts` so the desktop app's tag
+  search uses the identical matcher, not a second implementation.
+
 ## [0.9.1a] — 2026-07-16
 
 npm package: `@keshm/applyr` version `0.9.1-alpha.0`.

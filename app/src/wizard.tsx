@@ -1,6 +1,6 @@
 import React from "react";
 import { render } from "ink";
-import { runValidator } from "./helpers.js";
+import { runValidator } from "@applyr/core/helpers.js";
 import { withAltScreen } from "./altScreen.js";
 import { OnboardingWizard } from "./ui/onboarding/OnboardingWizard.js";
 

@@ -278,4 +278,29 @@ else
   fi
 fi
 
+# --- Phase 11: hosted Supabase backend config (optional) -------------------
+# Hosted/signed-in mode is opt-in from the desktop app (docs/app-integration-plan.md)
+# — a local-only setup never needs this file. Same warn-and-continue contract
+# as the Google Sheets check above: absence or a placeholder value only means
+# "Sign in" isn't usable yet on this machine, never a failing run.
+
+SUPABASE="$PROJECT_ROOT/config/supabase.json"
+
+if [ ! -f "$SUPABASE" ]; then
+  warn "Hosted backend config not found ($SUPABASE) — hosted sign-in will be unavailable in the desktop app. See config/supabase.example.json."
+else
+  if ! jq -e . "$SUPABASE" >/dev/null 2>&1; then
+    warn "$SUPABASE: invalid JSON — hosted sign-in will be unavailable."
+  else
+    SUPABASE_URL="$(jq -r '.url // empty' "$SUPABASE")"
+    SUPABASE_ANON_KEY="$(jq -r '.anonKey // empty' "$SUPABASE")"
+    if [ -z "$SUPABASE_URL" ] || [ "$SUPABASE_URL" = "YOUR_PROJECT_REF" ] || printf '%s' "$SUPABASE_URL" | grep -q "YOUR_PROJECT_REF"; then
+      warn "$SUPABASE: url is missing or still the placeholder — hosted sign-in will be unavailable."
+    fi
+    if [ -z "$SUPABASE_ANON_KEY" ] || [ "$SUPABASE_ANON_KEY" = "YOUR_SUPABASE_ANON_KEY" ]; then
+      warn "$SUPABASE: anonKey is missing or still the placeholder — hosted sign-in will be unavailable."
+    fi
+  fi
+fi
+
 echo "validate_local_config: OK"

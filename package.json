@@ -1,0 +1,19 @@
+{
+  "name": "applyr-workspace",
+  "private": true,
+  "description": "applyr monorepo root — npm workspaces for the shared TS core, the Ink TUI, and the Tauri desktop app.",
+  "workspaces": [
+    "packages/*",
+    "app",
+    "desktop"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:core": "npm run build --workspace=@applyr/core",
+    "build:app": "npm run build:core && npm run build --workspace=app",
+    "typecheck:app": "npm run build:core && npm run typecheck --workspace=app",
+    "smoke:app": "npm run build:app && npm run smoke --workspace=app"
+  }
+}

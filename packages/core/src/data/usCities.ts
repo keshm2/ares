@@ -11,8 +11,13 @@
  * one they start typing rather than silently collapsing to one.
  * Freehand text with no match is always accepted on Enter — this list
  * only drives suggestions, it's never a validated enum.
+ *
+ * The raw list is deduped at export because hand-curation by region has
+ * produced accidental exact repeats (a city that belongs to two regional
+ * groupings, e.g. "Durham, NC"), which showed up as duplicate suggestions
+ * and duplicate React keys downstream.
  */
-export const US_CITIES: string[] = [
+const RAW_US_CITIES: string[] = [
   "Remote",
 
   // Bay Area / Northern California
@@ -371,3 +376,5 @@ export const US_CITIES: string[] = [
   "Boca Raton, FL",
   "St. Petersburg, FL",
 ];
+
+export const US_CITIES: string[] = [...new Set(RAW_US_CITIES)];

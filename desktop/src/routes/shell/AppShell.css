@@ -1,0 +1,48 @@
+.shell {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 15rem 1fr;
+}
+
+.shell-sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) var(--space-4);
+  gap: var(--space-6);
+}
+
+.shell-brand {
+  padding: 0 var(--space-2);
+}
+
+.shell-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.shell-nav-item {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.shell-nav-item:hover {
+  background: var(--ground);
+  color: var(--text);
+}
+
+.shell-nav-item-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.shell-main {
+  overflow-y: auto;
+  padding: var(--space-7) var(--space-6);
+}
