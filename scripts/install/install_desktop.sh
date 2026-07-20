@@ -1,6 +1,17 @@
 #!/bin/bash
-# install_desktop.sh — builds and installs the applyr desktop app (Tauri +
-# React) from source, for macOS and Linux.
+# install_desktop.sh — installs the applyr desktop app (Tauri + React) for
+# macOS and Linux.
+#
+# Prefers downloading a prebuilt bundle from this checkout's matching
+# GitHub release (built once, on CI, by .github/workflows/desktop-release.yml)
+# — that path needs nothing beyond curl: no Rust, no Xcode Command Line
+# Tools, no OS-native GUI build dependencies, same as installing any other
+# compiled macOS/Linux app. Building from source is the FALLBACK, only
+# used when no matching prebuilt bundle exists (an unreleased checkout, a
+# release with no CI-built assets yet, or an arch with none) — that path
+# is the one that needs Rust + native build tools, because it's actually
+# compiling the app on this machine instead of just installing an
+# already-compiled one.
 #
 # This is a separate script from install.sh (which calls into this one as
 # an opt-in step) so it can also be re-run standalone after fixing a
@@ -13,14 +24,6 @@
 # here is never allowed to take down install.sh's main flow (see the
 # caller in install.sh, which treats a non-zero exit as a warning, not a
 # hard failure).
-#
-# Unlike the TUI (plain Node/npm), building the desktop app needs a Rust
-# toolchain and OS-native GUI build dependencies (Tauri wraps the system
-# webview). Those are real, sometimes multi-minute-to-install
-# prerequisites — this script checks for each, offers to install what's
-# missing (same "detect everything first, ask once" pattern as
-# install.sh's own step 1), and always leaves the TUI usable even if a
-# step here fails.
 
 set -euo pipefail
 
@@ -32,11 +35,148 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
-[ -f "desktop/package.json" ] || fail "desktop/ not found in this checkout — nothing to build."
+[ -f "desktop/package.json" ] || fail "desktop/ not found in this checkout — nothing to install."
 
 OS="$(uname -s)"
 SUDO=""
 [ "$(id -u 2>/dev/null || echo 0)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"
+REPO="keshm2/applyr"
+
+# --- macOS: install an already-built .app (shared by the prebuilt-download
+# and build-from-source paths) ------------------------------------------------
+install_macos_app() { # <path to a built/extracted applyr.app>
+  local app_src="$1"
+  local dest="/Applications"
+  [ -w "$dest" ] || dest="$HOME/Applications"
+  mkdir -p "$dest"
+  osascript -e 'quit app "applyr"' >/dev/null 2>&1 || true
+  rm -rf "$dest/applyr.app"
+  cp -R "$app_src" "$dest/applyr.app"
+  say "installed: $dest/applyr.app"
+  say "open it from Finder/Launchpad, or: open '$dest/applyr.app'"
+}
+
+# --- Linux: install whichever bundle format is available (shared by both
+# paths) -----------------------------------------------------------------------
+install_linux_bundle() { # <dir containing candidate .deb/.rpm/.AppImage files>
+  local dir="$1"
+  local deb rpm appimage
+  deb="$(find "$dir" -maxdepth 2 -name '*.deb' 2>/dev/null | head -n1 || true)"
+  rpm="$(find "$dir" -maxdepth 2 -name '*.rpm' 2>/dev/null | head -n1 || true)"
+  appimage="$(find "$dir" -maxdepth 2 -name '*.AppImage' 2>/dev/null | head -n1 || true)"
+
+  if [ -n "$deb" ] && command -v apt-get >/dev/null 2>&1; then
+    # apt (not dpkg -i) so it resolves the bundle's runtime deps too.
+    $SUDO apt-get install -y "./$deb" || fail "apt install of $deb failed."
+    say "installed via apt: $deb"
+    return 0
+  elif [ -n "$rpm" ] && command -v dnf >/dev/null 2>&1; then
+    $SUDO dnf install -y "./$rpm" || fail "dnf install of $rpm failed."
+    say "installed via dnf: $rpm"
+    return 0
+  elif [ -n "$appimage" ]; then
+    local appdir="$HOME/.local/share/applyr"
+    mkdir -p "$appdir" "$HOME/.local/share/applications" "$HOME/.local/bin"
+    cp "$appimage" "$appdir/applyr.AppImage"
+    chmod +x "$appdir/applyr.AppImage"
+    ln -sf "$appdir/applyr.AppImage" "$HOME/.local/bin/applyr-app"
+    local icon_src="desktop/src-tauri/icons/128x128.png"
+    [ -f "$icon_src" ] && cp "$icon_src" "$appdir/icon.png"
+    cat > "$HOME/.local/share/applications/applyr.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=applyr
+Comment=applyr desktop app
+Exec=$appdir/applyr.AppImage
+Icon=$appdir/icon.png
+Categories=Office;
+Terminal=false
+DESKTOP
+    command -v update-desktop-database >/dev/null 2>&1 \
+      && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+    say "installed: $appdir/applyr.AppImage (find \"applyr\" in your application launcher, or run: applyr-app)"
+    return 0
+  fi
+  return 1
+}
+
+# --- 0. Try a prebuilt bundle from this version's GitHub release --------------
+# VERSION (repo root) is a plain tracked file present in both a git
+# checkout and an unpacked release tarball, so this works either way —
+# unlike deriving the tag from `git describe`, which needs a real .git dir.
+try_prebuilt_install() {
+  command -v jq >/dev/null 2>&1 || { say "jq not found — skipping the prebuilt-download check, building from source instead."; return 1; }
+  [ -f VERSION ] || { say "no VERSION file in this checkout — skipping the prebuilt-download check."; return 1; }
+  local tag="v$(cat VERSION)"
+
+  say "checking the $tag GitHub release for a prebuilt desktop app…"
+  local release_json
+  release_json="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/tags/$tag" 2>/dev/null || true)"
+  if [ -z "$release_json" ] || ! echo "$release_json" | jq -e '.assets' >/dev/null 2>&1; then
+    say "no $tag release with build assets found on GitHub — will build from source instead."
+    return 1
+  fi
+
+  local work_dir
+  work_dir="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '$work_dir'" RETURN
+
+  if [ "$OS" = "Darwin" ]; then
+    local arch asset_url
+    arch="$(uname -m)"
+    [ "$arch" = "arm64" ] && arch="aarch64"
+    asset_url="$(echo "$release_json" | jq -r --arg a "$arch" \
+      '[.assets[] | select(.name | endswith(".dmg")) | select(.name | contains($a))][0].browser_download_url // empty')"
+    [ -n "$asset_url" ] || { say "no prebuilt macOS ($arch) bundle in $tag — will build from source instead."; return 1; }
+
+    say "downloading the prebuilt desktop app…"
+    curl -fsSL -o "$work_dir/applyr.dmg" "$asset_url" \
+      || { warn "download failed — will build from source instead."; return 1; }
+    local mount_dir="$work_dir/mnt"
+    mkdir -p "$mount_dir"
+    hdiutil attach "$work_dir/applyr.dmg" -mountpoint "$mount_dir" -nobrowse -quiet \
+      || { warn "couldn't mount the downloaded .dmg — will build from source instead."; return 1; }
+    install_macos_app "$mount_dir/applyr.app"
+    hdiutil detach "$mount_dir" -quiet >/dev/null 2>&1 || true
+    say "(prebuilt — no Rust or Xcode Command Line Tools needed)"
+    return 0
+
+  elif [ "$OS" = "Linux" ]; then
+    # amd64/x86_64 is the only arch CI currently produces; anything else
+    # (e.g. arm64 Linux) falls through to building from source.
+    local asset_urls
+    asset_urls="$(echo "$release_json" | jq -r \
+      '.assets[] | select(.name | test("\\.(deb|rpm|AppImage)$")) | .browser_download_url')"
+    [ -n "$asset_urls" ] || { say "no prebuilt Linux bundle in $tag — will build from source instead."; return 1; }
+
+    say "downloading the prebuilt desktop app…"
+    local url name
+    while IFS= read -r url; do
+      [ -n "$url" ] || continue
+      name="$(basename "$url")"
+      curl -fsSL -o "$work_dir/$name" "$url" || warn "failed to download $name — skipping it."
+    done <<< "$asset_urls"
+
+    install_linux_bundle "$work_dir" || { warn "no compatible package manager for the downloaded bundle(s) — will build from source instead."; return 1; }
+    say "(prebuilt — no Rust or OS-native build tools needed)"
+    return 0
+  fi
+  return 1
+}
+
+if try_prebuilt_install; then
+  say "done."
+  exit 0
+fi
+
+# --- Fallback: build from source ----------------------------------------------
+# Reached only when no prebuilt bundle was available. THIS is the path that
+# actually needs Rust + OS-native GUI build dependencies (Tauri wraps the
+# system webview) — real, sometimes multi-minute-to-install prerequisites.
+# Checks for each, offers to install what's missing (same "detect
+# everything first, ask once" pattern as install.sh's own step 1).
+say "no prebuilt bundle available — building the desktop app from source instead."
 
 # --- 1. Rust toolchain --------------------------------------------------------
 if ! command -v cargo >/dev/null 2>&1; then
@@ -67,7 +207,7 @@ fi
 # --- 2. OS-native build dependencies ------------------------------------------
 if [ "$OS" = "Darwin" ]; then
   if ! xcode-select -p >/dev/null 2>&1; then
-    warn "Xcode Command Line Tools not found — required to link the macOS app."
+    warn "Xcode Command Line Tools not found — required to link the macOS app when building from source."
     INSTALL_CLT="y"
     if [ -t 0 ]; then
       printf "Install them now (opens Apple's installer — a few minutes)? [Y/n] "
@@ -149,53 +289,9 @@ BUNDLE_DIR="desktop/src-tauri/target/release/bundle"
 if [ "$OS" = "Darwin" ]; then
   APP_SRC="$BUNDLE_DIR/macos/applyr.app"
   [ -d "$APP_SRC" ] || fail "expected bundle not found at $APP_SRC — build may have failed silently."
-
-  DEST="/Applications"
-  [ -w "$DEST" ] || DEST="$HOME/Applications"
-  mkdir -p "$DEST"
-
-  osascript -e 'quit app "applyr"' >/dev/null 2>&1 || true
-  rm -rf "$DEST/applyr.app"
-  cp -R "$APP_SRC" "$DEST/applyr.app"
-  say "installed: $DEST/applyr.app"
-  say "open it from Finder/Launchpad, or: open '$DEST/applyr.app'"
-
+  install_macos_app "$APP_SRC"
 elif [ "$OS" = "Linux" ]; then
-  DEB="$(find "$BUNDLE_DIR/deb" -maxdepth 1 -name '*.deb' 2>/dev/null | head -n1 || true)"
-  RPM="$(find "$BUNDLE_DIR/rpm" -maxdepth 1 -name '*.rpm' 2>/dev/null | head -n1 || true)"
-  APPIMAGE="$(find "$BUNDLE_DIR/appimage" -maxdepth 1 -name '*.AppImage' 2>/dev/null | head -n1 || true)"
-
-  if [ -n "$DEB" ] && command -v apt-get >/dev/null 2>&1; then
-    # apt (not dpkg -i) so it resolves the bundle's runtime deps too.
-    $SUDO apt-get install -y "./$DEB" || fail "apt install of $DEB failed."
-    say "installed via apt: $DEB"
-  elif [ -n "$RPM" ] && command -v dnf >/dev/null 2>&1; then
-    $SUDO dnf install -y "./$RPM" || fail "dnf install of $RPM failed."
-    say "installed via dnf: $RPM"
-  elif [ -n "$APPIMAGE" ]; then
-    APPDIR="$HOME/.local/share/applyr"
-    mkdir -p "$APPDIR" "$HOME/.local/share/applications" "$HOME/.local/bin"
-    cp "$APPIMAGE" "$APPDIR/applyr.AppImage"
-    chmod +x "$APPDIR/applyr.AppImage"
-    ln -sf "$APPDIR/applyr.AppImage" "$HOME/.local/bin/applyr-app"
-    ICON_SRC="desktop/src-tauri/icons/128x128.png"
-    [ -f "$ICON_SRC" ] && cp "$ICON_SRC" "$APPDIR/icon.png"
-    cat > "$HOME/.local/share/applications/applyr.desktop" <<DESKTOP
-[Desktop Entry]
-Type=Application
-Name=applyr
-Comment=applyr desktop app
-Exec=$APPDIR/applyr.AppImage
-Icon=$APPDIR/icon.png
-Categories=Office;
-Terminal=false
-DESKTOP
-    command -v update-desktop-database >/dev/null 2>&1 \
-      && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
-    say "installed: $APPDIR/applyr.AppImage (find \"applyr\" in your application launcher, or run: applyr-app)"
-  else
-    fail "no installable bundle found under $BUNDLE_DIR — build may have failed silently."
-  fi
+  install_linux_bundle "$BUNDLE_DIR" || fail "no installable bundle found under $BUNDLE_DIR — build may have failed silently."
 fi
 
 say "done."

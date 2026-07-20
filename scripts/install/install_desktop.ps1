@@ -1,6 +1,15 @@
 <#
-install_desktop.ps1 - builds and installs the applyr desktop app (Tauri +
-React) from source, natively on Windows (PowerShell, no WSL).
+install_desktop.ps1 - installs the applyr desktop app (Tauri + React),
+natively on Windows (PowerShell, no WSL).
+
+Prefers downloading a prebuilt bundle from this checkout's matching
+GitHub release (built once, on CI, by .github/workflows/desktop-release.yml)
+- that path needs nothing beyond PowerShell's own Invoke-WebRequest: no
+Rust, no Visual C++ Build Tools. Building from source is the FALLBACK,
+only used when no matching prebuilt bundle exists (an unreleased
+checkout, or a release with no CI-built assets yet) - that path is the
+one that needs Rust + Build Tools, because it's actually compiling the
+app on this machine instead of just installing an already-compiled one.
 
 Separate from install.ps1 (which calls into this as an opt-in step) so it
 can also be re-run standalone after fixing a missing dependency:
@@ -10,11 +19,6 @@ can also be re-run standalone after fixing a missing dependency:
 Early-preview status: the desktop app ships ALONGSIDE the TUI, not in
 place of it - this script never touches the TUI install, and install.ps1
 treats a non-zero exit from this script as a warning, not a hard failure.
-
-Unlike the TUI (plain Node/npm), building the desktop app needs a Rust
-toolchain (MSVC target) and the Visual C++ Build Tools that toolchain
-links against - real, sometimes multi-minute prerequisites. This script
-checks for each and offers to install what's missing before building.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -27,7 +31,125 @@ $scriptDir = Split-Path -Parent $PSCommandPath
 $projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
 Set-Location $projectRoot
 
-if (-not (Test-Path "desktop\package.json")) { Fail "desktop\ not found in this checkout - nothing to build." }
+if (-not (Test-Path "desktop\package.json")) { Fail "desktop\ not found in this checkout - nothing to install." }
+
+$repo = "keshm2/applyr"
+
+# --- Install a built/downloaded bundle (shared by both paths) -----------------
+function Install-DesktopBundle {
+  param([string]$BundleDir)
+  # NSIS installs per-user under %LOCALAPPDATA% with no elevation prompt by
+  # default in Tauri's template - prefer it over the MSI (which typically
+  # needs an admin prompt for a Program Files install) so this matches the
+  # no-elevation-needed install the app already gets on macOS.
+  $nsis = Get-ChildItem -Path (Join-Path $BundleDir "nsis") -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+  $msi  = Get-ChildItem -Path (Join-Path $BundleDir "msi") -Filter "*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+  if ($nsis) {
+    Say "installing $($nsis.Name) (silent)..."
+    $p = Start-Process -FilePath $nsis.FullName -ArgumentList "/S" -Wait -PassThru
+    if ($p.ExitCode -eq 0) {
+      Say "installed. Find 'applyr' in the Start Menu, or run: $($nsis.FullName) (double-click to install manually if the silent flag didn't take)."
+    } else {
+      Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $($nsis.FullName)"
+    }
+    return $true
+  } elseif ($msi) {
+    Say "installing $($msi.Name) (silent, may prompt for admin)..."
+    $p = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "`"$($msi.FullName)`"", "/quiet", "/norestart" -Wait -PassThru
+    if ($p.ExitCode -eq 0) {
+      Say "installed. Find 'applyr' in the Start Menu."
+    } else {
+      Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $($msi.FullName)"
+    }
+    return $true
+  }
+  return $false
+}
+
+# --- 0. Try a prebuilt bundle from this version's GitHub release --------------
+# VERSION (repo root) is a plain tracked file present in both a git
+# checkout and an unpacked release archive, so this works either way -
+# unlike deriving the tag from git metadata, which needs a real .git dir.
+function Try-PrebuiltInstall {
+  if (-not (Test-Path "VERSION")) {
+    Say "no VERSION file in this checkout - skipping the prebuilt-download check."
+    return $false
+  }
+  $tag = "v" + (Get-Content "VERSION" -Raw).Trim()
+
+  Say "checking the $tag GitHub release for a prebuilt desktop app..."
+  $release = $null
+  try {
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/tags/$tag" -ErrorAction Stop
+  } catch {
+    Say "no $tag release found on GitHub - will build from source instead."
+    return $false
+  }
+  if (-not $release.assets -or $release.assets.Count -eq 0) {
+    Say "$tag release has no build assets yet - will build from source instead."
+    return $false
+  }
+
+  $nsisAsset = $release.assets | Where-Object { $_.name -like "*-setup.exe" } | Select-Object -First 1
+  $msiAsset  = $release.assets | Where-Object { $_.name -like "*.msi" } | Select-Object -First 1
+  $asset = if ($nsisAsset) { $nsisAsset } else { $msiAsset }
+  if (-not $asset) {
+    Say "no prebuilt Windows bundle in $tag - will build from source instead."
+    return $false
+  }
+
+  $workDir = Join-Path $env:TEMP ("applyr-desktop-" + [System.Guid]::NewGuid().ToString())
+  New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+  try {
+    $downloadPath = Join-Path $workDir $asset.name
+    Say "downloading the prebuilt desktop app..."
+    try {
+      Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $downloadPath -UseBasicParsing
+    } catch {
+      Warn "download failed - will build from source instead."
+      return $false
+    }
+    $installed = $false
+    if ($asset.name -like "*-setup.exe") {
+      Say "installing $($asset.name) (silent)..."
+      $p = Start-Process -FilePath $downloadPath -ArgumentList "/S" -Wait -PassThru
+      if ($p.ExitCode -eq 0) {
+        Say "installed. Find 'applyr' in the Start Menu."
+        $installed = $true
+      } else {
+        Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $downloadPath"
+        $installed = $true # the file is real and usable even if the silent flag didn't take
+      }
+    } else {
+      Say "installing $($asset.name) (silent, may prompt for admin)..."
+      $p = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "`"$downloadPath`"", "/quiet", "/norestart" -Wait -PassThru
+      if ($p.ExitCode -eq 0) {
+        Say "installed. Find 'applyr' in the Start Menu."
+        $installed = $true
+      } else {
+        Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $downloadPath"
+        $installed = $true
+      }
+    }
+    if ($installed) { Say "(prebuilt - no Rust or Visual C++ Build Tools needed)" }
+    return $installed
+  } finally {
+    Remove-Item -Recurse -Force $workDir -ErrorAction SilentlyContinue
+  }
+}
+
+if (Try-PrebuiltInstall) {
+  Say "done."
+  exit 0
+}
+
+# --- Fallback: build from source ----------------------------------------------
+# Reached only when no prebuilt bundle was available. THIS is the path that
+# actually needs a Rust toolchain (MSVC target) and the Visual C++ Build
+# Tools that toolchain links against - real, sometimes multi-minute
+# prerequisites. Checks for each, offers to install what's missing.
+Say "no prebuilt bundle available - building the desktop app from source instead."
 
 # --- 1. Rust toolchain --------------------------------------------------------
 function Refresh-Path {
@@ -37,7 +159,7 @@ function Refresh-Path {
 }
 
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-  Warn "not detected: Rust (cargo) - required to compile the desktop app's native shell."
+  Warn "not detected: Rust (cargo) - required to compile the desktop app's native shell when building from source."
   $installRust = "y"
   try {
     $installRust = Read-Host "Install Rust now via rustup (official installer, ~minimal profile)? [Y/n]"
@@ -163,31 +285,7 @@ if (-not $buildOk) {
 
 # --- 4. Install the built bundle ------------------------------------------------
 $bundleDir = "desktop\src-tauri\target\release\bundle"
-
-# NSIS installs per-user under %LOCALAPPDATA% with no elevation prompt by
-# default in Tauri's template - prefer it over the MSI (which typically
-# needs an admin prompt for a Program Files install) so this matches the
-# no-elevation-needed install the app already gets on macOS.
-$nsis = Get-ChildItem -Path (Join-Path $bundleDir "nsis") -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-$msi  = Get-ChildItem -Path (Join-Path $bundleDir "msi") -Filter "*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
-
-if ($nsis) {
-  Say "installing $($nsis.Name) (silent)..."
-  $p = Start-Process -FilePath $nsis.FullName -ArgumentList "/S" -Wait -PassThru
-  if ($p.ExitCode -eq 0) {
-    Say "installed. Find 'applyr' in the Start Menu, or run: $($nsis.FullName) (double-click to install manually if the silent flag didn't take)."
-  } else {
-    Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $($nsis.FullName)"
-  }
-} elseif ($msi) {
-  Say "installing $($msi.Name) (silent, may prompt for admin)..."
-  $p = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "`"$($msi.FullName)`"", "/quiet", "/norestart" -Wait -PassThru
-  if ($p.ExitCode -eq 0) {
-    Say "installed. Find 'applyr' in the Start Menu."
-  } else {
-    Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $($msi.FullName)"
-  }
-} else {
+if (-not (Install-DesktopBundle -BundleDir $bundleDir)) {
   Fail "no installable bundle found under $bundleDir - build may have failed silently."
 }
 

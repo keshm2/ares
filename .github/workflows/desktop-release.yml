@@ -1,0 +1,78 @@
+# Builds the desktop app (Tauri) for macOS (arm64 + x86_64), Linux, and
+# Windows on GitHub-hosted runners — which already carry the native build
+# tools (Xcode CLT, MSVC) — and uploads the bundles as assets on the
+# matching GitHub Release. This means an end user never needs Rust or any
+# OS-native build tools themselves: scripts/install/install_desktop.sh|ps1
+# download a prebuilt bundle from the release instead of compiling one
+# locally, falling back to a from-source build only if no matching asset
+# is found (e.g. an unreleased checkout, or a platform/arch with none).
+#
+# Triggers on any `v*` tag push (the same tags scripts/install/uninstall.py
+# and the release process already use) and via workflow_dispatch so
+# existing tags can get assets attached retroactively.
+name: desktop-release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag to build and attach assets to"
+        required: true
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+          - platform: macos-latest
+            args: "--target x86_64-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Root-level install so the npm workspace (packages/core, app,
+      # desktop) links correctly; packages/core has no build hook of its
+      # own (a gap fixed in the installer scripts too), so build it
+      # explicitly before desktop's build runs.
+      - run: npm ci
+      - run: npm run build:core
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: "applyr ${{ github.event.inputs.tag || github.ref_name }}"
+          releaseBody: "Desktop app bundles for this release — see the GitHub Release notes for what's new. Installed automatically by scripts/install/install_desktop.sh|ps1, or download the file matching your OS/arch directly."
+          releaseDraft: false
+          prerelease: true
+          args: ${{ matrix.args }}

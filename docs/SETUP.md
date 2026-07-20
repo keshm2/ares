@@ -49,23 +49,28 @@ curl -L -o applyr-0.9.7a.zip https://github.com/keshm2/applyr/archive/refs/tags/
 ```
 
 **Desktop app (early preview, optional).** Near the end of the install,
-the installer offers to also build and install a native desktop app
+the installer offers to also install a native desktop app
 (macOS/Linux/Windows) alongside the TUI — a graphical alternative
-that's still catching up in features. It's opt-in and defaults to no,
-since it needs a Rust toolchain and OS-native GUI build tools on top of
-what the TUI needs, and a first build can take several minutes. Answer
-`y` when asked, or run it any time after the fact:
+that's still catching up in features. It's opt-in and defaults to no.
+Answer `y` when asked, or run it any time after the fact:
 
 ```bash
 bash scripts/install/install_desktop.sh        # macOS / Linux
 powershell -ExecutionPolicy Bypass -File scripts\install\install_desktop.ps1   # Windows
 ```
 
-It installs to `/Applications` (macOS, falling back to `~/Applications`
-if that's not writable), via `apt`/`dnf`/an AppImage + app-launcher
-entry (Linux), or a per-user installer with no admin prompt (Windows).
-A failure here never affects the TUI — retry any time with the same
-command. `applyr uninstall` removes it too, if present.
+It first checks this checkout's matching GitHub release for a prebuilt
+bundle (built once on CI — `.github/workflows/desktop-release.yml`) and
+just downloads + installs that: no Rust, no Xcode Command Line Tools, no
+Visual C++ Build Tools, nothing beyond curl — the same as installing any
+other compiled app. Only falls back to compiling from source (which
+*does* need those, and a first build can take several minutes) if no
+matching prebuilt bundle exists yet, e.g. running from an unreleased
+checkout. Installs to `/Applications` (macOS, falling back to
+`~/Applications` if that's not writable), via `apt`/`dnf`/an AppImage +
+app-launcher entry (Linux), or a per-user installer with no admin prompt
+(Windows). A failure here never affects the TUI — retry any time with
+the same command. `applyr uninstall` removes it too, if present.
 
 **Uninstall.** `applyr uninstall` (or `bash scripts/install/uninstall.sh`)
 removes the schedule and `applyr` command, then asks before deleting
