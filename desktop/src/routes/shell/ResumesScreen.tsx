@@ -8,6 +8,7 @@ export function ResumesScreen() {
   const [root, setRoot] = useState<string | undefined>(undefined);
   const [files, setFiles] = useState<ResumeFile[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [selected, setSelected] = useState<string | undefined>(undefined);
   const [converting, setConverting] = useState<string | undefined>(undefined);
   const [description, setDescription] = useState("");
   const [message, setMessage] = useState<{ text: string; error?: boolean } | undefined>(undefined);
@@ -26,6 +27,12 @@ export function ResumesScreen() {
       .finally(() => setLoaded(true));
   }, []);
 
+  // Land on the first resume rather than a blank detail pane.
+  useEffect(() => {
+    if (files.length > 0 && !files.some((f) => f.stem === selected)) setSelected(files[0]!.stem);
+  }, [files, selected]);
+
+  const selectedFile = files.find((f) => f.stem === selected);
   const pendingCount = files.filter((f) => f.needsConversion).length;
 
   const openFolder = async () => {
@@ -66,7 +73,7 @@ export function ResumesScreen() {
   };
 
   return (
-    <div className="aplyx-fade-rise" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: "42rem" }}>
+    <div className="aplyx-fade-rise" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
       <div>
         <h1 style={{ fontSize: "var(--text-3xl)", marginBottom: "var(--space-2)" }}>Resumes</h1>
         <div className="data-toolbar">
@@ -84,57 +91,96 @@ export function ResumesScreen() {
         <div className={message.error ? "message-banner message-banner-error" : "message-banner"}>{message.text}</div>
       ) : null}
 
-      {!loaded ? (
-        <div className="data-empty">Loading…</div>
-      ) : (
-        <div className="data-list">
-          {files.map((f) => {
-            const status = rowStatus(f);
-            return (
-              <div key={f.stem} className="data-row">
-                <div className="data-row-main">
-                  <span className="data-row-title">{f.category ?? f.stem}</span>
-                  <span className="data-row-sub">{f.stem}</span>
+      <div className="data-screen">
+        <div className="data-list-col">
+          {!loaded ? (
+            <div className="data-empty">Loading…</div>
+          ) : files.length === 0 ? (
+            <div className="data-empty">No resumes found — add a PDF to data/resumes/ to get started.</div>
+          ) : (
+            <div className="data-list">
+              {files.map((f) => {
+                const status = rowStatus(f);
+                return (
+                  <button
+                    key={f.stem}
+                    type="button"
+                    className={f.stem === selected ? "data-row selected" : "data-row"}
+                    onClick={() => {
+                      setSelected(f.stem);
+                      if (converting && converting !== f.stem) setConverting(undefined);
+                    }}
+                  >
+                    <div className="data-row-main">
+                      <span className="data-row-title">{f.category ?? f.stem}</span>
+                      <span className="data-row-sub">{f.stem}</span>
+                    </div>
+                    <span className={`status-badge ${status.className}`}>{status.text}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {selectedFile ? (
+          <div className="detail-col">
+            <div className="detail-title">{selectedFile.category ?? selectedFile.stem}</div>
+            <div className="detail-row">
+              <span className="detail-row-label">File</span>
+              <span className="detail-row-value">{selectedFile.stem}</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-row-label">Status</span>
+              <span className={`status-badge ${rowStatus(selectedFile).className}`} style={{ alignSelf: "flex-start" }}>
+                {rowStatus(selectedFile).text}
+              </span>
+            </div>
+            <hr className="detail-rule" />
+
+            {converting === selectedFile.stem ? (
+              <>
+                <p className="field-help">
+                  What's this resume for? Optional — helps tell arbitrarily-named resumes apart later.
+                </p>
+                <div className="field">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="e.g. Backend-focused"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void runConvert();
+                      if (e.key === "Escape") setConverting(undefined);
+                    }}
+                  />
                 </div>
-                <span className={`status-badge ${status.className}`}>{status.text}</span>
-                {f.needsConversion ? (
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => startConvert(f.stem)}>
+                <div className="detail-actions">
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => void runConvert()}>
                     Convert
+                  </button>
+                  <button type="button" className="btn btn-sm" onClick={() => setConverting(undefined)}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="detail-actions">
+                {selectedFile.needsConversion ? (
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => startConvert(selectedFile.stem)}>
+                    Convert to markdown
+                  </button>
+                ) : selectedFile.hasMarkdown ? (
+                  <button type="button" className="btn btn-sm" onClick={() => startConvert(selectedFile.stem)}>
+                    Re-convert
                   </button>
                 ) : null}
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {converting ? (
-        <div className="detail-col" style={{ width: "100%" }}>
-          <div className="detail-title">What's this resume for?</div>
-          <p className="field-help">Optional — helps tell arbitrarily-named resumes apart later. Leave blank to skip.</p>
-          <div className="field">
-            <input
-              type="text"
-              autoFocus
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Backend-focused"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void runConvert();
-                if (e.key === "Escape") setConverting(undefined);
-              }}
-            />
+            )}
           </div>
-          <div className="detail-actions">
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => void runConvert()}>
-              Convert
-            </button>
-            <button type="button" className="btn btn-sm" onClick={() => setConverting(undefined)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {root ? <p className="field-help">Folder: {root}/data/resumes</p> : null}
     </div>

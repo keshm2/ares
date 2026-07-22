@@ -7,6 +7,39 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.9.75a] — 2026-07-22
+
+npm package: `@keshm/aplyx` version `0.9.75-alpha.0`.
+
+### Added
+
+- **Desktop app: Phase 14C, desktop UI refinement and theming — done.**
+  Home is now a real dashboard (stat cards + one derived "next action"
+  card instead of a flat checklist). A 4-family theme system ships in
+  Settings: **Calm Cobalt** (new default, cool blue-tinted neutrals),
+  **Sage Slate**, **Graphite Cyan**, and the original palette preserved
+  verbatim as **Aplyx Classic** — mode (light/dark/system) and family are
+  independent axes, every family carries the full token contract
+  (`desktop/src/styles/tokens.css`, `desktop/src/lib/uiPrefs.ts`).
+  Resumes moved from a flat inline-action list to the same list+detail
+  split Jobs/Review/History already use; Review and History now
+  auto-advance to the first pending / newest item instead of landing on
+  a blank detail pane.
+- **Desktop app: three more bundled font options.** Alongside the
+  existing System/Geist choice, Settings now also offers **Inter**
+  (dense/tabular product UI), **IBM Plex Sans** paired with **IBM Plex
+  Mono** (enterprise/analytical tone), and **Atkinson Hyperlegible Next**
+  (accessibility/readability-first) — all OFL-licensed, self-hosted via
+  `@fontsource`/`@fontsource-variable` (no CDN fetch, works fully
+  offline), same pattern as Geist. System stays the default.
+
+### Fixed
+
+- **The desktop nav rail (and every other in-app link) rendered with the
+  browser-default underline** — no stylesheet anywhere reset
+  `text-decoration` on `<a>`. Fixed globally in
+  `desktop/src/styles/base.css`.
+
 ## [0.9.7a] — 2026-07-17
 
 npm package: `@keshm/aplyx` version `0.9.7-alpha.0`.

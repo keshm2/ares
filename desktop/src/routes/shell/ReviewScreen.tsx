@@ -35,6 +35,16 @@ export function ReviewScreen() {
   );
   const selectedEntry = entries.find((e) => e.job_id === selected);
 
+  // Queue-first workflow: land on the first pending item rather than a
+  // blank detail pane, and when acting on one resolves/removes it from
+  // `entries`, land on the next one automatically — deciding on an item
+  // flows straight into the next decision instead of bouncing back to an
+  // empty pane that has to be re-clicked into.
+  useEffect(() => {
+    if (entries.length === 0) return;
+    if (!entries.some((e) => e.job_id === selected)) setSelected(entries[0]!.job_id);
+  }, [entries, selected]);
+
   const open = async (entry: QueueEntry) => {
     try {
       await openUrl(entry.apply_url || entry.url);

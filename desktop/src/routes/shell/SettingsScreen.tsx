@@ -4,24 +4,41 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { BUILD_MARKER } from "@aplyx/core/version.js";
 import { useAuth } from "../../lib/AuthContext";
 import { findRoot, hasLocalInstall, setLocalRoot, forgetLocalRoot } from "../../lib/bridge";
-import { useUiPrefs, type FontPref, type ThemePref } from "../../lib/uiPrefs";
+import {
+  useUiPrefs,
+  THEME_FAMILY_LABELS,
+  FONT_LABELS,
+  type FontPref,
+  type ThemeFamily,
+  type ThemePref,
+} from "../../lib/uiPrefs";
 import "../../components/formFields.css";
 
 const THEME_OPTIONS: { value: ThemePref; label: string; detail: string }[] = [
   { value: "system", label: "System", detail: "Follow the OS appearance" },
-  { value: "light", label: "Light", detail: "Warm beige, always" },
-  { value: "dark", label: "Dark", detail: "Near-black plum, always" },
+  { value: "light", label: "Light", detail: "This family's light mode, always" },
+  { value: "dark", label: "Dark", detail: "This family's dark mode, always" },
 ];
 
-const FONT_OPTIONS: { value: FontPref; label: string; detail: string }[] = [
-  { value: "system", label: "System", detail: "Your OS's native UI font" },
-  { value: "geist", label: "Geist", detail: "Bundled Geist + Geist Mono" },
+const THEME_FAMILY_OPTIONS: { value: ThemeFamily; detail: string }[] = [
+  { value: "cobalt", detail: "Cool blue-tinted neutrals, cobalt accent — the default" },
+  { value: "sage", detail: "Quieter, softer, less saturated green-gray accent" },
+  { value: "legacy", detail: "The original warm beige + violet/plum look" },
+  { value: "graphite", detail: "Darker, more technical, ops-console feeling" },
+];
+
+const FONT_OPTIONS: { value: FontPref; detail: string }[] = [
+  { value: "system", detail: "Your OS's native UI font" },
+  { value: "geist", detail: "Bundled Geist + Geist Mono — modern, technical-product feel" },
+  { value: "inter", detail: "Bundled Inter — strong for dense, tabular product UI" },
+  { value: "plex", detail: "Bundled IBM Plex Sans + Plex Mono — enterprise, analytical tone" },
+  { value: "atkinson", detail: "Bundled Atkinson Hyperlegible Next — accessibility- and readability-first" },
 ];
 
 export function SettingsScreen() {
   const { status, session, signOut } = useAuth();
   const navigate = useNavigate();
-  const { theme, font, setTheme, setFont } = useUiPrefs();
+  const { theme, themeFamily, font, setTheme, setThemeFamily, setFont } = useUiPrefs();
   const [root, setRoot] = useState<string | undefined>(undefined);
   const [browsing, setBrowsing] = useState(false);
   const [rootError, setRootError] = useState<string | undefined>(undefined);
@@ -94,8 +111,27 @@ export function SettingsScreen() {
         <h2 style={{ fontSize: "var(--text-lg)", marginBottom: "var(--space-3)" }}>Appearance</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <div className="field">
-            <span className="field-label">Theme</span>
-            <div className="yesno-toggle" role="group" aria-label="Theme">
+            <span className="field-label">Theme family</span>
+            <div className="yesno-toggle" role="group" aria-label="Theme family">
+              {THEME_FAMILY_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={themeFamily === opt.value ? "selected" : ""}
+                  title={opt.detail}
+                  onClick={() => setThemeFamily(opt.value)}
+                >
+                  {THEME_FAMILY_LABELS[opt.value]}
+                </button>
+              ))}
+            </div>
+            <p className="field-help">
+              {THEME_FAMILY_OPTIONS.find((o) => o.value === themeFamily)?.detail}
+            </p>
+          </div>
+          <div className="field">
+            <span className="field-label">Mode</span>
+            <div className="yesno-toggle" role="group" aria-label="Mode">
               {THEME_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
@@ -109,8 +145,8 @@ export function SettingsScreen() {
               ))}
             </div>
             <p className="field-help">
-              Light is a warm beige, dark matches the aplyx logo badge. System follows your OS
-              and switches automatically.
+              System follows your OS and switches automatically; Light/Dark pin the current
+              theme family to that mode.
             </p>
           </div>
           <div className="field">
@@ -124,13 +160,13 @@ export function SettingsScreen() {
                   title={opt.detail}
                   onClick={() => setFont(opt.value)}
                 >
-                  {opt.label}
+                  {FONT_LABELS[opt.value]}
                 </button>
               ))}
             </div>
             <p className="field-help">
-              Geist is bundled with the app (no download). It applies to the whole interface,
-              including headlines and code.
+              {FONT_OPTIONS.find((o) => o.value === font)?.detail} Bundled fonts apply to the
+              whole interface, including headlines and code — no download, works offline.
             </p>
           </div>
         </div>

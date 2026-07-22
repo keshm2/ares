@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { AplyxState, AppliedJob } from "@aplyx/core/state.js";
 import { findRoot, loadLocalState } from "../../lib/bridge";
@@ -30,12 +30,17 @@ export function HistoryScreen() {
       .finally(() => setLoaded(true));
   }, []);
 
-  const jobs = [...(state?.applied ?? [])].reverse();
+  const jobs = useMemo(() => [...(state?.applied ?? [])].reverse(), [state]);
   const totals = { applied: 0, needs_review: 0, failed: 0 };
   for (const job of jobs) {
     if (job.status in totals) totals[job.status as keyof typeof totals] += 1;
   }
   const selectedJob = jobs.find((j) => j.job_id === selected);
+
+  // Land on the newest record rather than a blank detail pane.
+  useEffect(() => {
+    if (jobs.length > 0 && !jobs.some((j) => j.job_id === selected)) setSelected(jobs[0]!.job_id);
+  }, [jobs, selected]);
 
   const open = async (job: AppliedJob) => {
     try {
