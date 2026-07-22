@@ -129,27 +129,27 @@ async function autofill(): Promise<string> {
     const value = resolveValue(key, response.fields);
     if (!value) {
       // The profile has no value for this mapped field — highlight, never invent.
-      outline(el, "#d97706", "applyr: no profile value for this field — fill it yourself");
+      outline(el, "#d97706", "aplyx: no profile value for this field — fill it yourself");
       attention += 1;
       continue;
     }
     if (el instanceof HTMLSelectElement) {
       if (selectOption(el, value)) {
-        outline(el, "#0f6e2a", "applyr: filled from your profile");
+        outline(el, "#0f6e2a", "aplyx: filled from your profile");
         filled += 1;
       } else {
-        outline(el, "#d97706", `applyr: no option matches "${value}" — pick one yourself`);
+        outline(el, "#d97706", `aplyx: no option matches "${value}" — pick one yourself`);
         attention += 1;
       }
       continue;
     }
     if (el.value.trim()) continue; // never clobber something the user typed
     setNativeValue(el, value);
-    outline(el, "#0f6e2a", "applyr: filled from your profile");
+    outline(el, "#0f6e2a", "aplyx: filled from your profile");
     filled += 1;
   }
   for (const el of unmappedRequired) {
-    outline(el, "#d97706", "applyr: required field the profile can't answer — fill it yourself");
+    outline(el, "#d97706", "aplyx: required field the profile can't answer — fill it yourself");
     attention += 1;
   }
   return `Filled ${filled} field${filled === 1 ? "" : "s"}.` +
@@ -162,7 +162,7 @@ async function autofill(): Promise<string> {
 
 function init(): void {
   const host = document.createElement("div");
-  host.id = "applyr-panel-host";
+  host.id = "aplyx-panel-host";
   const shadow = host.attachShadow({ mode: "closed" });
   shadow.innerHTML = `
     <style>
@@ -195,7 +195,7 @@ function init(): void {
     </style>
     <div class="panel collapsed" id="panel">
       <div class="head">
-        <span class="brand">applyr</span>
+        <span class="brand">aplyx</span>
         <span class="spacer"></span>
         <button class="toggle" id="toggle" title="expand / collapse">▴</button>
       </div>
@@ -206,7 +206,7 @@ function init(): void {
         <button id="save" class="secondary">Save for review</button>
         <button id="applied" class="secondary">I submitted this — record it</button>
         <div class="status" id="status"></div>
-        <div class="note">applyr never submits a form — you review and click submit yourself.</div>
+        <div class="note">aplyx never submits a form — you review and click submit yourself.</div>
       </div>
     </div>`;
   document.documentElement.appendChild(host);

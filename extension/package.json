@@ -1,8 +1,8 @@
 {
-  "name": "applyr-extension",
+  "name": "aplyx-extension",
   "version": "0.8.2a",
   "private": true,
-  "description": "applyr browser extension — user-driven hybrid mode: autofill from safe_fields, fit badge, helper-backed outcome recording via the local bridge. Never submits a form.",
+  "description": "aplyx browser extension — user-driven hybrid mode: autofill from safe_fields, fit badge, helper-backed outcome recording via the local bridge. Never submits a form.",
   "license": "MIT",
   "type": "module",
   "scripts": {

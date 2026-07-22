@@ -11,9 +11,3 @@
   letter-spacing: -0.02em;
   color: var(--text);
 }
-
-/* The trailing "r" carries the brand pink, matching the wordmark in the
- * logo lockup. */
-.logo-wordmark-r {
-  color: var(--pink);
-}

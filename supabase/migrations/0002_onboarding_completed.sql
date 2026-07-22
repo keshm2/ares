@@ -1,4 +1,4 @@
--- applyr hosted backend — Phase 14A follow-up (2026-07-17).
+-- aplyx hosted backend — Phase 14A follow-up (2026-07-17).
 --
 -- Tracks whether a signed-in user has finished the hosted onboarding
 -- wizard (Welcome -> Import/Fresh -> Profile -> Resume -> Finish), so a

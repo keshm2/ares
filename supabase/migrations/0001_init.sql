@@ -1,4 +1,4 @@
--- applyr hosted backend — Phase 11 schema.
+-- aplyx hosted backend — Phase 11 schema.
 --
 -- Mirrors the local JSON shapes (packages/core/src/state.ts, the onboarding
 -- field schema in packages/core/src/onboarding/fields.ts) so local <-> hosted

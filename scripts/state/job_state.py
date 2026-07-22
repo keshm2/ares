@@ -56,6 +56,9 @@ ATS_URL_PATTERNS = [
     ("lever", ("lever.co",)),
     ("ashby", ("ashbyhq.com",)),
     ("workday", ("myworkdayjobs.com", "myworkdaysite.com")),
+    ("smartrecruiters", ("smartrecruiters.com",)),
+    ("amazon", ("amazon.jobs",)),
+    ("oracle", ("oraclecloud.com",)),
     ("icims", ("icims.com",)),
     ("taleo", ("taleo.net",)),
     ("successfactors", ("successfactors.com", "successfactors.eu")),
@@ -70,6 +73,9 @@ ATS_SOURCE_MAP = {
     "lever": "lever",
     "ashbyhq": "ashby",
     "ashby": "ashby",
+    "smartrecruiters": "smartrecruiters",
+    "amazon": "amazon",
+    "oracle": "oracle",
     "wellfound": "wellfound",
     "linkedin": "linkedin",
     "indeed": "indeed",
@@ -250,6 +256,9 @@ _EXT_ID_PATTERNS = [
     re.compile(r"lever\.co/posting/([0-9a-f-]+)", re.I),
     re.compile(r"[?&]jk=(\w+)", re.I),
     re.compile(r"ashbyhq\.com/[^/]+/([0-9a-f-]+)", re.I),
+    re.compile(r"smartrecruiters\.com/[^/]+/(\d+)", re.I),
+    re.compile(r"amazon\.jobs/[a-z-]+/jobs/(\d+)", re.I),
+    re.compile(r"oraclecloud\.com/hcmUI/CandidateExperience/[a-z-]+/sites/[^/]+/job/(\d+)", re.I),
 ]
 
 

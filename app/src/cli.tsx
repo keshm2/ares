@@ -5,9 +5,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { findProjectRoot } from "@applyr/core/project.js";
-import { py } from "@applyr/core/platform.js";
-import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "@applyr/core/state.js";
+import { findProjectRoot } from "@aplyx/core/project.js";
+import { py } from "@aplyx/core/platform.js";
+import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "@aplyx/core/state.js";
 import { App, type Tab } from "./ui/App.js";
 import { StatusScreen } from "./ui/StatusScreen.js";
 import { OnboardingWizard } from "./ui/onboarding/OnboardingWizard.js";
@@ -15,9 +15,9 @@ import { runWizard } from "./wizard.js";
 import { runAgent } from "./run.js";
 import { withAltScreen } from "./altScreen.js";
 
-const HELP = `applyr — persistent TUI for the applyr job-application agent
+const HELP = `aplyx — persistent TUI for the aplyx job-application agent
 
-Usage: applyr [command]
+Usage: aplyx [command]
 
   (no command)      open the app (status · jobs · review · history) —
                     runs the setup wizard first if onboarding isn't done
@@ -32,20 +32,20 @@ Usage: applyr [command]
 
 Updates are checked on every app launch (the TUI asks before
 installing) and auto-install on scheduled runs
-(APPLYR_AUTO_UPDATE=0 disables).
+(APLYX_AUTO_UPDATE=0 disables).
 
-With no core checkout found, applyr installs it automatically
-(--no-core or APPLYR_SKIP_CORE=1 skips this and prints the manual
+With no core checkout found, aplyx installs it automatically
+(--no-core or APLYX_SKIP_CORE=1 skips this and prints the manual
 install command instead).
 
 Inside the app, press ? for the full key reference.
 
 State writes go through the repo's Python/bash helpers — the TUI never
-edits state JSON directly. Set APPLYR_ROOT to run outside the repo.`;
+edits state JSON directly. Set APLYX_ROOT to run outside the repo.`;
 
-const VERSION_URL = "https://raw.githubusercontent.com/keshm2/applyr/main/VERSION";
-const BOOTSTRAP_URL = "https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.sh";
-const BOOTSTRAP_URL_PS1 = "https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.ps1";
+const VERSION_URL = "https://raw.githubusercontent.com/keshm2/aplyx/main/VERSION";
+const BOOTSTRAP_URL = "https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.sh";
+const BOOTSTRAP_URL_PS1 = "https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.ps1";
 
 /** The one-command core bootstrap for the current OS. */
 function bootstrapOneLiner(): string {
@@ -58,11 +58,11 @@ function bootstrapOneLiner(): string {
  *  main and return the remote version when it differs, so the TUI can
  *  ask before installing (see App's UpdateBox). Strictly fail-open — a
  *  dead network, missing VERSION, or slow GitHub never delays launch
- *  more than the 2.5 s fetch timeout, and APPLYR_AUTO_UPDATE=0 skips it.
+ *  more than the 2.5 s fetch timeout, and APLYX_AUTO_UPDATE=0 skips it.
  *  Reuses the same VERSION_URL fetch the old silent auto-update used;
  *  no second network check is added. */
 async function detectUpdate(root: string): Promise<string | null> {
-  if (process.env.APPLYR_AUTO_UPDATE === "0" || process.env.ARES_AUTO_UPDATE === "0") return null;
+  if (process.env.APLYX_AUTO_UPDATE === "0" || process.env.FLUX_AUTO_UPDATE === "0" || process.env.ARES_AUTO_UPDATE === "0") return null;
   if (!process.stdout.isTTY) return null; // never in piped/CI renders
   try {
     const local = fs.readFileSync(path.join(root, "VERSION"), "utf8").trim();
@@ -86,26 +86,26 @@ function installUpdate(root: string): void {
   const upd = py(["scripts/install/update.py", "--auto"]);
   const r = spawnSync(upd.cmd, upd.args, { cwd: root, stdio: "inherit" });
   if (r.status === 0) {
-    console.log("Update installed — restart applyr to load it.\n");
+    console.log("Update installed — restart aplyx to load it.\n");
   }
 }
 
 /** No core checkout found: install it right here (one-command promise),
- *  unless the user opted out with --no-core / APPLYR_SKIP_CORE=1, in
+ *  unless the user opted out with --no-core / APLYX_SKIP_CORE=1, in
  *  which case just print the manual one-liner. */
 async function bootstrapCore(): Promise<string | null> {
-  const target = process.env.APPLYR_HOME ?? path.join(os.homedir(), "applyr");
+  const target = process.env.APLYX_HOME ?? process.env.FLUX_HOME ?? path.join(os.homedir(), "aplyx");
   const oneLiner = bootstrapOneLiner();
-  if (process.argv.includes("--no-core") || process.env.APPLYR_SKIP_CORE === "1") {
+  if (process.argv.includes("--no-core") || process.env.APLYX_SKIP_CORE === "1" || process.env.FLUX_SKIP_CORE === "1") {
     console.log(`Skipped. Install later with: ${oneLiner}`);
     return null;
   }
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error(
-      "applyr: no applyr core found. Install it with one command:\n\n" +
+      "aplyx: no aplyx core found. Install it with one command:\n\n" +
         `  ${oneLiner}\n\n` +
-        `(installs to ${target}; set APPLYR_HOME to change, or APPLYR_ROOT to point\n` +
-        "at an existing checkout), then re-run applyr.",
+        `(installs to ${target}; set APLYX_HOME to change, or APLYX_ROOT to point\n` +
+        "at an existing checkout), then re-run aplyx.",
     );
     return null;
   }
@@ -115,7 +115,7 @@ async function bootstrapCore(): Promise<string | null> {
           `irm ${BOOTSTRAP_URL_PS1} | iex`], { stdio: "inherit" })
       : spawnSync("bash", ["-c", oneLiner], { stdio: "inherit" });
   if (r.status !== 0 || !fs.existsSync(path.join(target, "AGENTS.md"))) {
-    console.error("applyr: core install did not complete — see the output above.");
+    console.error("aplyx: core install did not complete — see the output above.");
     return null;
   }
   return target;
@@ -171,7 +171,7 @@ async function openApp(root: string, initialTab: Tab, updateVersion?: string): P
 /** First-run (and not-yet-onboarded) auto-launch: a fresh or incomplete
  * `_onboarding` block means `<App>` must not mount yet — render the wizard
  * first and only fall through once its `onDone` fires. Only applies to a
- * plain `applyr` invocation on a real TTY; every other command/context
+ * plain `aplyx` invocation on a real TTY; every other command/context
  * behaves exactly as before. */
 async function maybeRunOnboarding(root: string): Promise<void> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return;
@@ -212,7 +212,7 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  // npm-installed global `applyr` with no core checkout: offer to install
+  // npm-installed global `aplyx` with no core checkout: offer to install
   // the core right here (interactive), or print the one-liner (piped).
   let root: string;
   try {
@@ -223,7 +223,7 @@ async function main(): Promise<number> {
     root = installed;
   }
 
-  // Plain `applyr` with no core config yet (or an unfinished wizard run):
+  // Plain `aplyx` with no core config yet (or an unfinished wizard run):
   // run the wizard first so <App>'s WelcomeScreen/SidePanel never mount
   // ahead of onboarding. Every other command/context is untouched.
   if (command === "") await maybeRunOnboarding(root);

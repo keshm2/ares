@@ -56,7 +56,7 @@ export function EntryScreen() {
         <div className="entry-hero">
           <h1>Your job search, applied to.</h1>
           <p className="entry-subhead">
-            applyr searches job boards, tailors your resume, and applies on your behalf —
+            aplyx searches job boards, tailors your resume, and applies on your behalf —
             with every decision reviewable before it goes out.
           </p>
         </div>

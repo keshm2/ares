@@ -1,7 +1,7 @@
 import "./Logo.css";
 
 /**
- * The applyr mark: a dark rounded badge holding a block lowercase "a"
+ * The aplyx mark: a dark rounded badge holding a block lowercase "a"
  * built from rounded tiles that fade lavender -> purple -> violet -> pink
  * top-to-bottom, wired together with thin double-line circuit traces —
  * applications routed through a machine. Same geometry and fixed palette
@@ -17,7 +17,7 @@ export function LogoMark({ size = 32 }: { size?: number }) {
       height={size}
       viewBox="0 0 100 100"
       role="img"
-      aria-label="applyr"
+      aria-label="aplyx"
       className="logo-mark"
     >
       <rect x="0" y="0" width="100" height="100" rx="22" fill="#191720" />
@@ -61,12 +61,7 @@ export function Logo({ size = 32, withWordmark = true }: { size?: number; withWo
   return (
     <span className="logo-lockup">
       <LogoMark size={size} />
-      {withWordmark && (
-        <span className="logo-wordmark">
-          apply
-          <span className="logo-wordmark-r">r</span>
-        </span>
-      )}
+      {withWordmark && <span className="logo-wordmark">aplyx</span>}
     </span>
   );
 }

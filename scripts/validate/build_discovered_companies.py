@@ -53,7 +53,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 DEFAULT_OUT = "config/discovered_companies.json"
-USER_AGENT = "applyr-job-agent/phase5 (+https://github.com/SimplifyJobs)"
+USER_AGENT = "aplyx-job-agent/phase5 (+https://github.com/SimplifyJobs)"
 
 # Same two feeds fetch_simplify_listings.py already pulls at runtime —
 # kept as a separate copy here (not imported) since this is a one-off

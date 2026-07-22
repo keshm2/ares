@@ -37,7 +37,7 @@ export function WizardShell({
       </header>
 
       <div className="wizard-body">
-        <div className="wizard-step">
+        <div key={stepIndex} className="wizard-step aplyx-fade-rise">
           <h1>{title}</h1>
           {subtitle && <p className="wizard-subtitle">{subtitle}</p>}
           <div className="wizard-step-content">{children}</div>

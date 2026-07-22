@@ -1,7 +1,487 @@
-# applyr — Job Application Agent — Core Rules
+# aplyx — Job Application Agent — Core Rules
 
 ## Phase status (keep in sync with docs/PLAN.md's Phase Status Pointer)
-- **Last completed phase:** Phase 14A polish on top of the hosted
+- **Desktop app search smoothness + motion polish (2026-07-22,
+  operator-reported: the Mac app still "takes a few seconds" and feels
+  laggy/abrupt).** The remaining problem was no longer raw fetch time
+  alone — after the 2026-07-21 search-latency fix, the desktop app still
+  *felt* slow because it held all results until the slowest sources
+  finished and hard-swapped major UI regions with no transitions. Two
+  concrete fixes landed:
+  1. **Perceived search latency reduced with a two-phase desktop search**
+     in `desktop/src/routes/shell/JobsScreen.tsx`. Fast sources
+     (Ashby/Lever/Greenhouse/SmartRecruiters) now render first, then the
+     complete set replaces them once the slower Python-backed sources
+     (Amazon/Oracle/Workday) finish. This required no fork of the core
+     dedup/sort logic — the desktop screen simply calls the existing
+     `searchJobs(root, query, sources)` twice with source subsets. The
+     same patch also fixed stale-result races with a generation counter
+     and cached the resolved local root for the lifetime of the screen so
+     repeated search/fit/save actions don't keep re-awaiting `findRoot()`.
+  2. **Desktop motion/system polish** using the existing motion tokens in
+     `desktop/src/styles/tokens.css`: the first pass added entrance motion,
+     but that still *felt* static because routes hard-swapped. The current
+     fix is a real shell-level transition in `AppShell.tsx` — the previous
+     route animates out, the next route animates in, and the main column
+     holds its shape during lazy chunk loads via `.shell-route-fallback`.
+     On top of that, shell screens still mount with a subtle
+     `aplyx-fade-rise`; detail panes and local-home stats fade in; wizard
+     steps animate on step changes via `WizardShell.tsx`; and the shared
+     `desktop/src/styles/motion.css` centralizes those classes. The goal
+     was smoother, calmer transitions without making the app feel slower.
+  3. **Bridge/runtime tightening**: `packages/core/src/bridge.ts`
+     extracted an `exitWith()` helper so the child still hard-exits after
+     stdout is written (preserving the straggler-kill behavior required
+     by `withDeadline()`), but now has a short fallback timer in case a
+     broken pipe prevents the callback from firing. On the Rust side,
+     `desktop/src-tauri/src/lib.rs` now caches the resolved Node binary
+     path and bundled `bridge.js` path with `OnceLock`, removing repeated
+     filesystem probing on every bridge command.
+  **Verified:** `npm run typecheck`/`build` for both `app/` and
+  `desktop/`, `cargo check` in `desktop/src-tauri/`. **Not verified:**
+  perceived smoothness in a live Tauri window or on real Windows/Linux
+  machines — the desktop app still cannot be GUI-driven from this
+  session, so the motion/search improvements are code- and build-verified
+  rather than hand-felt here.
+
+- **Desktop app general lag/loading-time fix (2026-07-21, operator-
+  reported: "it still lags my desktop application... account for other
+  platforms as well").** Broader than the search-latency fix above (same
+  day, earlier). Two real issues found:
+  1. **Every debug build installed to `/Applications/aplyx.app` this
+     session was an unoptimized Rust `--debug` build (33MB binary), not
+     the `--release` build (11MB) a real install actually ships** —
+     `scripts/install/install_desktop.sh`/`.ps1` and the CI-built
+     prebuilt release pipeline (`.github/workflows/desktop-release.yml`,
+     via `tauri-apps/tauri-action`'s default) were already correctly
+     building release on all three platforms; this was purely an
+     artifact of using `--debug` for fast local iteration during this
+     session's testing, not a real product defect. Fixed going forward
+     by rebuilding and reinstalling in `--release` mode — this alone is
+     a well-established, large, cross-platform win (optimized code
+     paths, no debug-assertion overhead), not something specific to
+     macOS.
+  2. **The entire app — every route, both onboarding wizards, all six
+     `AppShell` screens — was one eagerly-bundled ~500KB JS chunk**,
+     parsed in full before the window could render anything, even
+     though a fresh launch only ever needs `EntryScreen` first. This
+     hits every platform, and hits harder on weaker WebView engines than
+     macOS's WKWebView (Windows WebView2, and especially Linux's
+     WebKitGTK). Fixed with route-level code-splitting: `App.tsx`'s
+     `AuthScreen`/`LocalWizard`/`HostedWizard`/`AppShell` and
+     `AppShell.tsx`'s six screens (`HomeScreen`/`JobsScreen`/
+     `ReviewScreen`/`HistoryScreen`/`ResumesScreen`/`SettingsScreen`) now
+     load via `React.lazy()` + `Suspense`, each becoming its own small
+     chunk (1.7-10KB) fetched only when actually navigated to, instead
+     of all being parsed upfront. Verified via the real Vite build
+     output: the previously-monolithic bundle split into a ~447KB
+     always-needed chunk (React/react-router/Supabase SDK/AuthContext —
+     needed on every launch regardless of route, since session-restore
+     has to run even for local-only users) plus 11 small per-route
+     chunks.
+  **Considered but not done this pass:** lazy-loading `@supabase/
+  supabase-js` itself out of the always-needed chunk (it's a real
+  contributor to that remaining ~447KB, confirmed via its ~724KB
+  unminified source size) — deferred because `AuthContext`'s session-
+  restore-on-launch logic is exactly the kind of already-debugged-twice
+  fragile subsystem (see the two bugs found immediately after Phase 14B
+  shipped) that shouldn't be touched without the ability to actually
+  click through the auth flow in a live window, which this session still
+  can't do. Flagging it as the next lever if further startup-weight
+  reduction is wanted.
+  **Verified:** clean typecheck/build across TUI/core/desktop(TS+Vite+
+  Rust `--release`)/extension; the real Vite chunk breakdown (above);
+  the search-latency fix from earlier the same day re-measured
+  unaffected (2.2-2.6s across 3 runs) after these changes. **Not
+  verified:** actual perceived launch/navigation smoothness in a live
+  window (no GUI-driving capability in this session) or on a real
+  Windows/Linux machine (none available here) — the fixes applied
+  (release-mode builds, route-based code-splitting) are platform-
+  agnostic by construction, but a real pass on both remaining platforms
+  is still worth doing before calling this closed.
+
+- **Search latency fix (2026-07-21, operator-reported: "sometimes very
+  very slow").** Manual search (`packages/core/src/jobs.ts`'s
+  `searchJobs()`, used by both the TUI and desktop) ran all sources
+  concurrently already, but three real bugs made the overall time
+  unbounded and, for the newest sources, routinely slow:
+  1. **SmartRecruiters ignored the search query at the API level** and
+     paginated every configured company up to its 500-posting cap
+     regardless of the query — measured live at **2.9s** just for this
+     one source (Dominos alone lists 24k+ postings). Fixed: the API
+     supports server-side `q=` keyword filtering (confirmed live) — now
+     passed through from both the manual-search path and the automated
+     agent's `fetch_smartrecruiters_listings.py` (`--search`). Same fix
+     brought this down to well under 1s in testing.
+  2. **Oracle's list request used an unnecessarily small page size**
+     (25, copied from the careers.oracle.com UI's own choice, not an
+     API-enforced cap — confirmed live that the API accepts at least
+     100 in one request) — forcing 2+ sequential ~2s Oracle requests for
+     a typical search. Fixed: raised to 100 in
+     `fetch_oracle_listings.py`, cutting typical searches to one Oracle
+     request. (A tempting-looking further optimization — dropping the
+     `expand=requisitionList` param since nothing downstream reads the
+     nested `workLocation` data it also pulls in — was tried and
+     reverted: without `expand=requisitionList` at all the API returns
+     zero actual postings, and `expand=requisitionList` alone costs the
+     same ~1.9-2s as the fuller expand. Oracle's own list endpoint is
+     just inherently ~2s server-side; this is a real external floor, not
+     a client-side inefficiency.)
+  3. **No hard ceiling on any single source.** Every source's own
+     retry/timeout budget (15s per Python-subprocess source, up to 30s
+     for a `fetch()`-based source with its one-retry-on-failure logic)
+     could, in the worst case, block the *entire* search — Promise.all
+     waits for every promise, so one hung/slow board held up results
+     from all the fast ones too. Fixed with a real hard ceiling: `jobs.ts`
+     gained `withDeadline()`, racing every one of the 7 source fetches
+     against a **2200ms** deadline — a source that doesn't answer in time
+     degrades to a "timed out" warning (shown in the UI's per-source
+     badge) instead of blocking the rest of the search. Tuned from live
+     measurement: hitting the deadline adds ~150-450ms of process/IPC
+     overhead on top, so 2200ms keeps the worst-case total search
+     reliably under the operator's 3-second target (measured 2.0-2.6s
+     across 8 consecutive runs after the fix, including ones where a
+     source did time out) while still comfortably covering Oracle's
+     normal ~1.9-2.3s response most of the time. Also tightened the
+     per-attempt timeouts feeding into that ceiling (raw-fetch sources:
+     15s → 6s; Python-subprocess sources' `--timeout`: 15 → 8) so a
+     genuinely hung request fails faster even before the outer race
+     kicks in.
+     **Load-bearing detail:** racing a promise doesn't cancel the
+     underlying `fetch()`/spawned Python process — it just stops
+     *waiting* on it. `packages/core/src/bridge.ts`'s `main()` previously
+     relied on the Node process exiting naturally once every promise
+     settled, which would have kept the process (and the Rust caller's
+     blocking `Command::output()` wait on it) alive for as long as the
+     abandoned straggler took, silently defeating the whole deadline.
+     Fixed by calling `process.exit()` immediately after the stdout
+     write's callback confirms it flushed, for every bridge command, not
+     just search.
+  **Verified:** all of the above with live timing measurements (not just
+  typecheck) — 8 consecutive real searches against the operator's live
+  config, config/board mix unchanged, before/after; clean
+  typecheck/build across TUI, `@aplyx/core`, desktop (TS+Vite+Rust), and
+  the extension; `checkJobFit`/`saveJobForReview` re-verified unaffected
+  (they're single-target, not raced — only the multi-source `searchJobs`
+  needed this).
+
+- **Last completed phase (2026-07-21, operator-directed):** Phase 16B —
+  ATS/source expansion — **IN PROGRESS, four sources added
+  (SmartRecruiters, then Amazon + Oracle after the operator expanded the
+  phase's scope to a company-specific-boards track)**, plus a search
+  sort/filter feature requested alongside it. Full detail in
+  docs/PLAN.md §3.18A; summary below.
+
+  **Company-specific careers boards (2026-07-21, later in the same
+  session).** The operator edited docs/PLAN.md directly to add a new
+  track to §3.18A: alongside the ATS-vendor matrix, track high-priority
+  employers with custom career pages that don't map to a shared ATS —
+  named examples **Amazon, Google, Oracle**. Researched all three,
+  shipped the two that had a genuine public JSON API:
+  - **Amazon** — `amazon.jobs/en/search.json?base_query=...&result_limit=...&offset=...`
+    is public, unauthenticated, and (unlike every other source in this
+    phase) returns **full JD text directly in the list response** —
+    confirmed live. Amazon is a single company, not a multi-tenant
+    product, so it needed no per-company slug config: it's a plain
+    board-name toggle (`"amazon"` in `targets.json` "boards"), same as
+    linkedin/indeed. Shipped: `scripts/jobs/fetch_amazon_listings.py`
+    (search + paginate, no `--jd-url` mode needed since JD is already
+    present); `job_state.py` ATS inference extended for `amazon.jobs`
+    URLs; `job-scraper.md` step 3b; manual search
+    (`jobs.ts`/`jobsSort.ts`) gained `fetchAmazon` as a 6th toggle in
+    both TUI and desktop. Verified live end to end: real postings with
+    full JD (German/Irish/Chinese SDE internships), correct
+    canonicalize (`ats_system: "amazon"`), correct fit-gate verdicts
+    (a Bengaluru posting scored on real content).
+  - **Oracle** — found via Playwright network inspection of
+    careers.oracle.com (its search box has no visible public API from a
+    plain curl; the real request only appears with a browser
+    User-Agent hitting the underlying XHR, not the static HTML). The
+    real endpoint,
+    `<tenant>.fa.<region>.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitions`,
+    is Oracle's own **Fusion HCM REST API for Oracle Recruiting Cloud
+    (ORC)** — a distinct, more modern product from the legacy Taleo ATS
+    already in `job_state.py`'s URL patterns, and (importantly) used by
+    many employers beyond Oracle itself, not just a one-off company
+    adapter. Like Workday, it needed a tenant-config model
+    (`"oracle_tenants": ["<host>/<siteNumber>"]`, e.g.
+    `"eeho.fa.us2.oraclecloud.com/CX_45001"` for Oracle's own careers
+    site) and lazy JD enrichment (list view's
+    `ExternalQualificationsStr`/`ExternalResponsibilitiesStr` are null;
+    only the per-requisition detail endpoint has them, confirmed live).
+    The public job URL uses ORC's generic `hcmUI` path (works for any
+    tenant, confirmed via a live 200, not just Oracle's own branded
+    careers.oracle.com domain). Shipped:
+    `scripts/jobs/fetch_oracle_listings.py` (list + `--jd-url` modes,
+    same shape as `fetch_workday_listings.py`); `oracle_tenants` wired
+    into both validators (missing/placeholder warn-and-skip, same as
+    `workday_tenants`) with Oracle's own tenant seeded into the live
+    config since it's already verified; `job_state.py` ATS inference
+    extended for `oraclecloud.com` URLs; `job-scraper.md` step 3c;
+    manual search gained `fetchOracle` as a 7th toggle in both
+    surfaces. Verified live end to end: real requisitions, correct
+    canonicalize (`ats_system: "oracle"`), a synthetic-JD fit-gate
+    pass, and a real "Lead Principal Software Engineer" posting
+    correctly `skipped_unfit` for requiring 10+ years.
+  - **Google — researched, explicitly NOT implemented.** No public REST
+    API found despite real effort (a plain curl to careers.google.com
+    returns an empty SPA shell; only loading it in a real browser via
+    Playwright and inspecting network requests revealed any data path
+    at all). What's actually there is Google's internal "boq" closure
+    hydration payload (`AF_initDataCallback` embedding a `ds:1` blob
+    directly in server-rendered HTML, but only when the request carries
+    a real browser User-Agent) — a deeply nested, **positional** (not
+    keyed) array format with no field names, undocumented, and free to
+    change shape at any time without notice. Parsing it reliably would
+    need either a hand-written recursive-descent parser for this
+    specific undocumented format (fragile, breaks silently on a schema
+    change) or a real Playwright browser per fetch (expensive, and a
+    different risk/cost class than every other source in this phase).
+    Given AGENTS.md's own standing bias toward deterministic scripts
+    over browser scraping and away from fragile-by-construction
+    integrations, this was left unimplemented rather than shipped
+    against an undocumented format — flag this for the operator if
+    Google coverage becomes a priority; it would need either accepting
+    the parsing fragility or a Playwright-per-search-query design (like
+    LinkedIn/Indeed/Wellfound/Handshake already use).
+
+  **Search sort/filter (requested alongside this phase).** Confirmed the
+  manual search's default ordering was already correct end to end —
+  `sortByPreferredThenPosted` in `packages/core/src/jobsSort.ts` (split
+  out of `jobs.ts`, same fs-free-split reasoning as `stateDerive.ts`, so
+  the desktop webview can call the real sort/filter functions, not just
+  import their types) sorts preferred-location matches first but never
+  drops a non-preferred posting, and the automated agent's own Phase 1
+  step 12 ("process preferred_locations matches first; continue into
+  fallback_scope matches after — do not stop early") already encoded the
+  same rule. Added on top: `desktop/src/routes/shell/JobsScreen.tsx` gained
+  a **Sort by** dropdown (Preferred location [default] / Recently posted /
+  Company A–Z / Title A–Z) and a **Preferred locations only** filter
+  toggle, both applied client-side against the already-fetched results
+  (no re-fetch) via the new `sortByCompanyAsc`/`sortByTitleAsc`/
+  `isPreferredLocation` exports. Verified with synthetic data: the
+  preferred-first sort keeps every job (count unchanged), preferred
+  matches float to the top, and the "preferred only" filter correctly
+  narrows to just those.
+
+  **Phase 16B — SmartRecruiters (first of the §3.18A source list).**
+  Chosen first because its public Postings API
+  (`api.smartrecruiters.com/v1/companies/{slug}/postings`) was verified
+  live and behaves like Greenhouse's: real companies (Equinox — 676
+  postings, Dominos — 24,454, Docusign, Wayfair, Visa) return real JSON,
+  no auth. One difference from Greenhouse: the list endpoint carries NO
+  JD text (confirmed live) — only the per-posting detail endpoint does —
+  so it follows the Workday/SimplifyJobs JD-enrichment pattern instead
+  (fetch JD lazily, after role filtering, before the fit gate). Shipped
+  end to end: `scripts/jobs/fetch_smartrecruiters_listings.py` (list +
+  `--jd-url` modes, same shape as `fetch_workday_listings.py`);
+  `config/smartrecruiters_vetted_slugs.json` (5 hand-verified companies)
+  wired into `seed_vetted_slugs.py`'s `SOURCES` map (which — found along
+  the way — already covered Greenhouse but neither Greenhouse nor the new
+  SmartRecruiters key was in `validate_local_config.{sh,py}`'s shape/
+  placeholder checks; added both while extending the same pattern);
+  `job_state.py`'s `ATS_URL_PATTERNS`/`ATS_SOURCE_MAP`/external-ID regexes
+  extended for `smartrecruiters.com` URLs; `job-scraper.md` step 3a added
+  (mirroring the Workday step's shape) plus the harness-capability-check
+  board list and the `applied_jobs.json` source enum, both regenerated via
+  `generate_agent_definitions.py`; manual search (`jobs.ts`/`jobsSort.ts`)
+  gained a `fetchSmartRecruiters` (paginated, capped at 500/company so
+  Dominos-sized boards can't starve the other sources) and a
+  `checkJobFit` branch for the lazy JD fetch; both the TUI's
+  `SearchScreen.tsx` and the desktop's `JobsScreen.tsx` gained
+  SmartRecruiters as a 5th source toggle. **Verified end to end against
+  the live public API** (not just typecheck): `fetch_smartrecruiters_listings.py`
+  list + `--jd-url` modes both tested live; `job_state.py canonicalize`
+  correctly resolves `ats_system: "smartrecruiters"` and the right
+  `job_id`; `evaluate_job_fit.py` ran on a real fetched JD; the bridge's
+  `searchJobs`/`checkJobFit` commands returned real current postings
+  (a real "Sr. Data Engineer" at Equinox, correctly fit-gated to
+  `skipped_unfit` for requiring 6+ years); both validators and the
+  agent-definition drift check pass clean.
+
+  **The other six §3.18A sources were researched, not implemented, this
+  pass — explicitly deferred with reasons, not silently skipped:**
+  - **Workable** — the public widget endpoint
+    (`apply.workable.com/api/v1/widget/accounts/{slug}`) responds and
+    parses, but returned an **empty jobs array for every real, definitely-
+    hiring company tested** (Revolut, Monzo, Deliveroo, Typeform, GitHub,
+    GitLab, Automattic) — the endpoint may be deprecated/restricted for
+    job data specifically. Do not implement against this endpoint without
+    first finding a company where it actually returns populated jobs, or
+    finding Workable's current documented API.
+  - **BambooHR** — careers pages live at `{tenant}.bamboohr.com/careers/
+    list`, but a guessed tenant ("gusto") 302-redirected to BambooHR's own
+    marketing site, meaning tenant discovery needs the same hand-verified-
+    subdomain approach Ashby/Lever/Greenhouse/SmartRecruiters used — not
+    yet done.
+  - **Jobvite** — a guessed tenant URL returned a 302; the real public
+    data shape (JSON API vs. server-rendered HTML) is still unresearched.
+  - **Rippling ATS** — a guessed tenant URL 404'd; needs a real known
+    Rippling-ATS customer to test against.
+  - **iCIMS, Taleo/Oracle** — per §3.18A's own framing, these are
+    enterprise/tenant-specific systems with no consistent public API by
+    design (heavily customized per tenant) — the higher-effort tier,
+    correctly left for last.
+  Per AGENTS.md/PLAN.md's own standing principle ("maximize reliable,
+  early, maintainable sources," not raw count) and the operator's
+  standing preference for verified-over-fast work, none of these six were
+  implemented against unverified assumptions this pass.
+
+- **Previously last completed phase:** Phase 14B — the desktop app's real Jobs/
+  Review/History/Resumes screens, at parity with the TUI — 2026-07-21,
+  operator-directed (sequenced ahead of phase 12, which stays deferred,
+  and ahead of phase 16B and the rebrand, per this session's explicit
+  ordering). Preceded by a project-wide **placeholder rename,
+  `aplyx` → `aplyx`**, done first in the same session so 14B and the
+  upcoming phase 16B/rebrand work wouldn't be built under the
+  known-temporary old name — every identifier surface (npm package
+  names, CLI bin, Tauri bundle id + deep-link scheme, launchd label,
+  `APLYX_*` env prefix, the desktop logo wordmark, the TUI's ANSI-Shadow
+  banner art) was updated; the real GitHub repo path (`keshm2/aplyx`)
+  was deliberately left alone since the actual repo rename rides with
+  the real rebrand later, not this placeholder pass.
+
+  **Phase 14B itself:** added real `JobsScreen`/`ReviewScreen`/
+  `HistoryScreen`/`ResumesScreen` to `desktop/src/routes/shell/`,
+  replacing the "coming in the next update" placeholders — through the
+  exact same `LocalAdapter`-backed bridge seam the Home/Settings
+  screens already used, no new write path. Shared-core groundwork that
+  made this possible: `state.ts` split into a new fs-free
+  `stateDerive.ts` (types + `isResolved`/`hasAppliedOrFailed`/
+  `isDismissed`/`registryByJobId`/`todayIso`) so the desktop webview can
+  use those pure derivations directly against a `AplyxState` it already
+  loaded, without pulling in `state.ts`'s `node:fs` reads into the
+  browser bundle (the exact hazard that made `hostedFields.ts` split
+  from `profile.ts` back in phase 11/14A — caught here the same way, by
+  a Vite externalization error, and fixed the same way); the TUI's
+  `app/src/jobs.ts` (board fetchers + canonicalize/fit/save) and
+  `app/src/resumes.ts` (resume-folder listing) moved to
+  `packages/core/src/` verbatim with re-export shims left in `app/src/`
+  for backward compatibility, since both are already framework-agnostic
+  Node code the new bridge commands could reuse directly; a new
+  `packages/core/src/reviewActions.ts` extracted the TUI
+  `ReviewScreen`'s inline mark-applied/dismiss logic into shared
+  functions the desktop bridge calls too, and the TUI screen was
+  refactored to call them instead of duplicating the logic (net
+  reduction, not just a move). New bridge commands (Rust
+  `#[tauri::command]` → `packages/core/src/bridge.ts` dispatcher):
+  `searchJobs`, `checkJobFit`, `saveJobForReview`,
+  `markQueueEntryApplied`, `dismissQueueEntry`, `listResumeDetails`,
+  `openResumesFolder` — every one shells out to the identical helpers
+  the TUI and the automated agent already use; no new state-write path,
+  no forked business logic.
+
+  **Verified:** clean typecheck/build across the TUI, `@aplyx/core`,
+  the desktop TypeScript + Vite bundle (no `node:fs`/`child_process`
+  externalization warnings — the regression check for the stateDerive
+  split), the Rust side (`cargo check`), and the browser extension; the
+  TUI smoke test still passes end to end. Every new bridge command was
+  exercised for real against an isolated scratch copy of `data/`+
+  `config/` (never the operator's live files) with Google Sheets sync
+  disabled in that scratch config: `searchJobs` hit live Ashby/Lever/
+  Greenhouse and returned real current postings; `checkJobFit` ran the
+  real deterministic fit gate; `saveJobForReview` saved once and
+  correctly deduped on retry; `markQueueEntryApplied` correctly refused
+  a real malformed legacy queue entry missing required fields (proving
+  the no-fabrication guard survives real-world data irregularities) and
+  correctly recorded a well-formed synthetic one end to end (applied_jobs
+  entry + registry status transition + event log, byte-verified);
+  `dismissQueueEntry` recorded `skipped_unfit` and correctly refused a
+  second dismiss of the same entry; `listResumeDetails` matched the
+  real `data/resumes/` contents. **Not verified**: the actual rendered
+  React UI in a live Tauri window (this session had no way to drive a
+  native GUI window) — the business-logic layer every screen calls is
+  fully verified above, but a real click-through pass on
+  `/Applications/aplyx.app` (or `npm run tauri dev`) is still worth
+  doing before calling 14B fully done.
+
+  **Two real bugs found immediately by the operator actually running the
+  installed app (2026-07-21, same day) — exactly the gap the "not
+  verified" note above flagged, both fixed:**
+  1. **"core bridge not found at /Users/runner/work/aplyx/aplyx/..."** —
+     `desktop/src-tauri/src/lib.rs`'s `bridge_script_path()` resolved the
+     bridge script via `env!("CARGO_MANIFEST_DIR")`, a path baked in at
+     *compile* time. `.github/workflows/desktop-release.yml` compiles
+     prebuilt release bundles on a GitHub Actions runner, so that path
+     only ever existed on the CI machine — every downloaded/installed
+     build was broken this way, not just this one. Fixed by declaring
+     `packages/core/dist` as a real Tauri bundle resource
+     (`tauri.conf.json` → `bundle.resources: {"../../packages/core/dist":
+     "core"}`) and resolving it at *runtime* via
+     `app.path().resolve("core/bridge.js", BaseDirectory::Resource)`,
+     falling back to the old dev-relative path only for a `tauri dev`
+     checkout. Verified: a real build's `Contents/Resources/core/
+     bridge.js` exists; the compiled binary, run with
+     `packages/core/dist` temporarily renamed away (so the dev fallback
+     *cannot* work), stays alive rather than crashing.
+  2. **"Couldn't find a local aplyx installation... Run from inside the
+     repo or set APLYX_ROOT"** — `findProjectRoot()`
+     (`packages/core/src/project.ts`) only ever succeeds via a shell env
+     var, the process's working directory, or upward from the compiled
+     bridge's own location — none of which exist for a Finder/Dock-
+     launched app (no env vars, no meaningful cwd, and the bridge now
+     lives inside the app bundle thanks to fix #1, nowhere near the
+     user's actual checkout). `desktop/src/routes/onboarding/local/
+     LocalWizard.tsx`'s root-error state was a dead end: a message and a
+     "← Back" button, no recovery. Fixed with a real recovery path: new
+     `isValidProjectRoot()` export + `validateRoot` bridge command/Rust
+     command; `desktop/src/lib/bridge.ts` gained `setLocalRoot()`/
+     `forgetLocalRoot()` backed by a `localStorage` key
+     (`aplyx.localRoot`) that `findRoot()` now checks before
+     auto-detecting; `LocalWizard`'s error state and `SettingsScreen`'s
+     "Local install" section both gained a "Browse for my aplyx
+     folder…" button (`@tauri-apps/plugin-dialog`'s directory picker,
+     already a granted capability) so a real folder pick sticks across
+     launches instead of needing auto-detection to work at all. Verified:
+     `validateRoot` accepts the real checkout, rejects `/tmp` with a
+     clear message, and normalizes a non-canonical path to the resolved
+     root; clean typecheck/build across TUI/core/desktop(TS+Vite)/Rust
+     afterward. A rebuilt bundle was reinstalled to `/Applications/
+     aplyx.app` and relaunched for the operator to click through — the
+     one thing this session still can't verify itself is the actual
+     click path in the live window.
+  3. **The manual browse step above is a real fix for a returning user
+     on this dev machine, but the operator correctly flagged it as
+     unacceptable friction for a brand-new install** — anyone who ran
+     `install.sh` should never see the root-detection screen at all.
+     Root-caused: nothing the installer already knows (the checkout
+     path it just cloned to / is running from) was ever communicated to
+     the desktop app, which has no cwd/env-var signal of its own once
+     installed. Fixed with a small durable pin file,
+     **`~/.aplyx/root`** (one absolute path, nothing else) —
+     `packages/core/src/project.ts` gained `pinnedRootFile()`/
+     `readPinnedRoot()`/`writePinnedRoot()`, and `findProjectRoot()` now
+     checks it (after `$APLYX_ROOT`/`$ARES_ROOT`, before the cwd/
+     `import.meta.url` fallbacks that mean nothing for a GUI app). All
+     four installers — `install.sh`, `install_desktop.sh`, and their
+     `.ps1` equivalents — now write this file unconditionally, first,
+     right after resolving their own checkout path (both desktop-install
+     scripts write it too, not just `install.sh`, since they're each
+     documented as independently re-runnable standalone). The manual
+     "browse for my aplyx folder" picker from fix #2 also now writes this
+     same pin file on a successful pick (`validateRoot`'s bridge-side
+     handler), so a one-time manual fix self-heals future launches and
+     reinstalls too, not just this browser's `localStorage`. **Verified
+     end to end, simulating a genuinely brand-new install**: cleared the
+     app's WebKit storage (`~/Library/WebKit/com.aplyx.desktop`,
+     `~/Library/Caches/com.aplyx.desktop`) and deleted `~/.aplyx/root` —
+     confirmed `findRoot` has nothing to resolve from at that point (the
+     original bug, reproduced on demand); wrote `~/.aplyx/root` by hand
+     (exactly what the installers now do) and relaunched with the
+     WebKit/localStorage cache still clean — `node bridge.js findRoot`
+     with no `APLYX_ROOT` env and an unrelated cwd now resolves correctly
+     via the pin alone. `bash -n` clean on both edited `.sh` files; the
+     two `.ps1` edits were reviewed by hand (no PowerShell interpreter on
+     this machine to run them against).
+
+  **What's still not done** (unchanged from 14A's note, still Phase
+  14B-adjacent scope not attempted this pass): hosted↔local
+  pipeline-state sync (`SupabaseAdapter.loadState()` still returns
+  `undefined` — the new screens only render against `LocalAdapter`
+  data); a one-shot full-state local→hosted migration beyond the
+  existing per-field profile import.
+
+  Before this: Phase 14A polish on top of the hosted
   backend + desktop app shell below — 2026-07-17, operator-directed.
   Released as **0.9.7a**: all three installers (`install.sh`/`.ps1`)
   now offer the desktop app as an opt-in step alongside the TUI, via
@@ -50,9 +530,9 @@
   `app/src/{state,helpers,settings,platform,project,harness,
   profileLinks,companyTargets,data/*}.ts` and the onboarding field
   schema (`ui/onboarding/pages.ts` → `packages/core/src/onboarding/
-  fields.ts`) moved into a new npm-workspace package `@applyr/core`
+  fields.ts`) moved into a new npm-workspace package `@aplyx/core`
   (root `package.json` gained `workspaces`); `app/` imports them
-  unchanged via `@applyr/core/*` — verified byte-behavior-identical by
+  unchanged via `@aplyx/core/*` — verified byte-behavior-identical by
   `npm run smoke --workspace=app` passing unchanged. New `Adapter`
   interface (`packages/core/src/adapter.ts`) with `LocalAdapter`
   (wraps the existing Python-helper calls) and `SupabaseAdapter` (pure
@@ -148,13 +628,13 @@
   pid file; hint bar shows live-run keys instead of the dead e/p/s set.
   Verified by replaying a real 794-line session log);
   TUI manual/automatic modes (2026-07-12);
-  project rename Ares → applyr + TUI accessibility pass (2026-07-12 —
-  `applyr` is the command/package name, env vars are `APPLYR_*` with
+  project rename Ares → aplyx + TUI accessibility pass (2026-07-12 —
+  `aplyx` is the command/package name, env vars are `APLYX_*` with
   legacy `ARES_*` fallbacks); TUI responsive layout + welcome page
   (2026-07-12 — banner/lists resize with the terminal, Jobs tab
   opens browsing instead of typing); TUI run controls polish
   (2026-07-12 — cap tier colors + MAX warning, optional
-  APPLYR_EXTRA_PROMPT per-run instruction); opencode `--print` CLI
+  APLYX_EXTRA_PROMPT per-run instruction); opencode `--print` CLI
   fix + TUI resize invariant + large-terminal fill (2026-07-12);
   fetch-efficiency rules (2026-07-12 — see "Fetch efficiency" under
   Critical rules); installer coding-agent choice (2026-07-12 —
@@ -169,44 +649,51 @@
   History/Status, AUTO cockpit with cap gauge + heartbeat counters +
   full-height log tail, randomized per-launch sidebar greeting,
   backspace fix: DEL 0x7f now erases backward in all text editors);
-  release 0.7.8a (2026-07-12 — npm package is **@keshm/applyr**
-  0.7.8-alpha.0, the unscoped `applyr` npm name is owned by an
+  release 0.7.8a (2026-07-12 — npm package is **@keshm/aplyx**
+  0.7.8-alpha.0, the unscoped `aplyx` npm name is owned by an
   unrelated package; README banner + agent artwork in docs/assets/;
   npm publish pending `npm login`); one-command install +
   auto-update (2026-07-13 — root `VERSION` + `scripts/update.sh`,
-  auto-hooked into runs and TUI launches with APPLYR_AUTO_UPDATE=0
-  opt-out, installer writes the `applyr` wrapper to ~/.local/bin;
+  auto-hooked into runs and TUI launches with APLYX_AUTO_UPDATE=0
+  opt-out, installer writes the `aplyx` wrapper to ~/.local/bin;
   releases must bump root `VERSION` to trigger client updates);
   release 0.7.9a (2026-07-13 — dedicated uninstaller
-  scripts/uninstall.sh + `applyr uninstall`; README trimmed to
+  scripts/uninstall.sh + `aplyx uninstall`; README trimmed to
   install/updates/uninstall/usage/safety, phase content moved to
   docs; first auto-update rollout; Discord made optional — install
   opt-in with one-channel vs separate-channels choice, disabled
   config = local-only outcomes, validator/reporter skip cleanly);
   TUI Settings tab (2026-07-13 — Config tab 5: personal info incl.
-  preferred_name greeting, Discord toggle/routes, persisted APPLYR_*
+  preferred_name greeting, Discord toggle/routes, persisted APLYX_*
   overrides in gitignored config/env.json exported by the runner
-  with an APPLYR_/ARES_ prefix filter; APPLYR_LOG_DIR honored by
+  with an APLYX_/ARES_ prefix filter; APLYX_LOG_DIR honored by
   runner/heartbeat/TUI).
-- **Implement next:** phase 12 — multi-agent cost tiering
-  (docs/PLAN.md §3.13) remains the next full phase unless the operator
-  redirects again. Phase 14B (the real Jobs/Review/History/Resumes
-  desktop screens, at parity with the TUI) is the natural follow-up to
-  the Phase 11 + 14A work above and needs its own go-ahead before
-  starting, per the one-phase-at-a-time rule. Phase 13 remains partial
-  (npm publish pending `npm login`; provider-setup and hosted storage
-  deferred); phase 15's full-run parity check remains an operator
-  action (the 2026-07-13 conformance legs are the first live signal).
+- **Implement next:** **phase 16B is IN PROGRESS** (SmartRecruiters
+  shipped; Workable/BambooHR/Jobvite/Rippling/iCIMS/Taleo researched and
+  explicitly deferred — see the phase-16B entry above for why each) —
+  continuing it (the next source, most likely BambooHR or Jobvite once
+  a real tenant is found to verify against) is the natural next step,
+  still under the operator-directed sequencing from 2026-07-21 that
+  supersedes the phase-12-next default below: 16B, then the real rebrand
+  (permanent name/license/category, replacing the `aplyx` placeholder —
+  docs/product-positioning-and-rebrand-plan.md), with **phase 12 (cost
+  tiering) explicitly deferred** past both. Each still needs its own
+  explicit go-ahead before starting, per the one-phase-at-a-time rule.
+  Phase 13 remains partial (npm publish pending `npm login`;
+  provider-setup and hosted storage deferred); phase 15's full-run
+  parity check remains an operator action (the 2026-07-13 conformance
+  legs are the first live
+  signal).
 - Whoever closes a phase or work item MUST update this block and the
   matching pointer at the top of docs/PLAN.md before stopping.
 
 ## Single-user deployment (phase 9)
 
-**applyr runs as one user on one machine.** State files in `data/`,
+**aplyx runs as one user on one machine.** State files in `data/`,
 live configs in `config/`, logs in `logs/`, and the resume folder
 (`data/resumes/`) are all implicitly per-user — there is
 no profile abstraction and none should be introduced without an
-explicitly approved phase. Two people who want to run applyr on the
+explicitly approved phase. Two people who want to run aplyx on the
 same machine today do so via **two separate clones** with two
 separate configs (see docs/SETUP.md "Two users on one machine");
 profile-based multi-user is a deliberately deferred future migration.
@@ -220,7 +707,7 @@ profile-based multi-user is a deliberately deferred future migration.
 | Per-user: personal documents | `data/resumes/` (markdown resumes + cover letter, each with a matching PDF) | Gitignored PII |
 | Per-user: logs + heartbeat | `logs/` (`run_job_agent.log`, `session_*.log`, `heartbeat.json`, `launchd.{out,err}.log`, `tmp/`) | Retention pruned by the runner |
 | Per-user: browser artifacts | `.playwright-mcp/` | Playwright profile/session state |
-| Per-user: schedule | `~/Library/LaunchAgents/com.applyr.job-agent.plist` | Lives outside the repo; label is fixed (see seams) |
+| Per-user: schedule | `~/Library/LaunchAgents/com.aplyx.job-agent.plist` | Lives outside the repo; label is fixed (see seams) |
 | Project-owned | `scripts/`, `agents/` (+ generated `.claude/agents/`, `.opencode/agents/`), `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/SETUP.md`, `docs/RELEASE.md`, `docs/CHANGELOG.md`, `config/*.example.json`, `config/{ashby,lever}_vetted_slugs.json`, `requirements.txt`, `opencode.jsonc`, `.mcp.json`, `app/`, `extension/`, `.github/`, `.gitignore` | Committed; identical across users |
 | Project-owned, local-only | `docs/PLAN.md` | Gitignored by design (plan/handoff doc), but not per-user data |
 
@@ -245,10 +732,10 @@ today:
   `service_account_key_path` field inside
   `config/google_sheets_config.json`.
 - **Resume folder** — `data/resumes/`.
-- **launchd label** — `com.applyr.job-agent` is fixed in
+- **launchd label** — `com.aplyx.job-agent` is fixed in
   `scheduler.sh`, so two clones cannot both install the 30-minute
   schedule today; a second install would need a per-clone label.
-- **TUI root** — already parameterized: `$APPLYR_ROOT` (legacy
+- **TUI root** — already parameterized: `$APLYX_ROOT` (legacy
   `$ARES_ROOT`) selects the project root, the ready-made pattern for
   the other seams.
 
@@ -265,14 +752,14 @@ today:
   re-tailor the same job forever. skipped_unfit is local-only and must
   never be written to applied_jobs.json.
 - Max 25 applications per session (rate limit protection). The TUI's
-  automatic mode may lower this per run via APPLYR_SESSION_CAP (1–25;
+  automatic mode may lower this per run via APLYX_SESSION_CAP (1–25;
   the legacy ARES_SESSION_CAP name is honored as a fallback);
   the cap can never exceed 25. scripts/runtime/run_job_agent.sh reads
-  APPLYR_SESSION_CAP (default 25), clamps values above 25 down to 25,
+  APLYX_SESSION_CAP (default 25), clamps values above 25 down to 25,
   and falls back to 25 on invalid or below-1 input, then injects the
   effective cap into the run prompt so the orchestrator is explicitly
   told the per-session limit. The runner may also append an optional
-  operator instruction (APPLYR_EXTRA_PROMPT, truncated to 500 chars,
+  operator instruction (APLYX_EXTRA_PROMPT, truncated to 500 chars,
   set from the TUI's automatic-mode prompt field) to the run prompt.
   That instruction can narrow or focus a run but NEVER overrides this
   file, the session cap, or the state-write discipline — if it
@@ -381,7 +868,7 @@ today:
 
 ## Harness capability matrix (phase 16)
 
-applyr runs under four coding agents. Business logic is identical
+aplyx runs under four coding agents. Business logic is identical
 everywhere — the only harness-specific code is the adapter block in
 `scripts/runtime/run_job_agent.sh` (never add harness branches anywhere
 else). Capabilities differ; the degraded paths below are behavioral
@@ -652,7 +1139,8 @@ four call sites. Do not add a harness branch anywhere else.
 - applied_jobs.json entries must include: job_id, company, title, url,
   apply_url, date_applied, status (applied|failed|needs_review), role_type
   (internship|new_grad), source (linkedin|indeed|greenhouse|lever|
-  wellfound|handshake|ashbyhq|simplify|workday), resume_used
+  wellfound|handshake|ashbyhq|simplify|workday|smartrecruiters|amazon|
+  oracle), resume_used
   (swe|ai_ml|balanced|cyber|networking_cyber),
   ats_score (number), location_tier (preferred|fallback),
   cover_letter_used (bool). review_queue.json entries must also include

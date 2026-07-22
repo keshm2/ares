@@ -170,7 +170,7 @@ export function writeDiscordRoute(root: string, route: string, url: string): voi
 }
 
 // --- Environment overrides (config/env.json) --------------------------------
-// Persisted APPLYR_* overrides; the runner exports them at startup and the
+// Persisted APLYX_* overrides; the runner exports them at startup and the
 // TUI reads them for its own paths. A real environment variable always wins.
 
 const envPath = (root: string) => path.join(root, "config", "env.json");
@@ -187,21 +187,28 @@ export function writeEnvOverride(root: string, key: string, value: string): void
   writeJson(file, cfg);
 }
 
-/** Effective value + where it came from (env > config/env.json > default). */
+/** Effective value + where it came from (env > config/env.json > default).
+ *  `key` accepts a list so a rebrand can pass the current name first and
+ *  older names (still honored) after — e.g. `["APLYX_X", "FLUX_X"]`. */
 export function effectiveEnv(
   root: string,
-  key: string,
+  key: string | readonly string[],
   fallback: string,
 ): { value: string; origin: "env" | "config" | "default" } {
-  const fromEnv = (process.env[key] ?? "").trim();
-  if (fromEnv) return { value: fromEnv, origin: "env" };
-  const fromConfig = readEnvOverride(root, key);
-  if (fromConfig) return { value: fromConfig, origin: "config" };
+  const keys = Array.isArray(key) ? key : [key];
+  for (const k of keys) {
+    const fromEnv = (process.env[k] ?? "").trim();
+    if (fromEnv) return { value: fromEnv, origin: "env" };
+  }
+  for (const k of keys) {
+    const fromConfig = readEnvOverride(root, k);
+    if (fromConfig) return { value: fromConfig, origin: "config" };
+  }
   return { value: fallback, origin: "default" };
 }
 
 /** Log directory honored by the runner and the TUI's log readers. */
 export function logDir(root: string): string {
-  const dir = effectiveEnv(root, "APPLYR_LOG_DIR", "logs").value;
+  const dir = effectiveEnv(root, ["APLYX_LOG_DIR", "FLUX_LOG_DIR"], "logs").value;
   return path.isAbsolute(dir) ? dir : path.join(root, dir);
 }

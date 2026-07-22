@@ -1,5 +1,5 @@
-import { effectiveEnv } from "@applyr/core/settings.js";
-import { isKnownHarness, readHarnessConfig, detectHarnessOnPath as detectOnPath } from "@applyr/core/harness.js";
+import { effectiveEnv } from "@aplyx/core/settings.js";
+import { isKnownHarness, readHarnessConfig, detectHarnessOnPath as detectOnPath } from "@aplyx/core/harness.js";
 import type { HarnessId } from "./theme.js";
 
 function isKnown(value: string): value is Exclude<HarnessId, "auto"> {
@@ -7,12 +7,12 @@ function isKnown(value: string): value is Exclude<HarnessId, "auto"> {
 }
 
 /** Same resolution order run_job_agent.py uses ahead of its own PATH
- *  auto-detect (APPLYR_HARNESS/ARES_HARNESS env override, then
+ *  auto-detect (APLYX_HARNESS/ARES_HARNESS env override, then
  *  config/harness.json): env override wins, then the config file, else
  *  "auto" — there's no CLI-on-PATH probe here since this only drives a
  *  cosmetic wave color, not the actual subprocess invocation. */
 export function resolveHarnessId(root: string): HarnessId {
-  const fromEnv = effectiveEnv(root, "APPLYR_HARNESS", "").value.trim();
+  const fromEnv = effectiveEnv(root, ["APLYX_HARNESS", "FLUX_HARNESS", "ARES_HARNESS"], "").value.trim();
   if (isKnown(fromEnv)) return fromEnv;
   const fromConfig = readHarnessConfig(root);
   if (fromConfig && isKnown(fromConfig)) return fromConfig;

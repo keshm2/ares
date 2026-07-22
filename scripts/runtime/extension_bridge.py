@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""extension_bridge.py — localhost bridge for the applyr browser extension (Phase 10).
+"""extension_bridge.py — localhost bridge for the aplyx browser extension (Phase 10).
 
 The Manifest V3 extension never touches state files directly. Every read
 and write flows through this bridge, and the bridge itself only shells
@@ -392,7 +392,7 @@ ROUTES_POST = {"/fit": handle_fit, "/fields": handle_fields, "/outcome": handle_
 
 
 class BridgeHandler(BaseHTTPRequestHandler):
-    server_version = "applyr-extension-bridge"
+    server_version = "aplyx-extension-bridge"
     token = ""  # set at startup
 
     def log_message(self, fmt, *args):  # route default logging through ours
@@ -416,7 +416,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if not self._authorized():
             return self._send(401, {"ok": False, "error": "missing or invalid bridge token"})
         if self.path == "/health":
-            return self._send(200, {"ok": True, "service": "applyr-extension-bridge", "version": VERSION})
+            return self._send(200, {"ok": True, "service": "aplyx-extension-bridge", "version": VERSION})
         if self.path == "/field-keys":
             return self._send(200, {"ok": True, "keys": sorted(read_safe_fields().keys())})
         return self._send(404, {"ok": False, "error": "unknown endpoint"})
@@ -444,7 +444,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="applyr browser-extension bridge (localhost only)")
+    parser = argparse.ArgumentParser(description="aplyx browser-extension bridge (localhost only)")
     parser.add_argument("--port", type=int, help=f"override the configured port (default {DEFAULT_PORT})")
     parser.add_argument("--show-token", action="store_true", help="print the bridge token and exit")
     args = parser.parse_args()
@@ -470,7 +470,7 @@ def main() -> int:
 
     server = ThreadingHTTPServer(("127.0.0.1", port), BridgeHandler)
     log(f"listening on http://127.0.0.1:{port} (token in {BRIDGE_CONFIG})")
-    log("paste the token into the extension's options page (applyr → Options)")
+    log("paste the token into the extension's options page (aplyx → Options)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

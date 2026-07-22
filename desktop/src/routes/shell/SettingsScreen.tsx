@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BUILD_MARKER } from "@applyr/core/version.js";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { BUILD_MARKER } from "@aplyx/core/version.js";
 import { useAuth } from "../../lib/AuthContext";
-import { findRoot, hasLocalInstall } from "../../lib/bridge";
+import { findRoot, hasLocalInstall, setLocalRoot, forgetLocalRoot } from "../../lib/bridge";
 import { useUiPrefs, type FontPref, type ThemePref } from "../../lib/uiPrefs";
 import "../../components/formFields.css";
 
@@ -22,15 +23,44 @@ export function SettingsScreen() {
   const navigate = useNavigate();
   const { theme, font, setTheme, setFont } = useUiPrefs();
   const [root, setRoot] = useState<string | undefined>(undefined);
+  const [browsing, setBrowsing] = useState(false);
+  const [rootError, setRootError] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
+  const refreshLocalInstall = () => {
     hasLocalInstall().then((has) => {
+      setRoot(undefined);
       if (has) findRoot().then(setRoot);
     });
-  }, []);
+  };
+
+  useEffect(refreshLocalInstall, []);
+
+  async function browseForRoot() {
+    setBrowsing(true);
+    setRootError(undefined);
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "Select your aplyx checkout folder",
+      });
+      if (typeof selected !== "string") return; // cancelled
+      const resolved = await setLocalRoot(selected);
+      setRoot(resolved);
+    } catch (err) {
+      setRootError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBrowsing(false);
+    }
+  }
+
+  function changeFolder() {
+    forgetLocalRoot();
+    void browseForRoot();
+  }
 
   return (
-    <div style={{ maxWidth: "34rem", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+    <div className="aplyx-fade-rise" style={{ maxWidth: "34rem", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
       <h1 style={{ fontSize: "var(--text-3xl)" }}>Settings</h1>
 
       <section>
@@ -79,7 +109,7 @@ export function SettingsScreen() {
               ))}
             </div>
             <p className="field-help">
-              Light is a warm beige, dark matches the applyr logo badge. System follows your OS
+              Light is a warm beige, dark matches the aplyx logo badge. System follows your OS
               and switches automatically.
             </p>
           </div>
@@ -115,6 +145,9 @@ export function SettingsScreen() {
               <div className="check-label">Connected</div>
               <div className="check-detail">{root}</div>
             </div>
+            <button type="button" className="wizard-back" onClick={changeFolder} disabled={browsing}>
+              {browsing ? "Choosing…" : "Change folder…"}
+            </button>
             <button type="button" className="wizard-back" onClick={() => navigate("/onboarding/local")}>
               Reopen setup
             </button>
@@ -124,14 +157,21 @@ export function SettingsScreen() {
             <span className="check-icon check-icon-pending">–</span>
             <div style={{ flex: 1 }}>
               <div className="check-label">No local installation found</div>
-              <div className="check-detail">Job search and applying run through a local install.</div>
+              <div className="check-detail">
+                Job search and applying run through a local install — point the app at your aplyx
+                checkout folder.
+              </div>
             </div>
+            <button type="button" className="wizard-back" onClick={() => void browseForRoot()} disabled={browsing}>
+              {browsing ? "Choosing…" : "Browse…"}
+            </button>
           </div>
         )}
+        {rootError ? <p className="field-help" style={{ color: "var(--danger)" }}>{rootError}</p> : null}
       </section>
 
       {/* Same build marker the TUI shows (dimmed) in its side panel footer
-       * — one shared @applyr/core constant, so both surfaces always agree. */}
+       * — one shared @aplyx/core constant, so both surfaces always agree. */}
       <p style={{ fontSize: "var(--text-xs)", color: "var(--text-faint)" }}>build {BUILD_MARKER}</p>
     </div>
   );

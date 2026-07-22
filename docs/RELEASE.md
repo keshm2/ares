@@ -1,4 +1,4 @@
-# Release notes — applyr 0.9.7a
+# Release notes — aplyx 0.9.7a
 
 > **Build:** `0.9.7a` — alpha.
 > **Branch:** `main`.
@@ -6,15 +6,15 @@
 > `BUILD_MARKER = "0.9.7a"` (re-exported from `app/src/theme.ts`,
 > visible in the TUI side-panel footer, and now also in the desktop
 > app's Settings screen — one shared constant, both surfaces agree).
-> **npm package:** `@keshm/applyr` version `0.9.7-alpha.0`, published
-> to the default `latest` dist-tag — `npm install -g @keshm/applyr`
-> gets it. The unscoped npm name `applyr` belongs to an unrelated
-> package — never `npm install applyr`. If a re-publish is ever needed
+> **npm package:** `@keshm/aplyx` version `0.9.7-alpha.0`, published
+> to the default `latest` dist-tag — `npm install -g @keshm/aplyx`
+> gets it. The unscoped npm name `aplyx` belongs to an unrelated
+> package — never `npm install aplyx`. If a re-publish is ever needed
 > for this same build, the npm semver bumps to `alpha.1`/`alpha.2`
 > while the human-facing build marker/git tag stay `0.9.7a` (same
 > divergence as `0.9.0a`'s `0.9.0-alpha.2`).
 > **Rollout:** clients on the updater lineage self-update on their next
-> scheduled run or `applyr` launch; older installs update manually once
+> scheduled run or `aplyx` launch; older installs update manually once
 > (`bash scripts/install/update.sh` / `powershell scripts\install\
 > update.ps1`).
 > **Desktop app:** early preview, 0.1.0 internally (Tauri app version,
@@ -50,7 +50,7 @@ frontend talks to Supabase directly (`SupabaseAdapter`, pure
   `applied_jobs`/`review_queue` tables plus a private per-user resumes
   storage bucket, every table RLS-scoped to `auth.uid()`, a
   status-transition guard on `jobs` mirroring the local engine's
-  never-downgrade rule. `applyr://auth-callback` deep link handles the
+  never-downgrade rule. `aplyx://auth-callback` deep link handles the
   email-confirmation and Google OAuth redirects (a desktop app can't
   sit at a `localhost` URL to receive them); PKCE flow throughout.
 - **Brand + theme.** Real logo (a block lowercase "a", traced from the
@@ -78,11 +78,11 @@ apt·dnf·pacman / Visual C++ Build Tools), asks before installing
 anything missing, builds in release mode, and installs the
 platform-native way:
 
-- macOS → `/Applications/applyr.app` (falls back to `~/Applications`
+- macOS → `/Applications/aplyx.app` (falls back to `~/Applications`
   rather than requiring sudo).
 - Linux → `apt install`/`dnf install` the built `.deb`/`.rpm` if
   available, else an AppImage plus a generated
-  `~/.local/share/applications/applyr.desktop` entry.
+  `~/.local/share/applications/aplyx.desktop` entry.
 - Windows → prefers the NSIS installer (per-user, no admin/UAC prompt)
   over the MSI.
 
@@ -126,21 +126,21 @@ also removes the desktop app if present, on all three platforms.
 ## Install / update / uninstall
 
 ```bash
-# install (one command; puts `applyr` on your PATH):
-curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.sh | bash
+# install (one command; puts `aplyx` on your PATH):
+curl -fsSL https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.sh | bash
 
 # or via npm:
-npm install -g @keshm/applyr
+npm install -g @keshm/aplyx
 
 # optionally also install the desktop app (early preview):
 bash scripts/install/install_desktop.sh        # macOS / Linux
 powershell -ExecutionPolicy Bypass -File scripts\install\install_desktop.ps1   # Windows
 
 # update now (also happens automatically on runs and launches):
-applyr update
+aplyx update
 
 # uninstall (removes the desktop app too, if installed):
-applyr uninstall          # add --keep-data to keep config/data/resumes
+aplyx uninstall          # add --keep-data to keep config/data/resumes
 ```
 
 Windows: `powershell -ExecutionPolicy Bypass -File scripts\install\install.ps1`
@@ -154,13 +154,13 @@ Windows: `powershell -ExecutionPolicy Bypass -File scripts\install\install.ps1`
   changes syntax-checked (`py_compile`).
 - Desktop app build + install exercised live end-to-end on macOS: a
   clean release build (Rust dependency tree compiled from scratch),
-  bundled, installed to `/Applications/applyr.app`, launched and
+  bundled, installed to `/Applications/aplyx.app`, launched and
   confirmed running; a warm re-run rebuilds incrementally; the new
   uninstall path correctly finds and removes it.
 - The new installer opt-in prompt verified both ways: non-interactive
   runs skip cleanly with a clear message and don't disturb the rest of
   the install; the rest of `install.sh` (config, harness detection,
-  TUI build, `applyr` on PATH) runs unaffected either way.
+  TUI build, `aplyx` on PATH) runs unaffected either way.
 - Onboarding-completion skip logic exercised live in a mocked-bridge
   browser session for local mode (both the completed and
   not-yet-completed branches land on the correct screen); the hosted
@@ -192,7 +192,7 @@ Windows: `powershell -ExecutionPolicy Bypass -File scripts\install\install.ps1`
 ## Release artifacts
 
 - Git tag `v0.9.7a` on `main`.
-- npm: `@keshm/applyr@0.9.7-alpha.0` under the `latest` dist-tag
+- npm: `@keshm/aplyx@0.9.7-alpha.0` under the `latest` dist-tag
   (`cd app && npm publish` — `publishConfig` sets `access: public` and
   the tag). Publish requires `npm login`.
 - CI workflow `.github/workflows/tui.yml` runs on every push touching

@@ -51,7 +51,7 @@ export const PAGES: PageDef[] = [
   {
     title: "Basics",
     fields: [
-      { id: "preferred_name", label: "Preferred name (optional)", kind: "text", placeholder: "how applyr addresses you" },
+      { id: "preferred_name", label: "Preferred name (optional)", kind: "text", placeholder: "how aplyx addresses you" },
       { id: "first_name", label: "Legal first name", kind: "text" },
       { id: "last_name", label: "Legal last name", kind: "text" },
     ],
@@ -120,7 +120,7 @@ export const PAGES: PageDef[] = [
         label: "Gender (optional)",
         kind: "text",
         placeholder: "e.g. Woman / Man / Non-binary / Decline",
-        help: "Asked by many EEO forms. Leave blank to decline — applyr never invents an answer.",
+        help: "Asked by many EEO forms. Leave blank to decline — aplyx never invents an answer.",
       },
       { id: "ethnicity", label: "Ethnicity (optional)", kind: "text", placeholder: "e.g. Asian / Decline" },
       { id: "hispanic_or_latino", label: "Hispanic or Latino? (y/n)", kind: "yesno" },
@@ -146,7 +146,7 @@ export const PAGES: PageDef[] = [
         label: "Preferred job locations (optional)",
         kind: "multi-location",
         placeholder: "type any city — enter adds it, blank enter moves on",
-        help: "A priority list, not a filter: applyr searches the whole US either way, these just sort matching jobs to the top. Any city works, listed or not.",
+        help: "A priority list, not a filter: aplyx searches the whole US either way, these just sort matching jobs to the top. Any city works, listed or not.",
       },
       { id: "target_companies", label: "Target companies", kind: "multi-company", placeholder: "type to search" },
     ],

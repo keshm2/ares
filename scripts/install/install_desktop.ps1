@@ -1,5 +1,5 @@
 <#
-install_desktop.ps1 - installs the applyr desktop app (Tauri + React),
+install_desktop.ps1 - installs the aplyx desktop app (Tauri + React),
 natively on Windows (PowerShell, no WSL).
 
 Prefers downloading a prebuilt bundle from this checkout's matching
@@ -31,9 +31,19 @@ $scriptDir = Split-Path -Parent $PSCommandPath
 $projectRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
 Set-Location $projectRoot
 
+# Pin this checkout's location to ~/.aplyx/root, same as install.ps1 -
+# written here too since this script is documented as independently
+# re-runnable on its own, not only as install.ps1's opt-in step. The
+# desktop app (Start-Menu/taskbar-launched, no shell env vars, no
+# meaningful working directory) reads this as its primary way to find the
+# checkout; see packages/core/src/project.ts's findProjectRoot().
+$pinDir = Join-Path $HOME ".aplyx"
+New-Item -ItemType Directory -Force -Path $pinDir | Out-Null
+Set-Content -Path (Join-Path $pinDir "root") -Value $projectRoot -NoNewline
+
 if (-not (Test-Path "desktop\package.json")) { Fail "desktop\ not found in this checkout - nothing to install." }
 
-$repo = "keshm2/applyr"
+$repo = "keshm2/aplyx"
 
 # --- Install a built/downloaded bundle (shared by both paths) -----------------
 function Install-DesktopBundle {
@@ -49,7 +59,7 @@ function Install-DesktopBundle {
     Say "installing $($nsis.Name) (silent)..."
     $p = Start-Process -FilePath $nsis.FullName -ArgumentList "/S" -Wait -PassThru
     if ($p.ExitCode -eq 0) {
-      Say "installed. Find 'applyr' in the Start Menu, or run: $($nsis.FullName) (double-click to install manually if the silent flag didn't take)."
+      Say "installed. Find 'aplyx' in the Start Menu, or run: $($nsis.FullName) (double-click to install manually if the silent flag didn't take)."
     } else {
       Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $($nsis.FullName)"
     }
@@ -58,7 +68,7 @@ function Install-DesktopBundle {
     Say "installing $($msi.Name) (silent, may prompt for admin)..."
     $p = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "`"$($msi.FullName)`"", "/quiet", "/norestart" -Wait -PassThru
     if ($p.ExitCode -eq 0) {
-      Say "installed. Find 'applyr' in the Start Menu."
+      Say "installed. Find 'aplyx' in the Start Menu."
     } else {
       Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $($msi.FullName)"
     }
@@ -99,7 +109,7 @@ function Try-PrebuiltInstall {
     return $false
   }
 
-  $workDir = Join-Path $env:TEMP ("applyr-desktop-" + [System.Guid]::NewGuid().ToString())
+  $workDir = Join-Path $env:TEMP ("aplyx-desktop-" + [System.Guid]::NewGuid().ToString())
   New-Item -ItemType Directory -Force -Path $workDir | Out-Null
   try {
     $downloadPath = Join-Path $workDir $asset.name
@@ -115,7 +125,7 @@ function Try-PrebuiltInstall {
       Say "installing $($asset.name) (silent)..."
       $p = Start-Process -FilePath $downloadPath -ArgumentList "/S" -Wait -PassThru
       if ($p.ExitCode -eq 0) {
-        Say "installed. Find 'applyr' in the Start Menu."
+        Say "installed. Find 'aplyx' in the Start Menu."
         $installed = $true
       } else {
         Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $downloadPath"
@@ -125,7 +135,7 @@ function Try-PrebuiltInstall {
       Say "installing $($asset.name) (silent, may prompt for admin)..."
       $p = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "`"$downloadPath`"", "/quiet", "/norestart" -Wait -PassThru
       if ($p.ExitCode -eq 0) {
-        Say "installed. Find 'applyr' in the Start Menu."
+        Say "installed. Find 'aplyx' in the Start Menu."
         $installed = $true
       } else {
         Warn "silent install returned exit code $($p.ExitCode) - run the installer manually: $downloadPath"

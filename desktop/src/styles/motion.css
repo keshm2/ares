@@ -1,0 +1,46 @@
+/* Shared entrance transitions — calm, premium, orientation-only.
+ *
+ * Two utilities: a plain opacity fade (`.aplyx-fade-in`) and a fade plus
+ * a 4px rise (`.aplyx-fade-rise`) for content that "arrives" into a region
+ * (a detail pane, a wizard step, a freshly-loaded screen). Durations
+ * come from the motion tokens in tokens.css, which already collapse to
+ * 0ms under prefers-reduced-motion; the guard below additionally drops
+ * the animations entirely so nothing animates when the user opts out,
+ * regardless of how a component applies these classes. Never use these
+ * for affordances that should feel immediate (nav click, hover, focus) —
+ * those stay on `transition`, not entrance `animation`. */
+
+@keyframes aplyx-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes aplyx-fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.aplyx-fade-in {
+  animation: aplyx-fade-in var(--duration-normal) var(--ease-out) both;
+}
+
+.aplyx-fade-rise {
+  animation: aplyx-fade-rise var(--duration-normal) var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aplyx-fade-in,
+  .aplyx-fade-rise {
+    animation: none;
+  }
+}

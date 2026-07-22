@@ -15,21 +15,22 @@ import {
   writeSafeField,
   writeTargetsArrayList,
   writeTargetsBool,
-} from "@applyr/core/settings.js";
-import { readProfileUsername, writeProfileUsername } from "@applyr/core/profileLinks.js";
-import { openPath } from "@applyr/core/helpers.js";
+} from "@aplyx/core/settings.js";
+import { readProfileUsername, writeProfileUsername } from "@aplyx/core/profileLinks.js";
+import { openPath } from "@aplyx/core/helpers.js";
 import { resumesDir } from "../resumes.js";
 import { detectHarnessOnPath } from "../harness.js";
-import { readCommittedCompanyDisplays, writeCommittedCompanyDisplays } from "@applyr/core/companyTargets.js";
-import { loadCompanyDirectory, companyWeight, type CompanyEntry } from "@applyr/core/data/companyDirectory.js";
-import { US_CITIES } from "@applyr/core/data/usCities.js";
-import { ROLE_CATEGORIES } from "@applyr/core/data/roleCategories.js";
-import { LEVEL_CATEGORIES } from "@applyr/core/data/levelCategories.js";
-import { SEASON_CATEGORIES } from "@applyr/core/data/seasonCategories.js";
+import { readCommittedCompanyDisplays, writeCommittedCompanyDisplays } from "@aplyx/core/companyTargets.js";
+import { loadCompanyDirectory, companyWeight, type CompanyEntry } from "@aplyx/core/data/companyDirectory.js";
+import { US_CITIES } from "@aplyx/core/data/usCities.js";
+import { ROLE_CATEGORIES } from "@aplyx/core/data/roleCategories.js";
+import { LEVEL_CATEGORIES } from "@aplyx/core/data/levelCategories.js";
+import { SEASON_CATEGORIES } from "@aplyx/core/data/seasonCategories.js";
 import { selectedCategoryIds, keywordsForSelectedCategories, type KeywordCategory } from "../categorySelection.js";
 import { filterSuggestions } from "./autocomplete.js";
 import { MultiEntryAutocomplete } from "./MultiEntryAutocomplete.js";
 import { AutoSparkleText, RainbowText } from "./KeyHints.js";
+import { wrapPadded, wrapText } from "./wrapText.js";
 import {
   InlineTextInput,
   deleteBackward,
@@ -39,9 +40,9 @@ import {
 } from "./TextInput.js";
 
 /**
- * Settings tab: view and edit the config that drives applyr —
+ * Settings tab: view and edit the config that drives aplyx —
  * personal info (config/targets.json safe_fields), Discord webhooks
- * (config/discord_config.json), and persisted APPLYR_* environment
+ * (config/discord_config.json), and persisted APLYX_* environment
  * overrides (config/env.json, exported by the runner; a real env var
  * always wins).
  *
@@ -98,10 +99,14 @@ interface Field {
     | "action";
   /** Default shown for env fields when neither env nor config set it. */
   fallback?: string;
+  /** Older env-var names for this field, still honored when reading the
+   *  effective value (checked in order, after `key`) — carries settings
+   *  forward across a rebrand without silently dropping what's already set. */
+  legacyKeys?: string[];
   /** Present on an "env" field to edit it as a fixed choice menu (arrow
    *  up/down + enter to select) instead of freeform text — e.g.
    *  yes/no for auto-update, or the coding-agent list for
-   *  APPLYR_HARNESS. `harness`, when set, renders that option's label
+   *  APLYX_HARNESS. `harness`, when set, renders that option's label
    *  in its harness wave color (see theme.ts's harnessGradient) — the
    *  same effect a live run driven by that harness uses — so picking
    *  one previews it. */
@@ -133,13 +138,13 @@ const SECTIONS: Section[] = [
       { kind: "personal", key: "last_name", label: "Last name", explain: "Legal last name typed into application forms." },
       { kind: "personal", key: "email", label: "Email", explain: "Contact email used on applications." },
       { kind: "personal", key: "phone", label: "Phone", explain: "Contact phone number used on applications." },
-      { kind: "personal-link", key: "linkedin_username", label: "LinkedIn username", explain: "LinkedIn username only (e.g. jane-doe-123) — applyr builds the full profile URL for you." },
-      { kind: "personal-link", key: "github_username", label: "GitHub username", explain: "GitHub username only (e.g. jane-doe) — applyr builds the full profile URL for you." },
+      { kind: "personal-link", key: "linkedin_username", label: "LinkedIn username", explain: "LinkedIn username only (e.g. jane-doe-123) — aplyx builds the full profile URL for you." },
+      { kind: "personal-link", key: "github_username", label: "GitHub username", explain: "GitHub username only (e.g. jane-doe) — aplyx builds the full profile URL for you." },
       { kind: "personal", key: "location", label: "Location", explain: "Home city/state (e.g. Seattle, WA) used on applications." },
       { kind: "personal", key: "zip_code", label: "Zip code", explain: "Home zip code used on applications." },
       { kind: "personal", key: "address_line1", label: "Address line 1", explain: "Street address used on applications." },
       { kind: "personal", key: "address_line2", label: "Address line 2", explain: "Apartment/unit — optional, used on applications." },
-      { kind: "personal", key: "gender", label: "Gender", explain: "Optional EEO demographic question many applications ask. Leave empty to decline — applyr never invents an answer for a field you left blank." },
+      { kind: "personal", key: "gender", label: "Gender", explain: "Optional EEO demographic question many applications ask. Leave empty to decline — aplyx never invents an answer for a field you left blank." },
       { kind: "personal", key: "ethnicity", label: "Ethnicity", explain: "Optional EEO demographic question some applications ask." },
       { kind: "personal", key: "hispanic_or_latino", label: "Hispanic/Latino", explain: "Optional EEO demographic question some applications ask." },
       { kind: "personal", key: "date_of_birth", label: "Date of birth", explain: "Only used where an application form explicitly requires it." },
@@ -149,13 +154,13 @@ const SECTIONS: Section[] = [
   {
     name: "Company targets",
     description:
-      "Which roles, levels, seasons, locations, and companies applyr searches for. Stored in config/targets.json (gitignored, local only). Roles/levels/seasons open a checkbox submenu; locations/companies open a search submenu.",
+      "Which roles, levels, seasons, locations, and companies aplyx searches for. Stored in config/targets.json (gitignored, local only). Roles/levels/seasons open a checkbox submenu; locations/companies open a search submenu.",
     fields: [
       {
         kind: "checklist",
         key: "role_keywords",
         label: "Roles",
-        explain: "Which kinds of roles applyr searches for — check every category that applies.",
+        explain: "Which kinds of roles aplyx searches for — check every category that applies.",
         categories: ROLE_CATEGORIES,
       },
       {
@@ -163,18 +168,18 @@ const SECTIONS: Section[] = [
         key: "level_keywords",
         label: "Levels",
         explain:
-          "Which experience levels applyr searches for. \"Full time\" also relaxes the fit gate's 3+ years hard-reject so senior/experienced postings are no longer automatically skipped — it does not affect how intern/new-grad/entry-level postings are found.",
+          "Which experience levels aplyx searches for. \"Full time\" also relaxes the fit gate's 3+ years hard-reject so senior/experienced postings are no longer automatically skipped — it does not affect how intern/new-grad/entry-level postings are found.",
         categories: LEVEL_CATEGORIES,
       },
       {
         kind: "checklist",
         key: "season_keywords",
         label: "Seasons",
-        explain: "Which internship/co-op seasons applyr searches for — check every one that applies.",
+        explain: "Which internship/co-op seasons aplyx searches for — check every one that applies.",
         categories: SEASON_CATEGORIES,
       },
       { kind: "location-autocomplete", key: "preferred_locations", label: "Preferred locations", explain: "Locations to prioritize, e.g. Remote, Seattle, WA. Search by name; already-added ones show a ✓." },
-      { kind: "company-autocomplete", key: "target_companies", label: "Target companies", explain: "Companies applyr watches for new postings — search by name (the same autofill used during setup); applyr figures out whether it's tracked via Ashby, Lever, or Greenhouse and stores the right identifier for you. Already-added companies show a ✓." },
+      { kind: "company-autocomplete", key: "target_companies", label: "Target companies", explain: "Companies aplyx watches for new postings — search by name (the same autofill used during setup); aplyx figures out whether it's tracked via Ashby, Lever, or Greenhouse and stores the right identifier for you. Already-added companies show a ✓." },
       {
         kind: "targets-array",
         key: "workday_tenants",
@@ -187,7 +192,7 @@ const SECTIONS: Section[] = [
   {
     name: "Resumes",
     description:
-      "Where applyr reads your resume PDFs from. Drop files into the folder, then convert them to markdown from the Resumes tab.",
+      "Where aplyx reads your resume PDFs from. Drop files into the folder, then convert them to markdown from the Resumes tab.",
     fields: [
       {
         kind: "action",
@@ -213,16 +218,17 @@ const SECTIONS: Section[] = [
   {
     name: "Environment",
     description:
-      "Persisted APPLYR_* overrides, saved to config/env.json and exported by every run. A variable set in your real shell environment always wins. Empty a value to return to the default.",
+      "Persisted APLYX_* overrides, saved to config/env.json and exported by every run. A variable set in your real shell environment always wins. Empty a value to return to the default.",
     fields: [
-      { kind: "env", key: "APPLYR_LOG_DIR", label: "Log directory", explain: "Where run/session logs and the heartbeat are stored. Relative paths resolve inside the project. (Agent fetch-scratch stays in the project's logs/tmp.)", fallback: "logs" },
-      { kind: "env", key: "APPLYR_SESSION_CAP", label: "Session cap", explain: "Default applications-per-run cap, 1-25. Runs may lower it; 25 is the hard ceiling.", fallback: "25" },
-      { kind: "env", key: "APPLYR_JOBS_PER_PAGE", label: "Jobs per page", explain: "How many results the manual Jobs search keeps per search, 10-75. Higher means more boards/pages hit per query — the picker warns as it gets expensive.", fallback: String(DEFAULT_PAGE_SIZE) },
-      { kind: "env", key: "APPLYR_KEEP_SESSION_LOGS", label: "Keep logs", explain: "How many session logs to keep before the oldest are pruned.", fallback: "30" },
-      { kind: "env", key: "APPLYR_LOCK_MAX_AGE_MIN", label: "Lock max age", explain: "Minutes before a hung run's lock is force-reclaimed by the next scheduled tick.", fallback: "60" },
+      { kind: "env", key: "APLYX_LOG_DIR", legacyKeys: ["FLUX_LOG_DIR"], label: "Log directory", explain: "Where run/session logs and the heartbeat are stored. Relative paths resolve inside the project. (Agent fetch-scratch stays in the project's logs/tmp.)", fallback: "logs" },
+      { kind: "env", key: "APLYX_SESSION_CAP", legacyKeys: ["FLUX_SESSION_CAP", "ARES_SESSION_CAP"], label: "Session cap", explain: "Default applications-per-run cap, 1-25. Runs may lower it; 25 is the hard ceiling.", fallback: "25" },
+      { kind: "env", key: "APLYX_JOBS_PER_PAGE", legacyKeys: ["FLUX_JOBS_PER_PAGE"], label: "Jobs per page", explain: "How many results the manual Jobs search keeps per search, 10-75. Higher means more boards/pages hit per query — the picker warns as it gets expensive.", fallback: String(DEFAULT_PAGE_SIZE) },
+      { kind: "env", key: "APLYX_KEEP_SESSION_LOGS", legacyKeys: ["FLUX_KEEP_SESSION_LOGS", "ARES_KEEP_SESSION_LOGS"], label: "Keep logs", explain: "How many session logs to keep before the oldest are pruned.", fallback: "30" },
+      { kind: "env", key: "APLYX_LOCK_MAX_AGE_MIN", legacyKeys: ["FLUX_LOCK_MAX_AGE_MIN", "ARES_LOCK_MAX_AGE_MIN"], label: "Lock max age", explain: "Minutes before a hung run's lock is force-reclaimed by the next scheduled tick.", fallback: "60" },
       {
         kind: "env",
-        key: "APPLYR_AUTO_UPDATE",
+        key: "APLYX_AUTO_UPDATE",
+        legacyKeys: ["FLUX_AUTO_UPDATE", "ARES_AUTO_UPDATE"],
         label: "Auto-update",
         explain: "Yes = self-update from GitHub main on every run/launch; No = never update automatically.",
         fallback: "1",
@@ -233,7 +239,8 @@ const SECTIONS: Section[] = [
       },
       {
         kind: "env",
-        key: "APPLYR_HARNESS",
+        key: "APLYX_HARNESS",
+        legacyKeys: ["FLUX_HARNESS", "ARES_HARNESS"],
         label: "Coding agent",
         explain: "Which coding agent runs the apply loop. Auto defers to config/harness.json, then whichever CLI is found on PATH. A live run's wave/spinner color always matches this choice.",
         fallback: "",
@@ -281,7 +288,7 @@ function currentValue(root: string, field: Field, directory?: CompanyEntry[]): {
       return { value: v || "(not set)", note: "" };
     }
     case "env": {
-      const eff = effectiveEnv(root, field.key, field.fallback ?? "");
+      const eff = effectiveEnv(root, [field.key, ...(field.legacyKeys ?? [])], field.fallback ?? "");
       if (field.options) {
         const match = field.options.find((o) => o.value === eff.value);
         return { value: match ? optionLabel(field, match) : eff.value || "(not set)", note: eff.origin };
@@ -300,7 +307,7 @@ function currentValue(root: string, field: Field, directory?: CompanyEntry[]): {
  * is reflected without restarting the TUI.
  */
 function optionLabel(field: Field, option: { label: string; value: string }): string {
-  if (field.key !== "APPLYR_HARNESS" || option.value !== "") return option.label;
+  if (field.key !== "APLYX_HARNESS" || option.value !== "") return option.label;
   const detected = detectHarnessOnPath();
   if (!detected) return "Auto (no coding agent found on PATH)";
   const name = field.options?.find((o) => o.value === detected)?.label ?? detected;
@@ -403,6 +410,7 @@ export function SettingsScreen({
   onInputActiveChange,
   onSettingsChange,
   contentRows = 20,
+  columns = 76,
 }: {
   root: string;
   active: boolean;
@@ -410,6 +418,7 @@ export function SettingsScreen({
   /** Fired after any write so the shell (sidebar name, etc.) refreshes. */
   onSettingsChange?: () => void;
   contentRows?: number;
+  columns?: number;
 }) {
   const [sectionCursor, setSectionCursor] = useState(0);
   const [inSection, setInSection] = useState(false);
@@ -516,7 +525,7 @@ export function SettingsScreen({
   // looks like it's already picked. Once Enter writes a new choice, this
   // recomputes on the next render and the ✓ jumps to it immediately.
   const currentOptionValue =
-    field.options && field.kind === "env" ? effectiveEnv(root, field.key, field.fallback ?? "").value : "";
+    field.options && field.kind === "env" ? effectiveEnv(root, [field.key, ...(field.legacyKeys ?? [])], field.fallback ?? "").value : "";
 
   // Inside a section (or editing) this screen owns the keyboard — esc
   // backs out one level instead of jumping to the welcome menu.
@@ -532,7 +541,7 @@ export function SettingsScreen({
       else if (field.kind === "personal-link")
         writeProfileUsername(root, field.key === "linkedin_username" ? "linkedin" : "github", value);
       else if (field.kind === "discord-route") writeDiscordRoute(root, field.key, value);
-      else if (field.kind === "env" && field.key === "APPLYR_JOBS_PER_PAGE") {
+      else if (field.kind === "env" && field.key === "APLYX_JOBS_PER_PAGE") {
         writeEnvOverride(root, field.key, value.trim() ? String(clampPageSize(value)) : "");
       } else if (field.kind === "env") writeEnvOverride(root, field.key, value);
       setMessage(`Saved ${field.label}.`);
@@ -772,7 +781,7 @@ export function SettingsScreen({
             return;
           }
           if (field.options) {
-            const effectiveValue = field.kind === "env" ? effectiveEnv(root, field.key, field.fallback ?? "").value : "";
+            const effectiveValue = field.kind === "env" ? effectiveEnv(root, [field.key, ...(field.legacyKeys ?? [])], field.fallback ?? "").value : "";
             const idx = field.options.findIndex((o) => o.value === effectiveValue);
             setOptionCursor(idx >= 0 ? idx : 0);
             setEditing(true);
@@ -851,6 +860,15 @@ export function SettingsScreen({
   }
 
   const detail = currentValue(root, field, directory);
+  // Fixed-height explain block: fields in a section have wildly different
+  // help-text lengths, so sizing it to only the CURRENT field would
+  // reflow the popup/message area below on every up/down press while
+  // browsing a section's field list. Reserve the tallest this section
+  // needs instead — scoped to the section, not every field ever, so
+  // switching sections is still free to resize.
+  const explainWidth = Math.max(20, columns - 2);
+  const explainMaxLines = Math.max(1, ...section.fields.map((f) => wrapText(f.explain, explainWidth).length));
+  const explainLines = wrapPadded(field.explain, explainWidth, explainMaxLines);
   return (
     <Box flexDirection="column">
       <Text bold color={theme.accent}>
@@ -883,7 +901,11 @@ export function SettingsScreen({
             ))}
           </Box>
           <Box marginTop={1} flexDirection="column">
-            <Text wrap="wrap">{field.explain}</Text>
+            {explainLines.map((line, i) => (
+              <Text key={i} wrap="truncate-end">
+                {line}
+              </Text>
+            ))}
           </Box>
         </>
       )}
@@ -901,9 +923,17 @@ export function SettingsScreen({
                   const windowed = categories
                     .map((cat, i) => ({ cat, i }))
                     .slice(categoryOffset, categoryOffset + visibleRows);
+                  // Both indicator rows are reserved whenever the list can
+                  // scroll at all (blank when that edge isn't reached yet) —
+                  // otherwise scrolling from an edge into the middle of the
+                  // list grows the popup by a row, then shrinks it back on
+                  // reaching the far edge.
+                  const scrollable = categories.length > visibleRows;
                   return (
                     <>
-                      {categoryOffset > 0 ? <Text dimColor>↑ {categoryOffset} more</Text> : null}
+                      {scrollable ? (
+                        categoryOffset > 0 ? <Text dimColor>↑ {categoryOffset} more</Text> : <Text> </Text>
+                      ) : null}
                       {windowed.map(({ cat, i }) => (
                         <OptionRow
                           key={cat.id}
@@ -913,8 +943,12 @@ export function SettingsScreen({
                           checked={editSelected.has(cat.id)}
                         />
                       ))}
-                      {categoryOffset + visibleRows < categories.length ? (
-                        <Text dimColor>↓ {categories.length - categoryOffset - visibleRows} more</Text>
+                      {scrollable ? (
+                        categoryOffset + visibleRows < categories.length ? (
+                          <Text dimColor>↓ {categories.length - categoryOffset - visibleRows} more</Text>
+                        ) : (
+                          <Text> </Text>
+                        )
                       ) : null}
                     </>
                   );
@@ -991,7 +1025,7 @@ export function SettingsScreen({
                               wrap="truncate-end"
                             />
                           </Box>
-                          {field.key === "APPLYR_JOBS_PER_PAGE" && editValue.trim()
+                          {field.key === "APLYX_JOBS_PER_PAGE" && editValue.trim()
                             ? (() => {
                                 const parsed = Number.parseInt(editValue, 10);
                                 const preview = Number.isFinite(parsed) ? Math.min(MAX_PAGE_SIZE, parsed) : null;

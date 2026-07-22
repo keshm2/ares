@@ -5,7 +5,7 @@ One command from a fresh machine to a validated, harness-configured setup
 that runs natively on PowerShell and cmd.exe - no WSL, no bash, no jq.
 
   # one-liner (from anywhere):
-  irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.ps1 | iex
+  irm https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.ps1 | iex
   # or from a clone/unpacked release:
   powershell -ExecutionPolicy Bypass -File scripts\install\install.ps1
 
@@ -20,7 +20,7 @@ Steps mirror scripts/install/install.sh:
   6. Regenerate per-harness agent definitions.
   7. Run the config validator.
   8. Build the TUI (app/) when node is available.
-  9. Put the `applyr` command on PATH (applyr.cmd + applyr.ps1 shims).
+  9. Put the `aplyx` command on PATH (aplyx.cmd + aplyx.ps1 shims).
 #>
 
 $ErrorActionPreference = "Stop"
@@ -40,8 +40,8 @@ function Find-Python {
 }
 
 # --- 0. Bootstrap ------------------------------------------------------------
-# (The npm-installed `applyr` command mirrors this bootstrap; its own
-# --no-core flag / APPLYR_SKIP_CORE=1 opt-out has no equivalent here since
+# (The npm-installed `aplyx` command mirrors this bootstrap; its own
+# --no-core flag / APLYX_SKIP_CORE=1 opt-out has no equivalent here since
 # this script IS the install.)
 $scriptPath = $PSCommandPath
 $projectRoot = $null
@@ -50,11 +50,11 @@ if ($scriptPath) {
   if (Test-Path (Join-Path $maybeRoot "AGENTS.md")) { $projectRoot = $maybeRoot }
 }
 if (-not $projectRoot) {
-  $target = if ($env:APPLYR_HOME) { $env:APPLYR_HOME } else { Join-Path $HOME "applyr" }
+  $target = if ($env:APLYX_HOME) { $env:APLYX_HOME } elseif ($env:FLUX_HOME) { $env:FLUX_HOME } else { Join-Path $HOME "aplyx" }
   if (Test-Path (Join-Path $target "AGENTS.md")) {
     Say "existing install found at $target - refreshing it from GitHub before re-running."
   } else {
-    Say "downloading applyr into $target ..."
+    Say "downloading aplyx into $target ..."
   }
   New-Item -ItemType Directory -Force -Path $target | Out-Null
   # Always re-fetch and overwrite tracked files, even for an existing install:
@@ -62,8 +62,8 @@ if (-not $projectRoot) {
   # bug) instead of re-running whatever happens to already be on disk.
   # Gitignored local state (config\*.json, data\, logs\, docs\PLAN.md)
   # isn't in the tarball, so it's left untouched.
-  $tgz = Join-Path $env:TEMP ("applyr-" + [System.Guid]::NewGuid().ToString() + ".tar.gz")
-  Invoke-WebRequest -UseBasicParsing -Uri "https://codeload.github.com/keshm2/applyr/tar.gz/refs/heads/main" -OutFile $tgz
+  $tgz = Join-Path $env:TEMP ("aplyx-" + [System.Guid]::NewGuid().ToString() + ".tar.gz")
+  Invoke-WebRequest -UseBasicParsing -Uri "https://codeload.github.com/keshm2/aplyx/tar.gz/refs/heads/main" -OutFile $tgz
   # tar.exe ships with Windows 10+; --strip-components drops the top dir.
   & tar.exe -xzf $tgz --strip-components=1 -C $target
   if ($LASTEXITCODE -ne 0) { Fail "failed to unpack the source tarball (needs Windows 10+ tar.exe)" }
@@ -73,12 +73,24 @@ if (-not $projectRoot) {
 }
 Set-Location $projectRoot
 
+# Pin this checkout's location to ~/.aplyx/root, read by
+# packages/core/src/project.ts's findProjectRoot() as its primary
+# resolution signal. Written unconditionally, first, regardless of what
+# happens in the rest of this script: a Finder/Dock-launched (or
+# Start-Menu-launched) desktop app has no shell env vars and no
+# meaningful working directory to fall back on, so without this pin a
+# brand-new install would land straight on the app's "browse for my aplyx
+# folder" manual recovery screen every time.
+$pinDir = Join-Path $HOME ".aplyx"
+New-Item -ItemType Directory -Force -Path $pinDir | Out-Null
+Set-Content -Path (Join-Path $pinDir "root") -Value $projectRoot -NoNewline
+
 # --- 1. Prerequisites --------------------------------------------------------
 # Detect everything missing FIRST (Python + the one required Python
 # package, pypdf - resume PDF conversion silently can't work without it)
 # and ask once, rather than hard-failing on the first missing thing: most
 # users running the one-liner have no idea what pypdf even is, and would
-# rather applyr just installed it. No jq here - this path is pure
+# rather aplyx just installed it. No jq here - this path is pure
 # PowerShell/Python by design (see the file header).
 $py = Find-Python
 $missingPython = -not $py
@@ -105,7 +117,7 @@ if ($missingPython -or $missingPypdf) {
   Write-Host ""
   if ($missingPython) { Warn "not detected: Python 3" }
   if ($missingPypdf)  { Warn "not detected (Python package): pypdf - needed for resume PDF conversion" }
-  Warn "these are needed to continue installing applyr."
+  Warn "these are needed to continue installing aplyx."
   $installDeps = Read-Host "Install them now? [Y/n]"
   if (-not $installDeps) { $installDeps = "y" }
   if ($installDeps -notmatch '^[Yy]') {
@@ -159,7 +171,7 @@ if (Test-Path "config\targets.json") {
   Say "config/targets.json exists - keeping it."
 } else {
   Copy-Item "config\targets.example.json" "config\targets.json"
-  Say "created config/targets.json from the example - fill placeholders (or run 'applyr setup')."
+  Say "created config/targets.json from the example - fill placeholders (or run 'aplyx setup')."
 }
 
 # --- 2b. Discord (optional, opt-in) ------------------------------------------
@@ -192,7 +204,7 @@ if (Test-Path $discordLive) {
       $s = $all; $r = $all; $f = $all; $m = $all
     }
     if ([string]::IsNullOrWhiteSpace($s)) {
-      Warn "no webhook URL entered - writing Discord as disabled; enable later with 'applyr setup'."
+      Warn "no webhook URL entered - writing Discord as disabled; enable later with 'aplyx setup'."
       Write-DisabledDiscord
     } else {
       $webhooks = [ordered]@{ success = $s; needs_review = $r; failed = $f }
@@ -202,7 +214,7 @@ if (Test-Path $discordLive) {
     }
   } else {
     Write-DisabledDiscord
-    Say "Discord skipped - outcomes stay local (state files + TUI). Enable any time with 'applyr setup'."
+    Say "Discord skipped - outcomes stay local (state files + TUI). Enable any time with 'aplyx setup'."
   }
 }
 
@@ -228,7 +240,7 @@ if (Test-Path "config\harness.json") {
   $harness = ""
   if ($detected.Count -gt 1) {
     Write-Host ""
-    Write-Host "Which coding agent should applyr use for runs?"
+    Write-Host "Which coding agent should aplyx use for runs?"
     for ($i = 0; $i -lt $detected.Count; $i++) { Write-Host ("  {0}) {1}" -f ($i+1), $labels[$detected[$i]]) }
     $choice = Read-Host ("Choose [1-{0}, default 1]" -f $detected.Count)
     $n = 0
@@ -246,12 +258,12 @@ if (Test-Path "config\harness.json") {
 }
 
 # --- 4. Profile (safe_fields, LOCAL ONLY) -------------------------------
-Say "profile: run 'applyr' (or 'applyr setup') to fill in your name, contact info, and job targets through the guided wizard - or edit config/targets.json by hand (see the _help notes in config/targets.example.json)."
+Say "profile: run 'aplyx' (or 'aplyx setup') to fill in your name, contact info, and job targets through the guided wizard - or edit config/targets.json by hand (see the _help notes in config/targets.example.json)."
 New-Item -ItemType Directory -Force -Path "data\resumes" | Out-Null
 Write-Host ""
 Write-Host "[docs] Resumes: add your base resumes (markdown + matching PDF) to" -ForegroundColor Cyan
 Write-Host ("       " + (Join-Path $projectRoot "data\resumes")) -ForegroundColor Cyan
-Write-Host "       See docs/SETUP.md for the expected filenames - applyr picks one" -ForegroundColor Cyan
+Write-Host "       See docs/SETUP.md for the expected filenames - aplyx picks one" -ForegroundColor Cyan
 Write-Host "       per job by category and tailors it. This folder is gitignored - local only." -ForegroundColor Cyan
 Write-Host ""
 
@@ -291,7 +303,7 @@ Py @("scripts\validate\validate_local_config.py")
 if ($LASTEXITCODE -eq 0) {
   Say "config valid."
 } else {
-  Warn "config not valid yet - edit the files named above (or run 'applyr setup'), then re-run the validator."
+  Warn "config not valid yet - edit the files named above (or run 'aplyx setup'), then re-run the validator."
 }
 
 # --- 8. TUI / extension (optional) -------------------------------------------
@@ -314,7 +326,7 @@ function Build-NodeSurface {
 if (Get-Command npm -ErrorAction SilentlyContinue) {
   # packages/core has no install/prepare hook that builds it automatically -
   # app/'s and desktop/'s own `tsc` builds both need its dist/ already
-  # present to resolve `@applyr/core/*` imports, which is never true on a
+  # present to resolve `@aplyx/core/*` imports, which is never true on a
   # fresh clone. Build it first so both surfaces build clean below.
   # try/catch, not just a $LASTEXITCODE check - same native-command-under-
   # Stop gotcha noted by the Python check above; this step must only warn,
@@ -340,7 +352,7 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 # usable either way.
 if ((Test-Path "desktop\package.json") -and (Get-Command npm -ErrorAction SilentlyContinue)) {
   Write-Host ""
-  Write-Host "applyr also has an early-preview desktop app (Tauri), alongside the TUI."
+  Write-Host "aplyx also has an early-preview desktop app (Tauri), alongside the TUI."
   Write-Host "Building it needs a Rust toolchain and Visual C++ Build Tools - this script"
   Write-Host "offers to install anything missing, and first-time compiling can take"
   Write-Host "several minutes."
@@ -366,64 +378,77 @@ if ((Test-Path "desktop\package.json") -and (Get-Command npm -ErrorAction Silent
   }
 }
 
-# --- 9. `applyr` command on PATH ---------------------------------------------
+# --- 9. `aplyx` command on PATH ---------------------------------------------
 $cliJs = Join-Path $projectRoot "app\dist\cli.js"
 if ((Test-Path $cliJs) -and (Get-Command node -ErrorAction SilentlyContinue)) {
-  $binDir = if ($env:APPLYR_BIN) { $env:APPLYR_BIN } else { Join-Path $env:LOCALAPPDATA "applyr\bin" }
+  $binDir = if ($env:APLYX_BIN) { $env:APLYX_BIN } elseif ($env:FLUX_BIN) { $env:FLUX_BIN } else { Join-Path $env:LOCALAPPDATA "aplyx\bin" }
   New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-  $cmdShim = Join-Path $binDir "applyr.cmd"
-  $ps1Shim = Join-Path $binDir "applyr.ps1"
+  $cmdShim = Join-Path $binDir "aplyx.cmd"
+  $ps1Shim = Join-Path $binDir "aplyx.ps1"
 
-  $foreign = (Test-Path $cmdShim) -and -not ((Get-Content $cmdShim -Raw -ErrorAction SilentlyContinue) -match "applyr wrapper")
+  # Clean up an older-name shim from a previous rebrand so a re-run doesn't
+  # leave both `flux` and `aplyx` on PATH pointing at this checkout.
+  foreach ($oldName in @("flux")) {
+    $oldShim = Join-Path $binDir "$oldName.cmd"
+    if ((Test-Path $oldShim) -and ((Get-Content $oldShim -Raw -ErrorAction SilentlyContinue) -match "$oldName wrapper") -and ((Get-Content $oldShim -Raw -ErrorAction SilentlyContinue) -match [regex]::Escape($projectRoot))) {
+      Remove-Item $oldShim, (Join-Path $binDir "$oldName.ps1") -ErrorAction SilentlyContinue
+      Say "removed the older ``$oldName`` command ($oldShim)."
+    }
+  }
+
+  $foreign = (Test-Path $cmdShim) -and -not ((Get-Content $cmdShim -Raw -ErrorAction SilentlyContinue) -match "aplyx wrapper")
   if ($foreign) {
-    Warn "$cmdShim exists and is not applyr's wrapper - leaving it alone."
+    Warn "$cmdShim exists and is not aplyx's wrapper - leaving it alone."
   } else {
     @"
 @echo off
-REM applyr wrapper - generated by scripts/install/install.ps1; safe to delete.
+REM aplyx wrapper - generated by scripts/install/install.ps1; safe to delete.
 REM Falls back to common install locations if this was moved or renamed
 REM after install, before giving up with an actionable error.
 set "PIN=$projectRoot"
 set "ROOT="
-if defined APPLYR_ROOT if exist "%APPLYR_ROOT%\app\dist\cli.js" set "ROOT=%APPLYR_ROOT%"
+if defined APLYX_ROOT if exist "%APLYX_ROOT%\app\dist\cli.js" set "ROOT=%APLYX_ROOT%"
 if not defined ROOT if exist "%PIN%\app\dist\cli.js" set "ROOT=%PIN%"
-if not defined ROOT if defined APPLYR_HOME if exist "%APPLYR_HOME%\app\dist\cli.js" set "ROOT=%APPLYR_HOME%"
-if not defined ROOT if exist "%USERPROFILE%\applyr\app\dist\cli.js" set "ROOT=%USERPROFILE%\applyr"
+if not defined ROOT if defined APLYX_HOME if exist "%APLYX_HOME%\app\dist\cli.js" set "ROOT=%APLYX_HOME%"
+if not defined ROOT if defined FLUX_ROOT if exist "%FLUX_ROOT%\app\dist\cli.js" set "ROOT=%FLUX_ROOT%"
+if not defined ROOT if defined FLUX_HOME if exist "%FLUX_HOME%\app\dist\cli.js" set "ROOT=%FLUX_HOME%"
+if not defined ROOT if exist "%USERPROFILE%\aplyx\app\dist\cli.js" set "ROOT=%USERPROFILE%\aplyx"
+if not defined ROOT if exist "%USERPROFILE%\flux\app\dist\cli.js" set "ROOT=%USERPROFILE%\flux"
 if not defined ROOT if exist "%USERPROFILE%\ares\app\dist\cli.js" set "ROOT=%USERPROFILE%\ares"
 if not defined ROOT goto :notfound
-if not defined APPLYR_ROOT set "APPLYR_ROOT=%ROOT%"
+if not defined APLYX_ROOT set "APLYX_ROOT=%ROOT%"
 node "%ROOT%\app\dist\cli.js" %*
 goto :eof
 :notfound
-echo applyr: install directory not found - last known %PIN% 1>&2
-echo applyr: if you moved it, set APPLYR_ROOT to the new location or re-run its installer. 1>&2
+echo aplyx: install directory not found - last known %PIN% 1>&2
+echo aplyx: if you moved it, set APLYX_ROOT to the new location or re-run its installer. 1>&2
 exit /b 1
 "@ | Set-Content -Encoding ASCII $cmdShim
     @"
-# applyr wrapper - generated by scripts/install/install.ps1; safe to delete.
+# aplyx wrapper - generated by scripts/install/install.ps1; safe to delete.
 # Falls back to common install locations if this was moved or renamed
 # after install, before giving up with an actionable error.
 `$pin = "$projectRoot"
 `$root = `$null
-foreach (`$c in @(`$env:APPLYR_ROOT, `$pin, `$env:APPLYR_HOME, (Join-Path `$env:USERPROFILE "applyr"), (Join-Path `$env:USERPROFILE "ares"))) {
+foreach (`$c in @(`$env:APLYX_ROOT, `$pin, `$env:APLYX_HOME, `$env:FLUX_ROOT, `$env:FLUX_HOME, (Join-Path `$env:USERPROFILE "aplyx"), (Join-Path `$env:USERPROFILE "flux"), (Join-Path `$env:USERPROFILE "ares"))) {
   if (`$c -and (Test-Path (Join-Path `$c "app\dist\cli.js"))) { `$root = `$c; break }
 }
 if (-not `$root) {
-  Write-Host "applyr: install directory not found (last known: $projectRoot)." -ForegroundColor Red
-  Write-Host "applyr: if you moved it, set APPLYR_ROOT to the new location or re-run its installer." -ForegroundColor Red
+  Write-Host "aplyx: install directory not found (last known: $projectRoot)." -ForegroundColor Red
+  Write-Host "aplyx: if you moved it, set APLYX_ROOT to the new location or re-run its installer." -ForegroundColor Red
   exit 1
 }
-if (-not `$env:APPLYR_ROOT) { `$env:APPLYR_ROOT = `$root }
+if (-not `$env:APLYX_ROOT) { `$env:APLYX_ROOT = `$root }
 node "`$root\app\dist\cli.js" @args
 "@ | Set-Content -Encoding UTF8 $ps1Shim
-    Say "installed the applyr command: $cmdShim"
+    Say "installed the aplyx command: $cmdShim"
 
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if (($userPath -split ";") -notcontains $binDir) {
       [Environment]::SetEnvironmentVariable("Path", ($userPath.TrimEnd(";") + ";" + $binDir), "User")
-      Warn "added $binDir to your user PATH - open a NEW terminal for `applyr` to resolve."
+      Warn "added $binDir to your user PATH - open a NEW terminal for `aplyx` to resolve."
     }
   }
 }
 
-Say "done. Open a new terminal and try: applyr   (updates auto-install; APPLYR_AUTO_UPDATE=0 disables)."
+Say "done. Open a new terminal and try: aplyx   (updates auto-install; APLYX_AUTO_UPDATE=0 disables)."

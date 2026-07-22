@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "applyr — application assistant",
+  "name": "aplyx — application assistant",
   "version": "0.8.2",
-  "description": "Autofill job applications from your local applyr profile, see the deterministic fit verdict, and record outcomes locally. Never submits a form for you.",
+  "description": "Autofill job applications from your local aplyx profile, see the deterministic fit verdict, and record outcomes locally. Never submits a form for you.",
   "permissions": ["storage"],
   "host_permissions": ["http://127.0.0.1/*"],
   "background": {

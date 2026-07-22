@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { filterSuggestions } from "@applyr/core/autocomplete.js";
+import { filterSuggestions } from "@aplyx/core/autocomplete.js";
 import "./TagSearchInput.css";
 
 /**

@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
-import { activeRunPid, latestSessionLog, readHeartbeat } from "@applyr/core/state.js";
-import { py, stopPid, stopProcessTree } from "@applyr/core/platform.js";
+import { activeRunPid, latestSessionLog, readHeartbeat } from "@aplyx/core/state.js";
+import { py, stopPid, stopProcessTree } from "@aplyx/core/platform.js";
 import { theme, statusGlyph, capTier, harnessGradient, HARNESS_WAVE_TICK_MS, HARNESS_WAVE_STEP } from "../theme.js";
 import { resolveHarnessId } from "../harness.js";
 import { RainbowText, AutoSparkleText, SpinnerGlyph, GradientProgressBar, KeyHints } from "./KeyHints.js";
@@ -172,7 +172,7 @@ export function parseCurrentApplication(lines: string[]): { title: string; compa
  * Two typed inputs, both opt-in (never captured on mount): `e` sets the
  * per-cycle application cap (1–25, tier-colored, MAX warns loudly), and
  * `p` sets an optional extra instruction the orchestrator receives via
- * APPLYR_EXTRA_PROMPT — leave it empty to run the standard workflow.
+ * APLYX_EXTRA_PROMPT — leave it empty to run the standard workflow.
  *
  * While a run is live, `x` opens a two-step stop confirmation (`x` again
  * stops; `c` instead opens the same prompt editor to type a correction,
@@ -352,13 +352,14 @@ export function RunScreen({
     const runner = py(["scripts/runtime/run_job_agent.py"]);
     const proc = spawn(runner.cmd, runner.args, {
       cwd: root,
-      // APPLYR_SESSION_CAP is the documented name; the legacy ARES_* name
-      // is still set so an un-migrated runner copy honors the cap too.
+      // APLYX_SESSION_CAP is the documented name; the legacy FLUX_*/ARES_*
+      // names are still set so an un-migrated runner copy honors the cap too.
       env: {
         ...process.env,
-        APPLYR_SESSION_CAP: String(cap),
+        APLYX_SESSION_CAP: String(cap),
+        FLUX_SESSION_CAP: String(cap),
         ARES_SESSION_CAP: String(cap),
-        ...(extraPrompt ? { APPLYR_EXTRA_PROMPT: extraPrompt } : {}),
+        ...(extraPrompt ? { APLYX_EXTRA_PROMPT: extraPrompt, FLUX_EXTRA_PROMPT: extraPrompt } : {}),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

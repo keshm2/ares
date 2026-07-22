@@ -3,11 +3,11 @@ import { Box, Text, useInput, type Key } from "ink";
 import fs from "node:fs";
 import path from "node:path";
 import { theme, MIN_COLUMNS, MIN_ROWS, SIDE_PANEL_WIDTH } from "../../theme.js";
-import { readSafeField, writeSafeField, readTargetsArrayList, writeTargetsArrayList } from "@applyr/core/settings.js";
-import { readProfileUsername, writeProfileUsername } from "@applyr/core/profileLinks.js";
-import { US_CITIES } from "@applyr/core/data/usCities.js";
-import { loadCompanyDirectory, companyWeight, type CompanyEntry } from "@applyr/core/data/companyDirectory.js";
-import { readCommittedCompanyDisplays, writeCommittedCompanyDisplays } from "@applyr/core/companyTargets.js";
+import { readSafeField, writeSafeField, readTargetsArrayList, writeTargetsArrayList } from "@aplyx/core/settings.js";
+import { readProfileUsername, writeProfileUsername } from "@aplyx/core/profileLinks.js";
+import { US_CITIES } from "@aplyx/core/data/usCities.js";
+import { loadCompanyDirectory, companyWeight, type CompanyEntry } from "@aplyx/core/data/companyDirectory.js";
+import { readCommittedCompanyDisplays, writeCommittedCompanyDisplays } from "@aplyx/core/companyTargets.js";
 import { KeyHints } from "../KeyHints.js";
 import { OnboardingSidePanel } from "../OnboardingSidePanel.js";
 import { RESUMES_HINTS, RESUMES_PROMPT_HINTS } from "../ResumesScreen.js";
@@ -20,7 +20,7 @@ import {
 } from "../TextInput.js";
 import { filterSuggestions } from "../autocomplete.js";
 import { acceptDobDigit, deleteDobDigit, dobDigits, dobError, formatDob } from "./dateInput.js";
-import { PAGES, TOTAL_FIELDS, RESUME_PAGE_INDEX, COMPLETION_PAGE_INDEX, type FieldDef } from "@applyr/core/onboarding/fields.js";
+import { PAGES, TOTAL_FIELDS, RESUME_PAGE_INDEX, COMPLETION_PAGE_INDEX, type FieldDef } from "@aplyx/core/onboarding/fields.js";
 import { useFieldFocus } from "./useFieldFocus.js";
 import { useSkipDefaultFlow } from "./useSkipDefaultFlow.js";
 import { QuestionFrame } from "./QuestionFrame.js";
@@ -610,7 +610,7 @@ export function OnboardingWizard({ root, onDone }: { root: string; onDone: () =>
     return (
       <Box flexDirection="column" paddingX={1} paddingTop={2} alignItems="center">
         <Text bold color={theme.accent}>
-          applyr
+          aplyx
         </Text>
         <Text dimColor>terminal too small</Text>
         <Box marginTop={1} flexDirection="column" alignItems="center">
@@ -628,7 +628,7 @@ export function OnboardingWizard({ root, onDone }: { root: string; onDone: () =>
       <Box flexDirection="column" paddingX={1} paddingTop={1}>
         <Box borderStyle="round" borderColor={theme.rule} flexDirection="column" width={boxWidth} paddingX={2} paddingY={1}>
           <Text bold color={theme.accent}>
-            Welcome to applyr!
+            Welcome to aplyx!
           </Text>
           <Box marginTop={1}>
             <Text wrap="wrap">
@@ -699,7 +699,7 @@ export function OnboardingWizard({ root, onDone }: { root: string; onDone: () =>
             placeholder={field.placeholder}
             warning={
               isFocused && skipFlow.warned
-                ? `No roles entered — applyr will use its default list: ${readExampleArray(root, "role_keywords").join(", ")}. Press enter again to accept, or start typing to override.`
+                ? `No roles entered — aplyx will use its default list: ${readExampleArray(root, "role_keywords").join(", ")}. Press enter again to accept, or start typing to override.`
                 : undefined
             }
           />
@@ -732,7 +732,7 @@ export function OnboardingWizard({ root, onDone }: { root: string; onDone: () =>
         const warning = isFocused
           ? skipFlow.warned
             ? field.kind === "multi-location"
-              ? "No preferred locations — applyr still searches the whole US either way; these only push matching jobs to the top. Press enter again to continue, or start typing to add one."
+              ? "No preferred locations — aplyx still searches the whole US either way; these only push matching jobs to the top. Press enter again to continue, or start typing to add one."
               : "No companies added — the project's vetted company list is still watched regardless. Press enter again to continue, or start typing to add one."
             : entryHint || undefined
           : undefined;
@@ -771,7 +771,7 @@ export function OnboardingWizard({ root, onDone }: { root: string; onDone: () =>
         </Box>
       </Box>
     );
-    footerHints = "enter open applyr";
+    footerHints = "enter open aplyx";
   } else if (isResumePage) {
     body = (
       <ResumeStep root={root} active={isResumePage} onInputActiveChange={setResumeInputActive} contentRows={contentRows} />

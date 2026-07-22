@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { py } from "@applyr/core/platform.js";
+import { py } from "@aplyx/core/platform.js";
 
 /**
  * Reader/writer for the interest-letter store. Mirrors the rest of the TUI's

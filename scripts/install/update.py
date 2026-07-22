@@ -25,7 +25,7 @@ Result line (always printed, last):
   update: check-failed <reason>   (auto mode: exit 0)
   update: failed <reason>         (auto mode: exit 0)
 
-Env overrides: APPLYR_UPDATE_URL, APPLYR_TARBALL_URL.
+Env overrides: APLYX_UPDATE_URL, APLYX_TARBALL_URL.
 """
 
 from __future__ import annotations
@@ -42,12 +42,18 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 VERSION_URL = os.environ.get(
-    "APPLYR_UPDATE_URL",
-    "https://raw.githubusercontent.com/keshm2/applyr/main/VERSION",
+    "APLYX_UPDATE_URL",
+    os.environ.get(
+        "FLUX_UPDATE_URL",
+        "https://raw.githubusercontent.com/keshm2/aplyx/main/VERSION",
+    ),
 )
 TARBALL_URL = os.environ.get(
-    "APPLYR_TARBALL_URL",
-    "https://codeload.github.com/keshm2/applyr/tar.gz/refs/heads/main",
+    "APLYX_TARBALL_URL",
+    os.environ.get(
+        "FLUX_TARBALL_URL",
+        "https://codeload.github.com/keshm2/aplyx/tar.gz/refs/heads/main",
+    ),
 )
 
 
@@ -153,7 +159,7 @@ def _overlay_tarball(fail_open) -> None:
             with tarfile.open(tmp_tgz, "r:gz") as tar:
                 members = []
                 for m in tar.getmembers():
-                    # strip-components=1: drop the leading "applyr-main/" segment.
+                    # strip-components=1: drop the leading "aplyx-main/" segment.
                     parts = m.name.split("/", 1)
                     if len(parts) < 2 or not parts[1]:
                         continue

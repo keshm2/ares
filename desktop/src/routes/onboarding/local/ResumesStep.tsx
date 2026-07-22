@@ -42,7 +42,7 @@ export function ResumesStep({ root }: { root: string }) {
   return (
     <div>
       <p>
-        Add at least one base resume — applyr tailors a copy of it per application. PDFs work
+        Add at least one base resume — aplyx tailors a copy of it per application. PDFs work
         best; you can add more (per role type) any time from Resumes in Settings.
       </p>
       {files.length > 0 && (
@@ -64,7 +64,7 @@ export function ResumesStep({ root }: { root: string }) {
       )}
       {files.length === 0 && (
         <p className="field-help" style={{ marginTop: "0.75rem" }}>
-          You can skip this and add resumes later — applyr won&rsquo;t apply anywhere without one.
+          You can skip this and add resumes later — aplyx won&rsquo;t apply anywhere without one.
         </p>
       )}
     </div>

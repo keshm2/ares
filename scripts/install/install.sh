@@ -5,7 +5,7 @@
 # setup. Non-destructive: existing live configs are never overwritten.
 #
 #   bash scripts/install/install.sh                                      # from a clone/unpacked release
-#   curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.sh | bash
 #
 # Steps:
 #   0. Bootstrap: when piped (curl | bash) or run outside the repo,
@@ -37,8 +37,8 @@ fi
 # --- 0. Bootstrap (curl | bash, or run outside the repo) ----------------------
 # When the script is piped, BASH_SOURCE is empty and there is no repo around
 # it. Download the source tarball, unpack, and re-exec from inside it.
-# (The npm-installed `applyr` command mirrors this bootstrap; its own
-# --no-core flag / APPLYR_SKIP_CORE=1 opt-out has no equivalent here since
+# (The npm-installed `aplyx` command mirrors this bootstrap; its own
+# --no-core flag / APLYX_SKIP_CORE=1 opt-out has no equivalent here since
 # this script IS the install.)
 SELF="${BASH_SOURCE[0]:-}"
 if [ -n "$SELF" ] && [ -f "$(dirname "$SELF")/../../AGENTS.md" ]; then
@@ -47,11 +47,11 @@ if [ -n "$SELF" ] && [ -f "$(dirname "$SELF")/../../AGENTS.md" ]; then
 else
   command -v curl >/dev/null 2>&1 || fail "curl is required for the one-line install"
   command -v tar  >/dev/null 2>&1 || fail "tar is required for the one-line install"
-  TARGET_DIR="${APPLYR_HOME:-$HOME/applyr}"
+  TARGET_DIR="${APLYX_HOME:-${FLUX_HOME:-$HOME/aplyx}}"
   if [ -f "$TARGET_DIR/AGENTS.md" ]; then
     say "existing install found at $TARGET_DIR — refreshing it from GitHub before re-running."
   else
-    say "downloading applyr into $TARGET_DIR …"
+    say "downloading aplyx into $TARGET_DIR …"
   fi
   mkdir -p "$TARGET_DIR"
   # Always re-fetch and overwrite tracked files, even for an existing install:
@@ -59,7 +59,7 @@ else
   # bug) instead of re-running whatever happens to already be on disk.
   # Gitignored local state (config/*.json, data/, logs/, docs/PLAN.md)
   # isn't in the tarball, so it's left untouched.
-  curl -fsSL "https://codeload.github.com/keshm2/applyr/tar.gz/refs/heads/main" \
+  curl -fsSL "https://codeload.github.com/keshm2/aplyx/tar.gz/refs/heads/main" \
     | tar -xz --strip-components=1 -C "$TARGET_DIR"
   # Re-attach stdin to the terminal so the interactive prompts below work
   # even though the script itself arrived on stdin.
@@ -71,12 +71,22 @@ else
 fi
 cd "$PROJECT_ROOT"
 
+# Pin this checkout's location to ~/.aplyx/root, read by
+# packages/core/src/project.ts's findProjectRoot() as its primary
+# resolution signal. Written unconditionally, first, regardless of what
+# happens in the rest of this script: a Finder/Dock-launched desktop app
+# has no shell env vars and no meaningful working directory to fall back
+# on, so without this pin a brand-new install would land straight on the
+# app's "browse for my aplyx folder" manual recovery screen every time.
+mkdir -p "$HOME/.aplyx"
+printf '%s' "$PROJECT_ROOT" > "$HOME/.aplyx/root"
+
 # --- 1. Prerequisites --------------------------------------------------------
 # Detect everything missing FIRST (tools + the one required Python package,
 # pypdf — resume PDF conversion silently can't work without it) and ask
 # once, rather than hard-failing on the first missing thing: most users
 # running the one-liner have no idea what jq/python3/pypdf even are, and
-# would rather applyr just installed them.
+# would rather aplyx just installed them.
 MISSING_TOOLS=""
 command -v jq      >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS jq"
 command -v python3 >/dev/null 2>&1 || MISSING_TOOLS="$MISSING_TOOLS python3"
@@ -91,7 +101,7 @@ if [ -n "$MISSING_TOOLS" ] || [ -n "$MISSING_PY_PKGS" ]; then
   echo
   [ -n "$MISSING_TOOLS" ]  && warn "not detected: $MISSING_TOOLS"
   [ -n "$MISSING_PY_PKGS" ] && warn "not detected (Python package): $MISSING_PY_PKGS — needed for resume PDF conversion"
-  warn "these are needed to continue installing applyr."
+  warn "these are needed to continue installing aplyx."
   INSTALL_DEPS="y"
   if [ -t 0 ]; then
     printf "Install them now? [Y/n] "
@@ -142,13 +152,13 @@ if [ -f "config/targets.json" ]; then
   say "config/targets.json exists — keeping it."
 else
   cp "config/targets.example.json" "config/targets.json"
-  say "created config/targets.json from the example — fill in the placeholders (or run 'applyr setup')."
+  say "created config/targets.json from the example — fill in the placeholders (or run 'aplyx setup')."
 fi
 
 # --- 2b. Discord status updates (OPTIONAL, opt-in) -----------------------------
 # Outcomes always land in the local state files and the TUI; Discord
 # webhooks are an optional extra channel. Opting out writes a disabled
-# config so the validator stays green; enable later via 'applyr setup'.
+# config so the validator stays green; enable later via 'aplyx setup'.
 DISCORD_LIVE="config/discord_config.json"
 write_disabled_discord() {
   printf '{\n  "enabled": false,\n  "webhooks": {}\n}\n' > "$DISCORD_LIVE"
@@ -184,7 +194,7 @@ elif [ -t 0 ]; then
       U_SUCCESS="$U_ALL"; U_REVIEW="$U_ALL"; U_FAILED="$U_ALL"; U_SUMMARY="$U_ALL"
     fi
     if [ -z "$U_SUCCESS" ]; then
-      warn "no webhook URL entered — writing Discord as disabled; enable later with 'applyr setup'."
+      warn "no webhook URL entered — writing Discord as disabled; enable later with 'aplyx setup'."
       write_disabled_discord
     else
       jq -n --arg s "$U_SUCCESS" --arg r "$U_REVIEW" --arg f "$U_FAILED" --arg m "$U_SUMMARY" \
@@ -194,11 +204,11 @@ elif [ -t 0 ]; then
     fi
   else
     write_disabled_discord
-    say "Discord skipped — outcomes stay local (state files + TUI). Enable any time with 'applyr setup'."
+    say "Discord skipped — outcomes stay local (state files + TUI). Enable any time with 'aplyx setup'."
   fi
 else
   write_disabled_discord
-  say "non-interactive install — wrote $DISCORD_LIVE as disabled (enable via 'applyr setup')."
+  say "non-interactive install — wrote $DISCORD_LIVE as disabled (enable via 'aplyx setup')."
 fi
 
 # --- 3. Harness detection (Phase 15 + 16: all four major coding agents) -------
@@ -233,7 +243,7 @@ else
   if [ "$#" -gt 1 ] && [ -t 0 ]; then
     # More than one agent installed and we can ask — let the user choose.
     echo
-    echo "Which coding agent should applyr use for runs?"
+    echo "Which coding agent should aplyx use for runs?"
     i=1
     for AGENT in $DETECTED; do
       echo "  $i) $(label_for "$AGENT")"
@@ -262,13 +272,13 @@ else
 fi
 
 # --- 4. User profile (safe_fields) ---------------------------------------
-say "profile: run 'applyr' (or 'applyr setup') to fill in your name, contact info, and job targets through the guided wizard — or edit config/targets.json by hand (see the _help notes in config/targets.example.json)."
+say "profile: run 'aplyx' (or 'aplyx setup') to fill in your name, contact info, and job targets through the guided wizard — or edit config/targets.json by hand (see the _help notes in config/targets.example.json)."
 
 mkdir -p data/resumes
 echo
 echo "${C_NOTICE}📄  Resumes: add your base resumes (markdown + matching PDF) to${C_RESET}"
 echo "${C_NOTICE}    $PROJECT_ROOT/data/resumes/${C_RESET}"
-echo "${C_NOTICE}    See docs/SETUP.md for the expected filenames — applyr picks one per${C_RESET}"
+echo "${C_NOTICE}    See docs/SETUP.md for the expected filenames — aplyx picks one per${C_RESET}"
 echo "${C_NOTICE}    job by category and tailors it. This folder is gitignored — local only.${C_RESET}"
 echo
 
@@ -310,7 +320,7 @@ python3 scripts/validate/generate_agent_definitions.py
 if bash scripts/validate/validate_local_config.sh; then
   say "config valid."
 else
-  warn "config not valid yet — edit the files named above (or run 'applyr setup'), then re-run:"
+  warn "config not valid yet — edit the files named above (or run 'aplyx setup'), then re-run:"
   warn "  bash scripts/validate/validate_local_config.sh"
 fi
 
@@ -333,7 +343,7 @@ build_node_surface() {
 if command -v npm >/dev/null 2>&1; then
   # packages/core has no install/prepare hook that builds it automatically —
   # app/'s and desktop/'s own `tsc` builds both need its dist/ already
-  # present to resolve `@applyr/core/*` imports, which is never true on a
+  # present to resolve `@aplyx/core/*` imports, which is never true on a
   # fresh clone. Build it first so both surfaces build clean below.
   npm run build:core --silent || warn "core build failed — the TUI build below will likely fail too. See docs/SETUP.md."
   build_node_surface app "the TUI"
@@ -350,7 +360,7 @@ fi
 # TUI install above already succeeded and stays fully usable either way.
 if [ -f "desktop/package.json" ] && command -v npm >/dev/null 2>&1; then
   echo
-  echo "applyr also has an early-preview desktop app (Tauri), alongside the TUI."
+  echo "aplyx also has an early-preview desktop app (Tauri), alongside the TUI."
   echo "Building it needs a Rust toolchain and some OS build tools — this script"
   echo "offers to install anything missing, and first-time compiling can take"
   echo "several minutes."
@@ -367,38 +377,45 @@ if [ -f "desktop/package.json" ] && command -v npm >/dev/null 2>&1; then
   fi
 fi
 
-# --- 9. `applyr` command on PATH ------------------------------------------------
-# One-command install ends with a working `applyr`: a tiny wrapper in
-# ~/.local/bin (override with APPLYR_BIN) pins APPLYR_ROOT to this
-# checkout. Never overwrites a foreign `applyr` binary.
+# --- 9. `aplyx` command on PATH ------------------------------------------------
+# One-command install ends with a working `aplyx`: a tiny wrapper in
+# ~/.local/bin (override with APLYX_BIN) pins APLYX_ROOT to this
+# checkout. Never overwrites a foreign `aplyx` binary.
 if [ -f "app/dist/cli.js" ] && command -v node >/dev/null 2>&1; then
-  BIN_DIR="${APPLYR_BIN:-$HOME/.local/bin}"
-  WRAPPER="$BIN_DIR/applyr"
-  if [ -e "$WRAPPER" ] && ! grep -q "applyr wrapper" "$WRAPPER" 2>/dev/null; then
-    warn "$WRAPPER exists and is not applyr's wrapper — leaving it alone."
+  BIN_DIR="${APLYX_BIN:-${FLUX_BIN:-$HOME/.local/bin}}"
+  WRAPPER="$BIN_DIR/aplyx"
+  # Clean up an older-name wrapper from a previous rebrand so a re-run
+  # doesn't leave both `flux` and `aplyx` on PATH pointing at this checkout.
+  OLD_WRAPPER="$BIN_DIR/flux"
+  if [ -f "$OLD_WRAPPER" ] && grep -q "flux wrapper" "$OLD_WRAPPER" 2>/dev/null && grep -q "$PROJECT_ROOT" "$OLD_WRAPPER" 2>/dev/null; then
+    rm -f "$OLD_WRAPPER"
+    say "removed the older \`flux\` command ($OLD_WRAPPER)."
+  fi
+  if [ -e "$WRAPPER" ] && ! grep -q "aplyx wrapper" "$WRAPPER" 2>/dev/null; then
+    warn "$WRAPPER exists and is not aplyx's wrapper — leaving it alone."
   else
     mkdir -p "$BIN_DIR"
     cat > "$WRAPPER" <<WRAP
 #!/bin/sh
-# applyr wrapper — generated by scripts/install/install.sh; safe to delete.
+# aplyx wrapper — generated by scripts/install/install.sh; safe to delete.
 # Falls back to common install locations if this was moved or renamed
 # after install, before giving up with an actionable error — rather
 # than the raw Node MODULE_NOT_FOUND stack trace a stale hardcoded
 # path would otherwise produce.
 PIN="$PROJECT_ROOT"
 ROOT=""
-for c in "\$APPLYR_ROOT" "\$PIN" "\$APPLYR_HOME" "\$HOME/applyr" "\$HOME/ares"; do
+for c in "\$APLYX_ROOT" "\$PIN" "\$APLYX_HOME" "\$FLUX_ROOT" "\$FLUX_HOME" "\$HOME/aplyx" "\$HOME/flux" "\$HOME/ares"; do
   if [ -n "\$c" ] && [ -f "\$c/app/dist/cli.js" ]; then ROOT="\$c"; break; fi
 done
 if [ -z "\$ROOT" ]; then
-  echo "applyr: install directory not found (last known: $PROJECT_ROOT)." >&2
-  echo "applyr: if you moved it, set APPLYR_ROOT to the new location or re-run its installer." >&2
+  echo "aplyx: install directory not found (last known: $PROJECT_ROOT)." >&2
+  echo "aplyx: if you moved it, set APLYX_ROOT to the new location or re-run its installer." >&2
   exit 1
 fi
-APPLYR_ROOT="\${APPLYR_ROOT:-\$ROOT}" exec node "\$ROOT/app/dist/cli.js" "\$@"
+APLYX_ROOT="\${APLYX_ROOT:-\$ROOT}" exec node "\$ROOT/app/dist/cli.js" "\$@"
 WRAP
     chmod +x "$WRAPPER"
-    say "installed the applyr command: $WRAPPER"
+    say "installed the aplyx command: $WRAPPER"
     case ":$PATH:" in
       *":$BIN_DIR:"*) ;;
       *) warn "$BIN_DIR is not on your PATH — add it (e.g. export PATH=\"$BIN_DIR:\$PATH\" in your shell profile)." ;;
@@ -406,4 +423,4 @@ WRAP
   fi
 fi
 
-say "done. Try: applyr   (updates auto-install on every run/launch; APPLYR_AUTO_UPDATE=0 disables, 'applyr update' runs one manually)."
+say "done. Try: aplyx   (updates auto-install on every run/launch; APLYX_AUTO_UPDATE=0 disables, 'aplyx update' runs one manually)."

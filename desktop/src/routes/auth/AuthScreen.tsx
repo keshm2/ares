@@ -27,7 +27,7 @@ export function AuthScreen() {
   const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   // Single place that decides where a completed sign-in lands: the
-  // applyr:// deep-link callback (email confirmation, Google OAuth) and a
+  // aplyx:// deep-link callback (email confirmation, Google OAuth) and a
   // password sign-in both just flip `status`/`onboardingCompleted` and let
   // this effect route — a returning user goes straight to the dashboard
   // instead of repeating the wizard every time; a first-time signup still
@@ -76,7 +76,7 @@ export function AuthScreen() {
           <h1>Hosted sign-in isn&rsquo;t set up yet</h1>
           <p className="auth-status-line">
             This installation doesn&rsquo;t have a hosted backend configured. Ask whoever set up
-            this copy of applyr to add <code>config/supabase.json</code>, or continue without an
+            this copy of aplyx to add <code>config/supabase.json</code>, or continue without an
             account.
           </p>
           <button className="auth-secondary" onClick={() => navigate("/onboarding/local")}>
@@ -136,7 +136,7 @@ export function AuthScreen() {
     if (result.error) setError(result.error);
     // A successful call opens the system browser for Google's consent
     // screen; there is no local navigation to perform here —
-    // AuthContext's deep-link listener exchanges the applyr://
+    // AuthContext's deep-link listener exchanges the aplyx://
     // auth-callback code and onAuthStateChange flips status once the
     // user finishes in the browser and the OS routes the redirect back.
   }

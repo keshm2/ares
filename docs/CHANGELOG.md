@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to applyr (formerly Ares) are documented here.
+All notable changes to aplyx (formerly Ares) are documented here.
 The format is roughly [Keep a Changelog](https://keepachangelog.com/)-style
 but trimmed to fit a small in-repo doc.
 
@@ -9,7 +9,7 @@ but trimmed to fit a small in-repo doc.
 
 ## [0.9.7a] — 2026-07-17
 
-npm package: `@keshm/applyr` version `0.9.7-alpha.0`.
+npm package: `@keshm/aplyx` version `0.9.7-alpha.0`.
 
 ### Added
 
@@ -28,7 +28,7 @@ npm package: `@keshm/applyr` version `0.9.7-alpha.0`.
   `0002_onboarding_completed.sql` — every table RLS-scoped to
   `auth.uid()`, a status-transition guard mirroring the local engine's
   never-downgrade rule, a private per-user resume storage bucket.
-  `applyr://auth-callback` deep link handles both the email-confirmation
+  `aplyx://auth-callback` deep link handles both the email-confirmation
   and Google OAuth redirects, since a desktop app can't sit at a
   `localhost` URL to receive them.
 - **All three installers can now also install the desktop app**, opt-in
@@ -45,7 +45,7 @@ npm package: `@keshm/applyr` version `0.9.7-alpha.0`.
   on macOS (falling back to `~/Applications` rather than requiring
   sudo), `apt`/`dnf`/an AppImage + app-launcher entry on Linux, a
   no-admin-prompt NSIS installer on Windows. Never fails the main
-  install — the TUI stays the reliable baseline either way. `applyr
+  install — the TUI stays the reliable baseline either way. `aplyx
   uninstall` removes the desktop app too, if present.
 - Settings (both TUI and the new desktop app) show a small, faded
   `build <version>` marker — one shared constant
@@ -87,7 +87,7 @@ npm package: `@keshm/applyr` version `0.9.7-alpha.0`.
 
 ## [0.9.1a] — 2026-07-16
 
-npm package: `@keshm/applyr` version `0.9.1-alpha.0`.
+npm package: `@keshm/aplyx` version `0.9.1-alpha.0`.
 
 ### Security
 
@@ -101,7 +101,7 @@ npm package: `@keshm/applyr` version `0.9.1-alpha.0`.
 ### Added
 
 - **Interest letters (Letters tab).** When an application asks "Why do you
-  want to work here?", applyr no longer invents an answer: it parks the job
+  want to work here?", aplyx no longer invents an answer: it parks the job
   and carries on. Write your own answer, or press `g` to have the new
   `@interest-letter` agent draft one grounded strictly in your resume and
   the JD — you edit and approve before anything is submitted. Approving is
@@ -136,7 +136,7 @@ npm package: `@keshm/applyr` version `0.9.1-alpha.0`.
 
 ## [0.9.0a] — 2026-07-15
 
-npm package: `@keshm/applyr` version `0.9.0-alpha.0`. Full notes:
+npm package: `@keshm/aplyx` version `0.9.0-alpha.0`. Full notes:
 [`RELEASE.md`](./RELEASE.md).
 
 ### Added
@@ -193,7 +193,7 @@ npm package: `@keshm/applyr` version `0.9.0-alpha.0`. Full notes:
 
 ## [0.8.43a] — 2026-07-14
 
-npm package: `@keshm/applyr` version `0.8.43-alpha.0`.
+npm package: `@keshm/aplyx` version `0.8.43-alpha.0`.
 
 ### Added
 
@@ -242,11 +242,11 @@ npm package: `@keshm/applyr` version `0.8.43-alpha.0`.
 
 ## [0.8.42a] — 2026-07-14
 
-npm package: `@keshm/applyr` version `0.8.42-alpha.0`.
+npm package: `@keshm/aplyx` version `0.8.42-alpha.0`.
 
 ### Added
 
-- **Resumes screen (6th TUI tab, `applyr resumes`, or the welcome
+- **Resumes screen (6th TUI tab, `aplyx resumes`, or the welcome
   menu).** Shows all 6 filenames `resume-tailor.md` actually reads,
   each marked ready / needs conversion / not added; `o` opens
   `data/resumes/` in Finder/Explorer/xdg-open; `c` converts a PDF
@@ -269,13 +269,13 @@ npm package: `@keshm/applyr` version `0.8.42-alpha.0`.
   after every update whenever a schedule is already present, so this
   class of bug can't recur for anyone past this release.
   **If you already have a schedule installed from before 0.8.4a**,
-  one-time fix: run `applyr` once and accept the update prompt, or
+  one-time fix: run `aplyx` once and accept the update prompt, or
   just re-run the installer — either refreshes the schedule. Simplest
-  option: `applyr uninstall` then reinstall.
+  option: `aplyx uninstall` then reinstall.
 
 ## [0.8.041a] — 2026-07-14
 
-npm package: `@keshm/applyr` version `0.8.41-alpha.0` (the human
+npm package: `@keshm/aplyx` version `0.8.41-alpha.0` (the human
 marker `0.8.041a` maps to `0.8.41-alpha.0` in strict semver — a
 leading zero in a numeric identifier, e.g. `041`, isn't valid semver
 and npm strips it silently on publish, so it's set explicitly here
@@ -285,16 +285,16 @@ instead).
 
 - **Installer PATH wrapper broke when the install directory was
   renamed or moved.** `scripts/install/install.sh` and `install.ps1`
-  generate a tiny launcher (`~/.local/bin/applyr` on Unix,
-  `applyr.cmd`/`applyr.ps1` on Windows) that baked in the absolute
+  generate a tiny launcher (`~/.local/bin/aplyx` on Unix,
+  `aplyx.cmd`/`aplyx.ps1` on Windows) that baked in the absolute
   install path as plain text at install time — moving or renaming
   that directory afterward (as just happened during the `0.8.4a`
-  restructure: `~/ares` → `~/applyr`) left the wrapper pointing at a
+  restructure: `~/ares` → `~/aplyx`) left the wrapper pointing at a
   path that no longer existed, surfacing as a raw Node
   `MODULE_NOT_FOUND` stack trace with no actionable guidance. Both
   wrappers now fall back through a short list of candidates —
   `$APPLYR_ROOT`, the originally recorded path, `$APPLYR_HOME`,
-  `~/applyr`, and `~/ares` (covering exactly this kind of rename in
+  `~/aplyx`, and `~/ares` (covering exactly this kind of rename in
   either direction) — before failing with a clear message pointing at
   `APPLYR_ROOT` or re-running the installer, instead of a cryptic
   crash. Verified with real (not just static) tests: normal launch,
@@ -302,11 +302,11 @@ instead).
 
 ## [0.8.4a] — 2026-07-14
 
-npm package: `@keshm/applyr` version `0.8.4-alpha.0`.
+npm package: `@keshm/aplyx` version `0.8.4-alpha.0`.
 
 ### Changed
 
-- **Repository renamed `keshm2/ares` → `keshm2/applyr`** to match the
+- **Repository renamed `keshm2/ares` → `keshm2/aplyx`** to match the
   product's actual name. All 19 hardcoded install/update URLs updated
   (installer scripts, the TUI's bootstrap/version constants,
   `app/package.json`), plus the GitHub-tarball extracted-folder-name
@@ -318,7 +318,7 @@ npm package: `@keshm/applyr` version `0.8.4-alpha.0`.
   and the docs was updated to match; ten scripts that compute their
   own project root via `__file__`/`BASH_SOURCE` parent-directory
   arithmetic needed one more level of unwrapping. Verified end-to-end
-  with a real `applyr status` run and the full conformance suite
+  with a real `aplyx status` run and the full conformance suite
   (13/13 PASS), not just static checks.
 - **Removed the unimplemented root `resumes/` drop-folder.** Nothing
   in the codebase ever consumed it; `data/resumes/` is the real,
@@ -348,7 +348,7 @@ npm package: `@keshm/applyr` version `0.8.4-alpha.0`.
 
 ## [0.8.3a] — 2026-07-14
 
-npm package: `@keshm/applyr` version `0.8.3-alpha.0`.
+npm package: `@keshm/aplyx` version `0.8.3-alpha.0`.
 
 ### Fixed
 
@@ -374,7 +374,7 @@ npm package: `@keshm/applyr` version `0.8.3-alpha.0`.
 
 ## [0.8.2a] — 2026-07-14
 
-npm package: `@keshm/applyr` version `0.8.2-alpha.0`.
+npm package: `@keshm/aplyx` version `0.8.2-alpha.0`.
 
 ### Added
 
@@ -382,7 +382,7 @@ npm package: `@keshm/applyr` version `0.8.2-alpha.0`.
   `scheduler.py`, `uninstall.py`, `update.py`, `append_state_entry.py`,
   and `validate_local_config.py` now cover install/update/runtime without
   WSL or bash on Windows.
-- **Update prompt in the TUI.** On a plain `applyr` launch, when a newer
+- **Update prompt in the TUI.** On a plain `aplyx` launch, when a newer
   version is detected, the UI now shows a bottom-right install prompt with
   a purple-to-white wave outline and yes/no actions.
 
@@ -403,8 +403,8 @@ npm package: `@keshm/applyr` version `0.8.2-alpha.0`.
 
 ## [0.8.0a] — 2026-07-13
 
-npm package: `@keshm/applyr` version `0.8.0-alpha.0` (default `latest`
-dist-tag — `npm install -g @keshm/applyr` gets it).
+npm package: `@keshm/aplyx` version `0.8.0-alpha.0` (default `latest`
+dist-tag — `npm install -g @keshm/aplyx` gets it).
 
 ### Fixed
 
@@ -442,7 +442,7 @@ dist-tag — `npm install -g @keshm/applyr` gets it).
 
 ## [0.7.9a] — 2026-07-13
 
-npm package: `@keshm/applyr` version `0.7.9-alpha.0` (alpha tag).
+npm package: `@keshm/aplyx` version `0.7.9-alpha.0` (alpha tag).
 This is the first build clients receive via **automatic update** —
 pushing the `VERSION` bump to `main` rolls it out.
 
@@ -454,9 +454,9 @@ pushing the `VERSION` bump to `main` rolls it out.
   `AGENTS.md`; conformance suite (`scripts/run_conformance.py`) with
   results in `docs/SETUP.md` §3.8.
 - **One-command install.** The cURL one-liner now ends with a working
-  `applyr` command: the installer writes a wrapper to
-  `~/.local/bin/applyr` (override with `APPLYR_BIN`) pinned to the
-  install via `APPLYR_ROOT`. An npm-installed `applyr` with no core
+  `aplyx` command: the installer writes a wrapper to
+  `~/.local/bin/aplyx` (override with `APPLYR_BIN`) pinned to the
+  install via `APPLYR_ROOT`. An npm-installed `aplyx` with no core
   offers to download the core itself instead of printing
   instructions.
 - **Automatic updates.** New root `VERSION` file and
@@ -466,24 +466,24 @@ pushing the `VERSION` bump to `main` rolls it out.
   config, and rebuilds the TUI afterwards. Per-user files are never
   touched. Hooked fail-open into every scheduled run (self-update,
   then re-exec the new runner; `APPLYR_SKIP_UPDATE` guards the loop)
-  and every interactive `applyr` launch (2.5 s check budget). New
-  `applyr update` command; `APPLYR_AUTO_UPDATE=0` opts out. Updater
+  and every interactive `aplyx` launch (2.5 s check budget). New
+  `aplyx update` command; `APPLYR_AUTO_UPDATE=0` opts out. Updater
   is single-flight with a 30-min stale-lock reclaim.
 - **Phase 9 — migration-friendliness review.** Single-user
   assumption, per-user vs project-owned file table, and future
   multi-user seams documented in `AGENTS.md`; two-users-per-machine
   note in `docs/SETUP.md` §3.7.
-- **Dedicated uninstall.** `scripts/uninstall.sh` (also `applyr
-  uninstall`): removes the launchd schedule and the `applyr` PATH
-  wrapper (only applyr's own, only if it points at this install),
+- **Dedicated uninstall.** `scripts/uninstall.sh` (also `aplyx
+  uninstall`): removes the launchd schedule and the `aplyx` PATH
+  wrapper (only aplyx's own, only if it points at this install),
   then deletes the install directory after an explicit confirmation —
   it holds config/data/resumes PII. `--keep-data` keeps the
   directory; `--yes` skips the prompt; non-interactive without
   `--yes` never deletes data. npm installs additionally run
-  `npm uninstall -g @keshm/applyr`.
+  `npm uninstall -g @keshm/aplyx`.
 
 - **Discord is now optional (opt-in at install).** The installer and
-  `applyr setup` ask whether to use Discord for status updates; no
+  `aplyx setup` ask whether to use Discord for status updates; no
   writes `{"enabled": false}` and outcomes stay local (state files +
   TUI). Opting in offers one channel for all updates or separate
   channels per status, with a highlighted ⚠ warning that Discord
@@ -504,8 +504,8 @@ pushing the `VERSION` bump to `main` rolls it out.
 
 ## [0.7.8a] — 2026-07-12
 
-npm package: **`@keshm/applyr` version `0.7.8-alpha.0`** (the
-unscoped npm name `applyr` belongs to an unrelated package; `0.7.8a`
+npm package: **`@keshm/aplyx` version `0.7.8-alpha.0`** (the
+unscoped npm name `aplyx` belongs to an unrelated package; `0.7.8a`
 is the human-facing build marker, `0.7.8-alpha.0` its strict-semver
 form).
 
@@ -513,12 +513,12 @@ form).
 
 - **Setup overhaul.** `scripts/install.sh` bootstraps itself from a
   cURL one-liner (`curl -fsSL …/scripts/install.sh | bash` downloads
-  the source into `~/applyr`, override with `APPLYR_HOME`, then
+  the source into `~/aplyx`, override with `APPLYR_HOME`, then
   re-runs from inside it); prompts for the user profile
   (`safe_fields`, written atomically via `jq`) behind a bold-cyan
   notice that everything stays **locally only**; creates the
   gitignored root `resumes/` drop-folder — drop all resumes there
-  as PDFs for scan/convert-to-markdown tailoring. `applyr setup`
+  as PDFs for scan/convert-to-markdown tailoring. `aplyx setup`
   shows the same privacy notice and resumes instruction. Three
   documented install paths: bash, cURL, npm.
 - **TUI density redesign.** Shared rules+columns split-view
@@ -538,9 +538,9 @@ form).
   **12-hour clock with time-zone abbreviation**.
 - **Navigation.** `esc` returns to the welcome menu from any screen
   (never quits, locked during a live run); an npm-installed
-  `applyr` with no core checkout prints the one-line core
+  `aplyx` with no core checkout prints the one-line core
   installer instead of a stack trace.
-- **README.** applyr banner artwork at the head; explicit
+- **README.** aplyx banner artwork at the head; explicit
   requirement callout — **Claude Code or opencode must be
   installed** — with both agents' artwork.
 
@@ -563,10 +563,10 @@ form).
 
 ### Added
 
-- **Project rename Ares → applyr.** TUI command and npm package
-  renamed to `applyr`. Documented env-var prefix is `APPLYR_*`
+- **Project rename Ares → aplyx.** TUI command and npm package
+  renamed to `aplyx`. Documented env-var prefix is `APPLYR_*`
   (the legacy `ARES_*` names are still honored as fallbacks).
-  launchd label is now `com.applyr.job-agent`; the scheduler
+  launchd label is now `com.aplyx.job-agent`; the scheduler
   installer / uninstaller also cleans up the pre-rename
   `com.ares.job-agent` label.
 - **TUI (Phase 13, re-scoped).** Persistent full-screen app
@@ -577,8 +577,8 @@ form).
   (applied / queue / mode / build marker), tier-colored cap
   input with animated MAX warning, optional per-run extra
   prompt (`APPLYR_EXTRA_PROMPT`). Subcommands:
-  `applyr status`, `applyr run`, `applyr setup [--check]`,
-  `applyr review`, `applyr history`, `applyr help`.
+  `aplyx status`, `aplyx run`, `aplyx setup [--check]`,
+  `aplyx review`, `aplyx history`, `aplyx help`.
 - **Harness portability (Phase 15, partial).**
   `scripts/run_job_agent.sh` selects OpenCode or Claude Code via
   `$APPLYR_HARNESS` → `config/harness.json` → auto-detect. The
@@ -611,7 +611,7 @@ form).
   resumes (`swe`, `ai_ml`, `balanced`, `cyber`,
   `networking_cyber`) plus the cover letter are loaded at
   runtime from the working copy.
-- **TUI bin / command** is `applyr` (was `ares` in the prior
+- **TUI bin / command** is `aplyx` (was `ares` in the prior
   TUI commit).
 - **`extension/`** is now part of the project as the Phase 10
   hybrid-mode extension (MV3, TypeScript).
@@ -664,7 +664,7 @@ form).
 ## Pre-tag history (untagged, summarized)
 
 - **TUI as a one-shot CLI** — the previous TUI commit
-  (`28b1d4c`) shipped `applyr` (then `ares-apply`) as a
+  (`28b1d4c`) shipped `aplyx` (then `ares-apply`) as a
   one-shot CLI with `status`, `review`, `history`, `run`,
   `setup` subcommands. 0.5.5a re-scopes that to a persistent
   full-screen app; the subcommands are preserved.

@@ -1,8 +1,8 @@
 [package]
 name = "desktop"
 version = "0.1.0"
-description = "applyr desktop app — Tauri shell over the shared @applyr/core TypeScript core"
-authors = ["applyr"]
+description = "aplyx desktop app — Tauri shell over the shared @aplyx/core TypeScript core"
+authors = ["aplyx"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { SupabaseAdapter } from "@applyr/core/adapters/supabase.js";
+import { SupabaseAdapter } from "@aplyx/core/adapters/supabase.js";
 import { getSupabaseClient } from "./supabaseClient";
 
 type AuthStatus = "checking" | "unconfigured" | "error" | "signed-out" | "signed-in";
@@ -14,7 +14,7 @@ type AuthStatus = "checking" | "unconfigured" | "error" | "signed-out" | "signed
  * `http://localhost:3000` — a desktop app isn't a website sitting at that
  * URL to receive the click, so without this every confirmation link was a
  * dead end (2026-07-16, caught in manual testing). The OS routes a click
- * on an `applyr://...` link to this running app; onOpenUrl below catches
+ * on an `aplyx://...` link to this running app; onOpenUrl below catches
  * it and finishes the sign-in.
  *
  * Caveat: macOS only recognizes a custom URL scheme once the app has been
@@ -27,7 +27,7 @@ type AuthStatus = "checking" | "unconfigured" | "error" | "signed-out" | "signed
  * Configuration → Redirect URLs allow-list, or Supabase will reject the
  * redirect.
  */
-const AUTH_CALLBACK_URL = "applyr://auth-callback";
+const AUTH_CALLBACK_URL = "aplyx://auth-callback";
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -134,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [attempt]);
 
-  // Catches the OS routing an applyr://auth-callback click back to this
+  // Catches the OS routing an aplyx://auth-callback click back to this
   // app — from either the email-confirmation link or the system-browser
   // Google OAuth redirect — and completes the session via the PKCE code
   // in the URL. Registered once client exists; harmless if it never fires.

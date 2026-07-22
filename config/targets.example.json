@@ -67,7 +67,9 @@
     "handshake",
     "ashbyhq",
     "simplify",
-    "workday"
+    "workday",
+    "smartrecruiters",
+    "amazon"
   ],
   "ashby_company_slugs": [
     "REPLACE_ME"
@@ -78,10 +80,16 @@
   "greenhouse_company_slugs": [
     "REPLACE_ME"
   ],
+  "smartrecruiters_company_slugs": [
+    "REPLACE_ME"
+  ],
   "simplify_feeds": [
     "REPLACE_ME"
   ],
   "workday_tenants": [
+    "REPLACE_ME"
+  ],
+  "oracle_tenants": [
     "REPLACE_ME"
   ],
   "safe_fields": {
@@ -112,8 +120,10 @@
     "ashby_company_slugs": "Company slugs (from an Ashby job-board URL, e.g. jobs.ashbyhq.com/<slug>) to scrape directly via the Ashby API.",
     "lever_company_slugs": "Company slugs (from a Lever job-board URL, e.g. jobs.lever.co/<slug>) to scrape directly via the Lever API.",
     "greenhouse_company_slugs": "Company slugs (from a Greenhouse job-board URL, e.g. boards.greenhouse.io/<slug>) to scrape directly via the Greenhouse jobs API.",
+    "smartrecruiters_company_slugs": "Company identifiers (from a SmartRecruiters careers URL, e.g. jobs.smartrecruiters.com/<identifier>) to scrape directly via the public SmartRecruiters Postings API.",
     "simplify_feeds": "Named SimplifyJobs GitHub listing feeds to pull from — see docs/SETUP.md for the supported feed names.",
-    "workday_tenants": "Workday tenant identifiers to scrape in review-only mode — see docs/SETUP.md for how to find a tenant string."
+    "workday_tenants": "Workday tenant identifiers to scrape in review-only mode — see docs/SETUP.md for how to find a tenant string.",
+    "oracle_tenants": "Oracle Recruiting Cloud tenant identifiers (\"<host>/<siteNumber>\", e.g. eeho.fa.us2.oraclecloud.com/CX_45001 for Oracle's own careers site) to scrape directly via the public Fusion HCM REST API — see docs/SETUP.md."
   },
   "_onboarding": { "completed": false, "committed_fields": [], "current_page": 0 }
 }

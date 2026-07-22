@@ -80,6 +80,6 @@ system_architecture.md
 /config/extension_bridge.json
 
 # Token-optimizer files (a Claude Code skill's local session-tracking
-# state, unrelated to applyr — can land in any subdirectory depending
+# state, unrelated to aplyx — can land in any subdirectory depending
 # on which directory a session's CWD was in)
 token-optimizer/

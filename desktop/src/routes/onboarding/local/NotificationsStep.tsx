@@ -42,7 +42,7 @@ export function NotificationsStep({ root }: { root: string }) {
         </span>
         <div style={{ flex: 1 }}>
           <div className="check-label">Discord notifications</div>
-          <div className="check-detail">Optional — get pinged as applyr applies, or skip this.</div>
+          <div className="check-detail">Optional — get pinged as aplyx applies, or skip this.</div>
         </div>
         <button type="button" className="wizard-back" onClick={() => save({ ...config, enabled: !config.enabled })}>
           {config.enabled ? "Disable" : "Enable"}

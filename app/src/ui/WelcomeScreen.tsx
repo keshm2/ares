@@ -1,7 +1,8 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { Heartbeat } from "@applyr/core/state.js";
+import type { Heartbeat } from "@aplyx/core/state.js";
 import { theme } from "../theme.js";
+import { wrapPadded, wrapText } from "./wrapText.js";
 
 function DetailRow({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
@@ -20,7 +21,7 @@ export interface WelcomeOption {
 }
 
 /**
- * Launch surface on every plain `applyr` run. It is an actual menu,
+ * Launch surface on every plain `aplyx` run. It is an actual menu,
  * not a splash screen, so the first interaction can be "take me where
  * I want to go" instead of "dismiss this and remember hotkeys".
  */
@@ -47,6 +48,14 @@ export function WelcomeScreen({
 }) {
   const selected = options[cursor] ?? options[0];
   const wide = columns >= 84 && contentRows >= 16;
+  // Fixed-height "Selected" panel: every option's description wraps to a
+  // different number of lines, so sizing the panel to only the CURRENT
+  // option's description would grow/shrink the whole menu (and shove the
+  // footer hint around, or off the bottom of a clipped short terminal) on
+  // every arrow-key press. Reserve the tallest any option needs instead.
+  const descWidth = wide ? 44 : Math.max(20, columns - 4);
+  const descMaxLines = Math.max(1, ...options.map((o) => wrapText(o.description, descWidth).length));
+  const descLines = wrapPadded(selected.description, descWidth, descMaxLines);
   const showLastRun = contentRows >= 16;
   // Row tiers: the frame is clipped at the viewport (App pins height with
   // overflow hidden), so on short terminals the menu sheds its supporting
@@ -66,7 +75,7 @@ export function WelcomeScreen({
   return (
     <Box flexDirection="column">
       <Text bold color={theme.accent}>
-        Welcome to applyr
+        Welcome to aplyx
       </Text>
       {showIntro ? (
         <Box marginTop={1}>
@@ -100,7 +109,11 @@ export function WelcomeScreen({
           {showSelected ? (
             <Box marginTop={1} flexDirection="column">
               <Text dimColor>Selected</Text>
-              <Text wrap="wrap">{selected.description}</Text>
+              {descLines.map((line, i) => (
+                <Text key={i} wrap="truncate-end">
+                  {line}
+                </Text>
+              ))}
             </Box>
           ) : null}
         </Box>

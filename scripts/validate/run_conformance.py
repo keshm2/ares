@@ -135,7 +135,7 @@ def helper(name: str) -> str:
 
 
 def deterministic_leg() -> None:
-    tmp = tempfile.mkdtemp(prefix="applyr-conformance-")
+    tmp = tempfile.mkdtemp(prefix="aplyx-conformance-")
     targets = os.path.join(tmp, "targets.json")
     registry = os.path.join(tmp, "job_registry.json")
     events = os.path.join(tmp, "job_events.jsonl")

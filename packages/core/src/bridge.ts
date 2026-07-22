@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { findProjectRoot } from "./project.js";
+import { findProjectRoot, isValidProjectRoot, writePinnedRoot } from "./project.js";
 import {
   ensureTargetsFile,
   readDiscordEnabled,
@@ -14,6 +14,10 @@ import { LocalAdapter } from "./adapters/local.js";
 import { readSupabaseConfig } from "./supabaseConfig.js";
 import { detectAllHarnessesOnPath, readHarnessConfig, writeHarnessConfig, isKnownHarness } from "./harness.js";
 import { loadCompanyDirectory } from "./data/companyDirectory.js";
+import { searchJobs, checkJobFit, saveJobForReview, type JobSource, type SearchJob } from "./jobs.js";
+import { markQueueEntryApplied, dismissQueueEntry } from "./reviewActions.js";
+import { listResumeFiles, resumesDir } from "./resumes.js";
+import type { QueueEntry } from "./stateDerive.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -23,9 +27,9 @@ import path from "node:path";
  * a Tauri webview can't — so the Rust shell (desktop/src-tauri) spawns this as
  * a subprocess (stdio, not a localhost server) and passes one command name
  * plus one JSON-args blob per invocation. This dispatcher reuses
- * @applyr/core's existing functions verbatim; it adds no new business logic.
+ * @aplyx/core's existing functions verbatim; it adds no new business logic.
  *
- * Usage: applyr-core-bridge <command> [jsonArgs]
+ * Usage: aplyx-core-bridge <command> [jsonArgs]
  * Prints one JSON line to stdout: { ok: true, result } or { ok: false, error }.
  */
 
@@ -49,6 +53,26 @@ async function dispatch(command: string, args: Args): Promise<unknown> {
   switch (command) {
     case "findRoot":
       return { root: findProjectRoot() };
+
+    case "validateRoot": {
+      const dir = String(args.dir ?? "");
+      if (!dir) throw new Error("validateRoot requires { dir }");
+      const resolved = path.resolve(dir);
+      if (!isValidProjectRoot(resolved)) {
+        throw new Error(
+          `"${resolved}" doesn't look like a aplyx checkout — expected to find scripts/state/job_state.py and AGENTS.md there.`,
+        );
+      }
+      // A manual pick self-heals future launches (and reinstalls) the
+      // same way an installer-written pin does — best-effort, never
+      // blocks the caller from proceeding with the now-validated root.
+      try {
+        writePinnedRoot(resolved);
+      } catch {
+        // ignore — the caller's own localStorage cache still works
+      }
+      return { root: resolved };
+    }
 
     case "ensureTargetsFile": {
       const root = resolveRoot(args);
@@ -175,6 +199,53 @@ async function dispatch(command: string, args: Args): Promise<unknown> {
       return { ok: true };
     }
 
+    case "searchJobs": {
+      const root = resolveRoot(args);
+      const query = String(args.query ?? "");
+      const sources = (args.sources as Partial<Record<JobSource, boolean>> | undefined) ?? {};
+      return searchJobs(root, query, sources);
+    }
+
+    case "checkJobFit": {
+      const root = resolveRoot(args);
+      const job = args.job as SearchJob;
+      if (!job) throw new Error("checkJobFit requires { job }");
+      return checkJobFit(root, job);
+    }
+
+    case "saveJobForReview": {
+      const root = resolveRoot(args);
+      const job = args.job as SearchJob;
+      if (!job) throw new Error("saveJobForReview requires { job }");
+      const result = await saveJobForReview(root, job);
+      return { result };
+    }
+
+    case "markQueueEntryApplied": {
+      const root = resolveRoot(args);
+      const entry = args.entry as QueueEntry;
+      if (!entry) throw new Error("markQueueEntryApplied requires { entry }");
+      return markQueueEntryApplied(root, entry);
+    }
+
+    case "dismissQueueEntry": {
+      const root = resolveRoot(args);
+      const entry = args.entry as QueueEntry;
+      if (!entry) throw new Error("dismissQueueEntry requires { entry }");
+      return dismissQueueEntry(root, entry);
+    }
+
+    case "listResumeDetails": {
+      const root = resolveRoot(args);
+      return { files: listResumeFiles(root) };
+    }
+
+    case "openResumesFolder": {
+      const root = resolveRoot(args);
+      openPath(resumesDir(root));
+      return { ok: true };
+    }
+
     case "readOnboardingCompleted": {
       const root = resolveRoot(args);
       return { completed: readOnboardingCompleted(root) };
@@ -194,17 +265,36 @@ async function dispatch(command: string, args: Args): Promise<unknown> {
 async function main(): Promise<void> {
   const [command, rawArgs] = process.argv.slice(2);
   if (!command) {
-    process.stderr.write("usage: applyr-core-bridge <command> [jsonArgs]\n");
+    process.stderr.write("usage: aplyx-core-bridge <command> [jsonArgs]\n");
     process.exit(2);
   }
   try {
     const result = await dispatch(command, parseArgs(rawArgs));
-    process.stdout.write(`${JSON.stringify({ ok: true, result })}\n`);
+    // Exit right after the write flushes rather than letting Node idle
+    // until every promise/timer settles naturally. Commands like
+    // searchJobs race each source against a hard deadline (see jobs.ts's
+    // withDeadline) so one slow/hung board can't block the whole search —
+    // but a still-pending fetch() or spawned Python process left running
+    // in the background would otherwise keep this process (and the Rust
+    // caller's blocking wait on it) alive for as long as that straggler
+    // takes, defeating the deadline entirely.
+    //
+    // The write callback is the flush signal for a pipe (Rust captures
+    // stdout via Command::output), but if it never fires (broken pipe,
+    // unusual OS condition) the Rust caller would hang forever — so a
+    // short unref'd fallback timer caps the wait. The timer is moot in
+    // the normal path since process.exit() fires first.
+    exitWith(`${JSON.stringify({ ok: true, result })}\n`, 0);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    process.stdout.write(`${JSON.stringify({ ok: false, error: message })}\n`);
-    process.exit(1);
+    exitWith(`${JSON.stringify({ ok: false, error: message })}\n`, 1);
   }
+}
+
+function exitWith(payload: string, code: number): void {
+  const fallback = setTimeout(() => process.exit(code), 2_000);
+  fallback.unref?.();
+  process.stdout.write(payload, () => process.exit(code));
 }
 
 main();

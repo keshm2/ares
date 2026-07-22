@@ -44,7 +44,7 @@ _HAS_REGISTRY = ("opencode", "claude")
 def resolve_harness(root: str = ".") -> str:
     """Env override, then config/harness.json, then a PATH probe. Returns ""
     when nothing usable is found (callers report their own error)."""
-    harness = os.environ.get("APPLYR_HARNESS", os.environ.get("ARES_HARNESS", "")) or ""
+    harness = os.environ.get("APLYX_HARNESS", os.environ.get("FLUX_HARNESS", os.environ.get("ARES_HARNESS", ""))) or ""
     if not harness:
         cfg = os.path.join(root, "config", "harness.json")
         if os.path.isfile(cfg):
@@ -111,7 +111,7 @@ def agent_command(exe: str, harness: str, agent: str, prompt: str,
     if harness == "opencode":
         return [exe, "run", "--agent", agent, *opencode_print_flag(exe), prompt]
     if harness == "claude":
-        perm = os.environ.get("APPLYR_CLAUDE_PERMISSION_MODE", "bypassPermissions")
+        perm = os.environ.get("APLYX_CLAUDE_PERMISSION_MODE", os.environ.get("FLUX_CLAUDE_PERMISSION_MODE", "bypassPermissions"))
         # Claude Code resolves .claude/agents/ defs, but the headless -p entry
         # point doesn't auto-select one, so the body is named explicitly. No
         # delegate inlining here — the registry handles it.

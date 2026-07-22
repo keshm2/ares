@@ -71,7 +71,7 @@ jobs:
         with:
           projectPath: desktop
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
-          releaseName: "applyr ${{ github.event.inputs.tag || github.ref_name }}"
+          releaseName: "aplyx ${{ github.event.inputs.tag || github.ref_name }}"
           releaseBody: "Desktop app bundles for this release — see the GitHub Release notes for what's new. Installed automatically by scripts/install/install_desktop.sh|ps1, or download the file matching your OS/arch directly."
           releaseDraft: false
           prerelease: true

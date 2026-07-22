@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { WizardShell } from "../../../components/WizardShell";
-import { findRoot, ensureTargetsFile, writeOnboardingCompleted, writeHarness } from "../../../lib/bridge";
+import { findRoot, ensureTargetsFile, writeOnboardingCompleted, writeHarness, setLocalRoot } from "../../../lib/bridge";
 import { WelcomeStep } from "./WelcomeStep";
 import { EnvironmentStep } from "./EnvironmentStep";
 import { CodingAgentStep } from "./CodingAgentStep";
@@ -15,7 +16,7 @@ const STEPS = ["welcome", "environment", "agent", "profile", "resumes", "notific
 type Step = (typeof STEPS)[number];
 
 const TITLES: Record<Step, string> = {
-  welcome: "Welcome to applyr",
+  welcome: "Welcome to aplyx",
   environment: "Environment check",
   agent: "Coding agent",
   profile: "Your profile",
@@ -29,6 +30,7 @@ export function LocalWizard() {
   const navigate = useNavigate();
   const [root, setRoot] = useState<string | undefined>(undefined);
   const [rootError, setRootError] = useState<string | undefined>(undefined);
+  const [browsing, setBrowsing] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [harness, setHarness] = useState<string | undefined>(undefined);
 
@@ -41,14 +43,44 @@ export function LocalWizard() {
       .catch((err) => setRootError(err instanceof Error ? err.message : String(err)));
   }, []);
 
+  async function browseForRoot() {
+    setBrowsing(true);
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "Select your aplyx checkout folder",
+      });
+      if (typeof selected !== "string") return; // cancelled
+      const resolved = await setLocalRoot(selected);
+      setRoot(resolved);
+      setRootError(undefined);
+      await ensureTargetsFile(resolved);
+    } catch (err) {
+      setRootError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBrowsing(false);
+    }
+  }
+
   if (rootError) {
     return (
       <main style={{ padding: "3rem", maxWidth: "32rem", margin: "0 auto" }}>
-        <h1>Couldn&rsquo;t find a local applyr installation</h1>
+        <h1>Couldn&rsquo;t find a local aplyx installation</h1>
         <p className="wizard-subtitle">{rootError}</p>
-        <button className="wizard-back" onClick={() => navigate("/")}>
-          &larr; Back
-        </button>
+        <p className="field-help">
+          A Finder- or Dock-launched app has no way to know where your aplyx checkout lives on
+          disk — point it at the folder yourself (the one containing <code>AGENTS.md</code> and{" "}
+          <code>scripts/</code>).
+        </p>
+        <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-4)" }}>
+          <button className="wizard-back" onClick={() => void browseForRoot()} disabled={browsing}>
+            {browsing ? "Choosing…" : "Browse for my aplyx folder…"}
+          </button>
+          <button className="wizard-back" onClick={() => navigate("/")}>
+            &larr; Back
+          </button>
+        </div>
       </main>
     );
   }
@@ -56,7 +88,7 @@ export function LocalWizard() {
   if (!root) {
     return (
       <main style={{ padding: "3rem", textAlign: "center" }}>
-        <p className="wizard-subtitle">Looking for your local applyr installation&hellip;</p>
+        <p className="wizard-subtitle">Looking for your local aplyx installation&hellip;</p>
       </main>
     );
   }

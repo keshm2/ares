@@ -1,9 +1,19 @@
-import { NavLink, Route, Routes } from "react-router-dom";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { Logo } from "../../components/Logo";
-import { HomeScreen } from "./HomeScreen";
-import { SettingsScreen } from "./SettingsScreen";
-import { ComingSoonScreen } from "./ComingSoonScreen";
 import "./AppShell.css";
+
+// Same route-level code-splitting reasoning as App.tsx: a user visiting
+// Home shouldn't have to wait on Jobs/Review/History/Resumes/Settings
+// (each with their own bridge calls, sort/filter logic, etc.) being
+// parsed too. Each tab's screen is its own chunk now, fetched on first
+// visit rather than all six upfront.
+const HomeScreen = lazy(() => import("./HomeScreen").then((m) => ({ default: m.HomeScreen })));
+const SettingsScreen = lazy(() => import("./SettingsScreen").then((m) => ({ default: m.SettingsScreen })));
+const JobsScreen = lazy(() => import("./JobsScreen").then((m) => ({ default: m.JobsScreen })));
+const ReviewScreen = lazy(() => import("./ReviewScreen").then((m) => ({ default: m.ReviewScreen })));
+const HistoryScreen = lazy(() => import("./HistoryScreen").then((m) => ({ default: m.HistoryScreen })));
+const ResumesScreen = lazy(() => import("./ResumesScreen").then((m) => ({ default: m.ResumesScreen })));
 
 const NAV = [
   { to: "/app", label: "Home", end: true },
@@ -15,6 +25,20 @@ const NAV = [
 ];
 
 export function AppShell() {
+  const location = useLocation();
+  const [displayedLocation, setDisplayedLocation] = useState(location);
+  const [transition, setTransition] = useState<"idle" | "out" | "in">("idle");
+
+  useEffect(() => {
+    if (location.pathname === displayedLocation.pathname) return;
+    setTransition("out");
+    const timer = window.setTimeout(() => {
+      setDisplayedLocation(location);
+      setTransition("in");
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [displayedLocation.pathname, location]);
+
   return (
     <div className="shell">
       <aside className="shell-sidebar">
@@ -36,26 +60,23 @@ export function AppShell() {
       </aside>
 
       <main className="shell-main">
-        <Routes>
-          <Route index element={<HomeScreen />} />
-          <Route
-            path="jobs"
-            element={<ComingSoonScreen title="Jobs" detail="Live board search is coming in the next update." />}
-          />
-          <Route
-            path="review"
-            element={<ComingSoonScreen title="Review queue" detail="Triage is coming in the next update." />}
-          />
-          <Route
-            path="history"
-            element={<ComingSoonScreen title="History" detail="Your application history is coming in the next update." />}
-          />
-          <Route
-            path="resumes"
-            element={<ComingSoonScreen title="Resumes" detail="Resume management is coming in the next update." />}
-          />
-          <Route path="settings" element={<SettingsScreen />} />
-        </Routes>
+        <div
+          className={`shell-route-frame${transition === "out" ? " shell-route-out" : transition === "in" ? " shell-route-in" : ""}`}
+          onAnimationEnd={() => {
+            if (transition === "in") setTransition("idle");
+          }}
+        >
+          <Suspense fallback={<div className="shell-route-fallback" />}>
+            <Routes location={displayedLocation}>
+              <Route index element={<HomeScreen />} />
+              <Route path="jobs" element={<JobsScreen />} />
+              <Route path="review" element={<ReviewScreen />} />
+              <Route path="history" element={<HistoryScreen />} />
+              <Route path="resumes" element={<ResumesScreen />} />
+              <Route path="settings" element={<SettingsScreen />} />
+            </Routes>
+          </Suspense>
+        </div>
       </main>
     </div>
   );

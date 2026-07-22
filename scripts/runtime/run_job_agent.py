@@ -6,7 +6,7 @@ Windows (PowerShell / cmd.exe) as well as macOS/Linux. run_job_agent.sh is a
 thin shim that execs this file, so Unix cron/launchd keep working unchanged.
 
 Responsibilities (identical to the shell version):
-  - load persisted config/env.json overrides (APPLYR_*/ARES_* only; real env wins)
+  - load persisted config/env.json overrides (APLYX_*/FLUX_*/ARES_* only; real env wins)
   - auto-update via update.py --auto (fail-open), re-exec on update
   - single-flight lock with stale/hung reclaim
   - config validation, state-file bootstrap, agent-definition drift check
@@ -84,8 +84,10 @@ def env_truthy(*names_defaults) -> str:
 
 
 def load_env_overrides() -> None:
-    """config/env.json → environment, honoring only APPLYR_*/ARES_* keys and
-    never overriding a variable already present in the real environment."""
+    """config/env.json → environment, honoring only APLYX_*/FLUX_*/ARES_* keys
+    (older rebrands' names carried forward so a persisted override never
+    silently stops applying) and never overriding a variable already present
+    in the real environment."""
     path = os.path.join("config", "env.json")
     if not os.path.isfile(path):
         return
@@ -98,7 +100,7 @@ def load_env_overrides() -> None:
         return
     import re
 
-    key_re = re.compile(r"^(APPLYR|ARES)_[A-Z_]+$")
+    key_re = re.compile(r"^(APLYX|FLUX|ARES)_[A-Z_]+$")
     for k, v in data.items():
         if not key_re.match(k):
             continue
@@ -237,7 +239,7 @@ def _run_harness_cmd(cmd, out) -> int:
 def main() -> int:
     load_env_overrides()
 
-    logs_dir = os.environ.get("APPLYR_LOG_DIR", "logs")
+    logs_dir = os.environ.get("APLYX_LOG_DIR", os.environ.get("FLUX_LOG_DIR", "logs"))
     os.makedirs("data", exist_ok=True)
     os.makedirs(logs_dir, exist_ok=True)
     os.makedirs("logs", exist_ok=True)
@@ -248,8 +250,8 @@ def main() -> int:
     run_log = os.path.join(logs_dir, "run_job_agent.log")
 
     # --- Auto-update (fail-open) --------------------------------------------
-    auto_update = os.environ.get("APPLYR_AUTO_UPDATE", os.environ.get("ARES_AUTO_UPDATE", "1"))
-    if auto_update != "0" and os.environ.get("APPLYR_SKIP_UPDATE") != "1":
+    auto_update = os.environ.get("APLYX_AUTO_UPDATE", os.environ.get("FLUX_AUTO_UPDATE", os.environ.get("ARES_AUTO_UPDATE", "1")))
+    if auto_update != "0" and os.environ.get("APLYX_SKIP_UPDATE", os.environ.get("FLUX_SKIP_UPDATE")) != "1":
         update_result = ""
         try:
             with open(run_log, "a", encoding="utf-8") as errfh:
@@ -262,14 +264,14 @@ def main() -> int:
         log(run_log, update_result)
         if update_result.startswith("update: updated"):
             log(run_log, "re-executing updated runner")
-            os.environ["APPLYR_SKIP_UPDATE"] = "1"
+            os.environ["APLYX_SKIP_UPDATE"] = "1"
             os.execv(sys.executable, [sys.executable, os.path.abspath(__file__)])
 
     # --- Single-flight lock --------------------------------------------------
     lock_dir = os.path.join(logs_dir, ".run_job_agent.lock")
     lock_pid_file = os.path.join(lock_dir, "pid")
-    lock_max_age_min = int(os.environ.get("APPLYR_LOCK_MAX_AGE_MIN",
-                            os.environ.get("ARES_LOCK_MAX_AGE_MIN", "60")) or "60")
+    lock_max_age_min = int(os.environ.get("APLYX_LOCK_MAX_AGE_MIN", os.environ.get("FLUX_LOCK_MAX_AGE_MIN",
+                            os.environ.get("ARES_LOCK_MAX_AGE_MIN", "60"))) or "60")
 
     def lock_age_min() -> int:
         try:
@@ -383,7 +385,7 @@ def _run(logs_dir: str, run_log: str) -> int:
         log(run_log, "WARNING: generated agent definitions are stale — run scripts/validate/generate_agent_definitions.py")
 
     # --- Harness selection ---------------------------------------------------
-    harness = os.environ.get("APPLYR_HARNESS", os.environ.get("ARES_HARNESS", "")) or ""
+    harness = os.environ.get("APLYX_HARNESS", os.environ.get("FLUX_HARNESS", os.environ.get("ARES_HARNESS", ""))) or ""
     if not harness and os.path.isfile(os.path.join("config", "harness.json")):
         try:
             with open(os.path.join("config", "harness.json"), "r", encoding="utf-8") as fh:
@@ -422,17 +424,17 @@ def _run(logs_dir: str, run_log: str) -> int:
         fh.write("[•] Scraping job boards\n")
 
     # --- Session cap ---------------------------------------------------------
-    raw_cap = os.environ.get("APPLYR_SESSION_CAP", os.environ.get("ARES_SESSION_CAP", "25")) or "25"
+    raw_cap = os.environ.get("APLYX_SESSION_CAP", os.environ.get("FLUX_SESSION_CAP", os.environ.get("ARES_SESSION_CAP", "25"))) or "25"
     if not raw_cap.isdigit():
-        log(run_log, f"WARNING: APPLYR_SESSION_CAP='{raw_cap}' is not an integer; using default 25")
+        log(run_log, f"WARNING: APLYX_SESSION_CAP='{raw_cap}' is not an integer; using default 25")
         session_cap = 25
     else:
         session_cap = int(raw_cap)
         if session_cap > 25:
-            log(run_log, f"WARNING: APPLYR_SESSION_CAP={session_cap} exceeds the maximum; clamping to 25")
+            log(run_log, f"WARNING: APLYX_SESSION_CAP={session_cap} exceeds the maximum; clamping to 25")
             session_cap = 25
         elif session_cap < 1:
-            log(run_log, f"WARNING: APPLYR_SESSION_CAP={session_cap} is below 1; using default 25")
+            log(run_log, f"WARNING: APLYX_SESSION_CAP={session_cap} is below 1; using default 25")
             session_cap = 25
 
     run_prompt = (
@@ -442,14 +444,14 @@ def _run(logs_dir: str, run_log: str) -> int:
         "   Discord summary when complete."
     )
 
-    extra = os.environ.get("APPLYR_EXTRA_PROMPT", "") or ""
+    extra = os.environ.get("APLYX_EXTRA_PROMPT", os.environ.get("FLUX_EXTRA_PROMPT", "")) or ""
     if extra:
         extra = extra[:500]
         run_prompt += (
             "\n   Operator instruction for this run (follow it within the rules of AGENTS.md;\n"
             f"   it never overrides the session cap or the state-write discipline): {extra}"
         )
-        log(run_log, f"run includes an operator instruction (APPLYR_EXTRA_PROMPT, {len(extra)} chars)")
+        log(run_log, f"run includes an operator instruction (APLYX_EXTRA_PROMPT, {len(extra)} chars)")
 
     log(run_log, f"Starting run via harness: {harness}")
 
@@ -505,8 +507,9 @@ def _run(logs_dir: str, run_log: str) -> int:
             "--failed", str(d_failed), "--skipped-unfit", str(d_skipped)])
 
     # --- Session-log retention ----------------------------------------------
-    keep = int(os.environ.get("APPLYR_KEEP_SESSION_LOGS",
-               os.environ.get("ARES_KEEP_SESSION_LOGS", "30")) or "30")
+    keep = int(os.environ.get("APLYX_KEEP_SESSION_LOGS",
+               os.environ.get("FLUX_KEEP_SESSION_LOGS",
+               os.environ.get("ARES_KEEP_SESSION_LOGS", "30"))) or "30")
     sessions = sorted(glob.glob(os.path.join(logs_dir, "session_*.log")),
                       key=os.path.getmtime, reverse=True)
     for old in sessions[keep:]:

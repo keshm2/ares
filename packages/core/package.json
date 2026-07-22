@@ -1,7 +1,7 @@
 {
-  "name": "@applyr/core",
+  "name": "@aplyx/core",
   "version": "0.1.0",
-  "description": "Shared framework-agnostic TS core for applyr: local state reads, helper wrappers that shell out to the Python core, settings/config read-write, platform/process utilities, project-root resolution, the onboarding field schema, and the storage-adapter interface (Local/Supabase). Consumed by the Ink TUI (app/) and the Tauri desktop app (desktop/).",
+  "description": "Shared framework-agnostic TS core for aplyx: local state reads, helper wrappers that shell out to the Python core, settings/config read-write, platform/process utilities, project-root resolution, the onboarding field schema, and the storage-adapter interface (Local/Supabase). Consumed by the Ink TUI (app/) and the Tauri desktop app (desktop/).",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -9,6 +9,26 @@
     "./state.js": {
       "types": "./dist/state.d.ts",
       "default": "./dist/state.js"
+    },
+    "./stateDerive.js": {
+      "types": "./dist/stateDerive.d.ts",
+      "default": "./dist/stateDerive.js"
+    },
+    "./jobs.js": {
+      "types": "./dist/jobs.d.ts",
+      "default": "./dist/jobs.js"
+    },
+    "./jobsSort.js": {
+      "types": "./dist/jobsSort.d.ts",
+      "default": "./dist/jobsSort.js"
+    },
+    "./resumes.js": {
+      "types": "./dist/resumes.d.ts",
+      "default": "./dist/resumes.js"
+    },
+    "./reviewActions.js": {
+      "types": "./dist/reviewActions.d.ts",
+      "default": "./dist/reviewActions.js"
     },
     "./helpers.js": {
       "types": "./dist/helpers.d.ts",
@@ -96,7 +116,7 @@
     }
   },
   "bin": {
-    "applyr-core-bridge": "dist/bridge.js"
+    "aplyx-core-bridge": "dist/bridge.js"
   },
   "files": [
     "dist"

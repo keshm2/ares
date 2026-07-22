@@ -1,5 +1,5 @@
 /**
- * The applyr release/build marker — shown faded in both the TUI's side
+ * The aplyx release/build marker — shown faded in both the TUI's side
  * panel footer (app/src/theme.ts re-exports this for app/src/ui/
  * SidePanel.tsx) and the desktop app's Settings screen, so both surfaces
  * always report the same build without two hand-maintained copies

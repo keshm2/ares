@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Adapter, FieldValue } from "../adapter.js";
-import type { ApplyrState } from "../state.js";
+import type { AplyxState } from "../state.js";
 import { HOSTED_PROFILE_FIELD_IDS, HOSTED_PREFERENCE_FIELD_IDS } from "../onboarding/hostedFields.js";
 
 type Row = Record<string, unknown>;
@@ -86,7 +86,7 @@ export class SupabaseAdapter implements Adapter {
     if (error) throw error;
   }
 
-  async loadState(): Promise<ApplyrState | undefined> {
+  async loadState(): Promise<AplyxState | undefined> {
     // Hosted pipeline-state sync (jobs/job_events/applied_jobs/review_queue
     // tables) is Phase 14B scope — until then a hosted-only session has no
     // dashboard data of its own; the Home screen shows a "connect a local

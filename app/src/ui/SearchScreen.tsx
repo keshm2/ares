@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { openUrl } from "@applyr/core/helpers.js";
+import { openUrl } from "@aplyx/core/helpers.js";
 import {
   checkJobFit,
   errorMessage,
@@ -25,9 +25,12 @@ const SOURCE_LABEL: Record<JobSource, string> = {
   ashbyhq: "Ashby",
   lever: "Lever",
   greenhouse: "Greenhouse",
+  smartrecruiters: "SmartRecruiters",
+  amazon: "Amazon",
+  oracle: "Oracle",
   workday: "Workday",
 };
-const SOURCES: JobSource[] = ["ashbyhq", "lever", "greenhouse", "workday"];
+const SOURCES: JobSource[] = ["ashbyhq", "lever", "greenhouse", "smartrecruiters", "amazon", "oracle", "workday"];
 
 type Action = "idle" | "searching" | "fitting" | "saving";
 
@@ -130,6 +133,9 @@ export function SearchScreen({
     ashbyhq: true,
     lever: true,
     greenhouse: true,
+    smartrecruiters: true,
+    amazon: true,
+    oracle: true,
     workday: true,
   });
   const [sourceFocused, setSourceFocused] = useState(false);
@@ -138,6 +144,18 @@ export function SearchScreen({
   const [offset, setOffset] = useState(0);
   const [message, setMessage] = useState("Press / and type a title query, then enter to search the live boards.");
   const [fits, setFits] = useState<Record<string, FitResult>>({});
+  // "loading." -> "loading.." -> "loading..." -> "loading." while a
+  // search is in flight, replacing the static "Fetching X sources…"
+  // message so a slow/borderline search still reads as alive, not stuck.
+  const [loadingDots, setLoadingDots] = useState(1);
+  useEffect(() => {
+    if (action !== "searching") {
+      setLoadingDots(1);
+      return;
+    }
+    const interval = setInterval(() => setLoadingDots((d) => (d % 3) + 1), 400);
+    return () => clearInterval(interval);
+  }, [action]);
   // With the detail pane the list only shares rows with the query,
   // sources, and message lines; stacked (narrow) keeps room for the
   // inline selection details below the list.
@@ -148,7 +166,7 @@ export function SearchScreen({
   // overflow into the next source's cell or force the row onto a second
   // line, which corrupted the frame below it (the list has no reserved
   // extra row for a wrapped source line).
-  const sourceColW = columns > 0 ? Math.max(18, Math.floor(columns / 4) - 1) : 22;
+  const sourceColW = columns > 0 ? Math.max(20, Math.floor(columns / SOURCES.length) - 1) : 24;
 
   const busy = action !== "idle";
   // Also captured while toggling sources (sourceFocused): that mode uses
@@ -455,9 +473,15 @@ export function SearchScreen({
         </Box>
       ) : null}
       <Box>
-        <Text color={message.startsWith("Search failed") || message.startsWith("Fit check failed") || message.startsWith("Save failed") ? theme.danger : undefined} dimColor={!busy && !message.startsWith("Saved")} wrap="truncate-end">
-          {busy ? "● " : ""}{message}
-        </Text>
+        {action === "searching" ? (
+          <Text color={theme.accent}>
+            loading{".".repeat(loadingDots)}
+          </Text>
+        ) : (
+          <Text color={message.startsWith("Search failed") || message.startsWith("Fit check failed") || message.startsWith("Save failed") ? theme.danger : undefined} dimColor={!busy && !message.startsWith("Saved")} wrap="truncate-end">
+            {busy ? "● " : ""}{message}
+          </Text>
+        )}
       </Box>
     </Box>
   );

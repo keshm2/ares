@@ -29,11 +29,16 @@
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-muted);
+  transition:
+    background var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out),
+    transform var(--duration-quick) var(--ease-out);
 }
 
 .shell-nav-item:hover {
   background: var(--ground);
   color: var(--text);
+  transform: translateX(2px);
 }
 
 .shell-nav-item-active {
@@ -45,4 +50,48 @@
 .shell-main {
   overflow-y: auto;
   padding: var(--space-7) var(--space-6);
+}
+
+.shell-route-frame {
+  min-height: 60vh;
+}
+
+@keyframes shell-route-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes shell-route-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.shell-route-out {
+  animation: shell-route-out var(--duration-quick) var(--ease-out) both;
+}
+
+.shell-route-in {
+  animation: shell-route-in var(--duration-normal) var(--ease-out) both;
+}
+
+/* Holds the main column's height while a lazy route chunk loads so the
+ * layout doesn't collapse/flash blank before the screen fades in. Quiet
+ * by design — no spinner, since per-route chunks are small (1.7–10KB)
+ * and a spinner would itself flash. */
+.shell-route-fallback {
+  min-height: 60vh;
 }

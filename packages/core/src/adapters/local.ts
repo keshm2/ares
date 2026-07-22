@@ -1,6 +1,6 @@
 import type { Adapter, FieldValue } from "../adapter.js";
 import { loadState } from "../state.js";
-import type { ApplyrState } from "../state.js";
+import type { AplyxState } from "../state.js";
 import { loadCompanyDirectory, type CompanyEntry } from "../data/companyDirectory.js";
 import { readLocalProfileField, writeLocalProfileField } from "../onboarding/profile.js";
 
@@ -8,8 +8,8 @@ import { readLocalProfileField, writeLocalProfileField } from "../onboarding/pro
  * Local-mode adapter: reads/writes config/*.json directly (via settings.ts/
  * profileLinks.ts/companyTargets.ts) and reads runtime state from data/*.json
  * — the same files and helpers the TUI already uses. No network calls, no
- * account. `root` is the local applyr installation directory (resolved the
- * same way the TUI resolves it: $APPLYR_ROOT, or discovered during the
+ * account. `root` is the local aplyx installation directory (resolved the
+ * same way the TUI resolves it: $APLYX_ROOT, or discovered during the
  * desktop app's onboarding "Environment checks" step).
  */
 export class LocalAdapter implements Adapter {
@@ -28,7 +28,7 @@ export class LocalAdapter implements Adapter {
     writeLocalProfileField(this.root, id, value, this.directory);
   }
 
-  async loadState(): Promise<ApplyrState | undefined> {
+  async loadState(): Promise<AplyxState | undefined> {
     return loadState(this.root);
   }
 }

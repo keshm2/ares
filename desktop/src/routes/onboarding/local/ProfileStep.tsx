@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PAGES, PRIVACY_LINE } from "@applyr/core/onboarding/fields.js";
+import { PAGES, PRIVACY_LINE } from "@aplyx/core/onboarding/fields.js";
 import { readProfileField, writeProfileField } from "../../../lib/bridge";
 import { FieldInput } from "../../../components/FieldInput";
 

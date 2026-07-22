@@ -1,6 +1,6 @@
 // Local-mode IPC: the frontend calls these narrow, typed commands via
 // invoke() rather than being granted a general shell-execute permission.
-// Each command shells out (Rust-side only) to the shared @applyr/core
+// Each command shells out (Rust-side only) to the shared @aplyx/core
 // bridge CLI (packages/core/src/bridge.ts) over stdio — a spawned
 // subprocess, not a localhost server — reusing the exact same profile/state
 // logic the Ink TUI already uses. Hosted mode bypasses this entirely: the
@@ -8,29 +8,64 @@
 use serde_json::Value;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
+use tauri::path::BaseDirectory;
+use tauri::Manager;
 
-/// Dev-mode resolution of the bridge script, relative to this crate's
-/// manifest dir (desktop/src-tauri). Packaging the bridge as a bundled
-/// Tauri resource/sidecar for a distributable end-user build is a separate,
-/// later distribution-readiness pass — Phase 14A targets local development
-/// on a full applyr checkout, same as the TUI does today.
-fn bridge_script_path() -> Result<PathBuf, String> {
+/// Resolves the bridge script for both a packaged/installed build and a
+/// local `tauri dev` checkout.
+///
+/// A prebuilt release (see .github/workflows/desktop-release.yml, which
+/// compiles on a GitHub-hosted CI runner and installers download the
+/// result) bakes `env!("CARGO_MANIFEST_DIR")` in at *compile* time — on
+/// the CI runner that's something like
+/// `/Users/runner/work/aplyx/aplyx/desktop/src-tauri`, a path that only
+/// ever exists on the machine that ran `cargo build`. Every end user
+/// hitting "core bridge not found at /Users/runner/work/..." was this
+/// exact bug: the dev-relative path is meaningless outside a full source
+/// checkout built in place. Resources declared in tauri.conf.json's
+/// `bundle.resources` (`packages/core/dist` → `core/`) are copied into
+/// the app bundle at build time and resolved here at *run* time via
+/// `resource_dir()`, so a downloaded/installed build finds its own copy
+/// regardless of where it was compiled. The dev-relative path remains the
+/// fallback for `tauri dev` against a full checkout, same as before.
+fn bridge_script_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    // The path never changes within a process lifetime, but every bridge
+    // command re-probed the filesystem (two exists() checks, and under
+    // tauri dev a resource-dir resolution) on every call — once per
+    // search, fit, save, profile read, etc. Cache it after the first hit.
+    static CACHE: OnceLock<PathBuf> = OnceLock::new();
+    if let Some(p) = CACHE.get() {
+        return Ok(p.clone());
+    }
+    let resolved = bridge_script_path_uncached(app)?;
+    let _ = CACHE.set(resolved.clone());
+    Ok(resolved)
+}
+
+fn bridge_script_path_uncached(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if let Ok(resource_path) = app.path().resolve("core/bridge.js", BaseDirectory::Resource) {
+        if resource_path.exists() {
+            return Ok(resource_path);
+        }
+    }
+
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let path = manifest_dir
+    let dev_path = manifest_dir
         .join("..")
         .join("..")
         .join("packages")
         .join("core")
         .join("dist")
         .join("bridge.js");
-    if path.exists() {
-        Ok(path)
-    } else {
-        Err(format!(
-            "core bridge not found at {} — run `npm run build:core` from the repo root",
-            path.display()
-        ))
+    if dev_path.exists() {
+        return Ok(dev_path);
     }
+
+    Err(format!(
+        "core bridge not found in the app's bundled resources or at {} — run `npm run build:core` from the repo root",
+        dev_path.display()
+    ))
 }
 
 /// A Finder-launched .app inherits launchd's minimal PATH
@@ -41,6 +76,19 @@ fn bridge_script_path() -> Result<PathBuf, String> {
 /// availability…" forever. Probe the common install locations before
 /// falling back to PATH lookup.
 fn node_binary() -> PathBuf {
+    // Probing Homebrew/Volta/nvm install paths (several exists() checks
+    // and a read_dir) on every bridge command is wasteful — the node
+    // binary doesn't move during a process lifetime. Cache the first hit.
+    static CACHE: OnceLock<PathBuf> = OnceLock::new();
+    if let Some(p) = CACHE.get() {
+        return p.clone();
+    }
+    let resolved = node_binary_uncached();
+    let _ = CACHE.set(resolved.clone());
+    resolved
+}
+
+fn node_binary_uncached() -> PathBuf {
     for p in [
         "/opt/homebrew/bin/node",
         "/usr/local/bin/node",
@@ -72,8 +120,8 @@ fn node_binary() -> PathBuf {
     PathBuf::from("node")
 }
 
-fn run_bridge(command: &str, args: Option<Value>) -> Result<Value, String> {
-    let script = bridge_script_path()?;
+fn run_bridge(app: &tauri::AppHandle, command: &str, args: Option<Value>) -> Result<Value, String> {
+    let script = bridge_script_path(app)?;
     let mut cmd = Command::new(node_binary());
     cmd.arg(&script).arg(command);
     if let Some(a) = &args {
@@ -100,116 +148,175 @@ fn run_bridge(command: &str, args: Option<Value>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-fn find_root() -> Result<Value, String> {
-    run_bridge("findRoot", None)
+fn find_root(app: tauri::AppHandle) -> Result<Value, String> {
+    run_bridge(&app, "findRoot", None)
 }
 
 #[tauri::command]
-fn ensure_targets_file(root: String) -> Result<Value, String> {
-    run_bridge("ensureTargetsFile", Some(serde_json::json!({ "root": root })))
+fn validate_root(app: tauri::AppHandle, dir: String) -> Result<Value, String> {
+    run_bridge(&app, "validateRoot", Some(serde_json::json!({ "dir": dir })))
 }
 
 #[tauri::command]
-fn read_profile_field(root: String, id: String) -> Result<Value, String> {
+fn ensure_targets_file(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "ensureTargetsFile", Some(serde_json::json!({ "root": root })))
+}
+
+#[tauri::command]
+fn read_profile_field(app: tauri::AppHandle, root: String, id: String) -> Result<Value, String> {
     run_bridge(
+        &app,
         "readProfileField",
         Some(serde_json::json!({ "root": root, "id": id })),
     )
 }
 
 #[tauri::command]
-fn write_profile_field(root: String, id: String, value: Value) -> Result<Value, String> {
+fn write_profile_field(app: tauri::AppHandle, root: String, id: String, value: Value) -> Result<Value, String> {
     run_bridge(
+        &app,
         "writeProfileField",
         Some(serde_json::json!({ "root": root, "id": id, "value": value })),
     )
 }
 
 #[tauri::command]
-fn load_local_state(root: String) -> Result<Value, String> {
-    run_bridge("loadState", Some(serde_json::json!({ "root": root })))
+fn load_local_state(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "loadState", Some(serde_json::json!({ "root": root })))
 }
 
 #[tauri::command]
-fn run_validator(root: String) -> Result<Value, String> {
-    run_bridge("runValidator", Some(serde_json::json!({ "root": root })))
+fn run_validator(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "runValidator", Some(serde_json::json!({ "root": root })))
 }
 
 #[tauri::command]
-fn read_supabase_config(root: String) -> Result<Value, String> {
-    run_bridge("readSupabaseConfig", Some(serde_json::json!({ "root": root })))
+fn read_supabase_config(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "readSupabaseConfig", Some(serde_json::json!({ "root": root })))
 }
 
 #[tauri::command]
-fn detect_harnesses() -> Result<Value, String> {
-    run_bridge("detectHarnesses", None)
+fn detect_harnesses(app: tauri::AppHandle) -> Result<Value, String> {
+    run_bridge(&app, "detectHarnesses", None)
 }
 
 #[tauri::command]
-fn list_companies(root: String) -> Result<Value, String> {
-    run_bridge("listCompanies", Some(serde_json::json!({ "root": root })))
+fn list_companies(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "listCompanies", Some(serde_json::json!({ "root": root })))
 }
 
 #[tauri::command]
-fn read_harness(root: String) -> Result<Value, String> {
-    run_bridge("readHarness", Some(serde_json::json!({ "root": root })))
+fn read_harness(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "readHarness", Some(serde_json::json!({ "root": root })))
 }
 
 #[tauri::command]
-fn write_harness(root: String, harness: String) -> Result<Value, String> {
+fn write_harness(app: tauri::AppHandle, root: String, harness: String) -> Result<Value, String> {
     run_bridge(
+        &app,
         "writeHarness",
         Some(serde_json::json!({ "root": root, "harness": harness })),
     )
 }
 
 #[tauri::command]
-fn read_discord_config(root: String) -> Result<Value, String> {
-    run_bridge("readDiscordConfig", Some(serde_json::json!({ "root": root })))
+fn read_discord_config(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "readDiscordConfig", Some(serde_json::json!({ "root": root })))
 }
 
 #[tauri::command]
-fn write_discord_config(root: String, enabled: Option<bool>, routes: Value) -> Result<Value, String> {
+fn write_discord_config(app: tauri::AppHandle, root: String, enabled: Option<bool>, routes: Value) -> Result<Value, String> {
     run_bridge(
+        &app,
         "writeDiscordConfig",
         Some(serde_json::json!({ "root": root, "enabled": enabled, "routes": routes })),
     )
 }
 
 #[tauri::command]
-fn list_resumes(root: String) -> Result<Value, String> {
-    run_bridge("listResumes", Some(serde_json::json!({ "root": root })))
+fn list_resumes(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "listResumes", Some(serde_json::json!({ "root": root })))
 }
 
 #[tauri::command]
-fn convert_resume(root: String, stem: String, description: Option<String>) -> Result<Value, String> {
+fn convert_resume(app: tauri::AppHandle, root: String, stem: String, description: Option<String>) -> Result<Value, String> {
     run_bridge(
+        &app,
         "convertResume",
         Some(serde_json::json!({ "root": root, "stem": stem, "description": description.unwrap_or_default() })),
     )
 }
 
 #[tauri::command]
-fn import_resume_file(root: String, source_path: String, stem: String) -> Result<Value, String> {
+fn import_resume_file(app: tauri::AppHandle, root: String, source_path: String, stem: String) -> Result<Value, String> {
     run_bridge(
+        &app,
         "importResumeFile",
         Some(serde_json::json!({ "root": root, "sourcePath": source_path, "stem": stem })),
     )
 }
 
 #[tauri::command]
-fn open_extension_folder(root: String) -> Result<Value, String> {
-    run_bridge("openExtensionFolder", Some(serde_json::json!({ "root": root })))
+fn open_extension_folder(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "openExtensionFolder", Some(serde_json::json!({ "root": root })))
 }
 
 #[tauri::command]
-fn read_onboarding_completed(root: String) -> Result<Value, String> {
-    run_bridge("readOnboardingCompleted", Some(serde_json::json!({ "root": root })))
-}
-
-#[tauri::command]
-fn write_onboarding_completed(root: String, completed: bool) -> Result<Value, String> {
+fn search_jobs(app: tauri::AppHandle, root: String, query: String, sources: Value) -> Result<Value, String> {
     run_bridge(
+        &app,
+        "searchJobs",
+        Some(serde_json::json!({ "root": root, "query": query, "sources": sources })),
+    )
+}
+
+#[tauri::command]
+fn check_job_fit(app: tauri::AppHandle, root: String, job: Value) -> Result<Value, String> {
+    run_bridge(&app, "checkJobFit", Some(serde_json::json!({ "root": root, "job": job })))
+}
+
+#[tauri::command]
+fn save_job_for_review(app: tauri::AppHandle, root: String, job: Value) -> Result<Value, String> {
+    run_bridge(&app, "saveJobForReview", Some(serde_json::json!({ "root": root, "job": job })))
+}
+
+#[tauri::command]
+fn mark_queue_entry_applied(app: tauri::AppHandle, root: String, entry: Value) -> Result<Value, String> {
+    run_bridge(
+        &app,
+        "markQueueEntryApplied",
+        Some(serde_json::json!({ "root": root, "entry": entry })),
+    )
+}
+
+#[tauri::command]
+fn dismiss_queue_entry(app: tauri::AppHandle, root: String, entry: Value) -> Result<Value, String> {
+    run_bridge(
+        &app,
+        "dismissQueueEntry",
+        Some(serde_json::json!({ "root": root, "entry": entry })),
+    )
+}
+
+#[tauri::command]
+fn list_resume_details(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "listResumeDetails", Some(serde_json::json!({ "root": root })))
+}
+
+#[tauri::command]
+fn open_resumes_folder(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "openResumesFolder", Some(serde_json::json!({ "root": root })))
+}
+
+#[tauri::command]
+fn read_onboarding_completed(app: tauri::AppHandle, root: String) -> Result<Value, String> {
+    run_bridge(&app, "readOnboardingCompleted", Some(serde_json::json!({ "root": root })))
+}
+
+#[tauri::command]
+fn write_onboarding_completed(app: tauri::AppHandle, root: String, completed: bool) -> Result<Value, String> {
+    run_bridge(
+        &app,
         "writeOnboardingCompleted",
         Some(serde_json::json!({ "root": root, "completed": completed })),
     )
@@ -220,7 +327,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        // Auth callback deep link (applyr://auth-callback — see
+        // Auth callback deep link (aplyx://auth-callback — see
         // desktop/src/lib/AuthContext.tsx). Works out of the box on macOS
         // once the app is bundled+installed. On Windows/Linux, a deep-link
         // click spawns a NEW app instance with the URL as a CLI arg rather
@@ -230,6 +337,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             find_root,
+            validate_root,
             ensure_targets_file,
             read_profile_field,
             write_profile_field,
@@ -246,6 +354,13 @@ pub fn run() {
             convert_resume,
             import_resume_file,
             open_extension_folder,
+            search_jobs,
+            check_job_fit,
+            save_job_for_review,
+            mark_queue_entry_applied,
+            dismiss_queue_entry,
+            list_resume_details,
+            open_resumes_folder,
             read_onboarding_completed,
             write_onboarding_completed
         ])

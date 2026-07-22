@@ -1,11 +1,11 @@
 import React from "react";
 import { render } from "ink";
-import { runValidator } from "@applyr/core/helpers.js";
+import { runValidator } from "@aplyx/core/helpers.js";
 import { withAltScreen } from "./altScreen.js";
 import { OnboardingWizard } from "./ui/onboarding/OnboardingWizard.js";
 
 /**
- * Entry point for `applyr setup [--check]`. The interactive flow is the
+ * Entry point for `aplyx setup [--check]`. The interactive flow is the
  * Ink onboarding wizard (`app/src/ui/onboarding/OnboardingWizard.tsx`) —
  * this file no longer prompts anything itself. `--check`, and any
  * non-TTY context where an Ink app can't take keyboard input (CI, piped
@@ -18,10 +18,10 @@ export async function runWizard(root: string, checkOnly: boolean): Promise<numbe
   if (checkOnly || !interactive) {
     if (!checkOnly) {
       console.log(
-        "applyr setup needs an interactive terminal to run the guided wizard.\n" +
+        "aplyx setup needs an interactive terminal to run the guided wizard.\n" +
           "See config/targets.example.json's _help block, or edit config/targets.json\n" +
-          "and config/discord_config.json directly, then run `applyr setup --check`.\n" +
-          "Once applyr is running, the Settings tab keeps everything editable.\n",
+          "and config/discord_config.json directly, then run `aplyx setup --check`.\n" +
+          "Once aplyx is running, the Settings tab keeps everything editable.\n",
       );
     }
     return report(runValidatorAndPrint(root));
@@ -43,6 +43,6 @@ function runValidatorAndPrint(root: string): boolean {
 }
 
 function report(ok: boolean): number {
-  console.log(ok ? "\nSetup looks good — config is valid." : "\nConfig is not valid yet — fix the ERROR lines above and re-run `applyr setup --check`.");
+  console.log(ok ? "\nSetup looks good — config is valid." : "\nConfig is not valid yet — fix the ERROR lines above and re-run `aplyx setup --check`.");
   return ok ? 0 : 1;
 }

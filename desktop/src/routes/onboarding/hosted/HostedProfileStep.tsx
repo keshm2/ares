@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { SupabaseAdapter } from "@applyr/core/adapters/supabase.js";
-import { PAGES, PRIVACY_LINE } from "@applyr/core/onboarding/fields.js";
+import { SupabaseAdapter } from "@aplyx/core/adapters/supabase.js";
+import { PAGES, PRIVACY_LINE } from "@aplyx/core/onboarding/fields.js";
 import { FieldInput } from "../../../components/FieldInput";
 
 type FieldValue = string | string[];

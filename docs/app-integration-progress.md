@@ -1,4 +1,4 @@
-# applyr app integration — progress notes
+# aplyx app integration — progress notes
 
 Working log for the Phase 11 (hosted Supabase backend) + Phase 14A
 (Tauri desktop app shell) build. Companion to
@@ -21,12 +21,12 @@ which remain the canonical record.
 | Home / Settings screens | Done (real) |
 | Jobs / Review / History / Resumes screens | Not done — Phase 14B, deferred |
 | Email/password + Google auth | Done, code-complete |
-| Deep-link auth callback (`applyr://auth-callback`) | Done, verified at the OS level on macOS |
+| Deep-link auth callback (`aplyx://auth-callback`) | Done, verified at the OS level on macOS |
 | `config/supabase.json` populated | Done (operator did this) |
 | Migration `0001_init.sql` applied to the live Supabase project | Done (operator ran it via SQL Editor) |
 | Migration `0002_onboarding_completed.sql` applied to the live project | **Not done yet — blocks the skip-wizard fix below from working live** |
 | Google OAuth client configured in Supabase | Not done yet |
-| Redirect URL `applyr://auth-callback` added in Supabase dashboard | Not done yet — next step |
+| Redirect URL `aplyx://auth-callback` added in Supabase dashboard | Not done yet — next step |
 | End-to-end sign-up verified working | Not yet confirmed — pending the redirect URL step above |
 | Custom SMTP (Resend or Gmail app-password) | Not done yet — Supabase's built-in mailer is unreliable/rate-limited, flagged to operator |
 
@@ -35,7 +35,7 @@ which remain the canonical record.
 ### Shared core (`packages/core`)
 
 Extracted from `app/src/` (the TUI) into a real npm-workspace package,
-`@applyr/core`, so the TUI and the desktop app share one
+`@aplyx/core`, so the TUI and the desktop app share one
 implementation instead of two:
 
 - `state.ts`, `helpers.ts`, `settings.ts`, `platform.ts`, `project.ts`,
@@ -61,7 +61,7 @@ implementation instead of two:
   `@supabase/supabase-js` with zero Node-API dependency, so it runs
   directly in the Tauri webview.
 
-`app/`'s imports were rewritten to `@applyr/core/*` in place — no
+`app/`'s imports were rewritten to `@aplyx/core/*` in place — no
 duplication. Verified by `npm run smoke --workspace=app` passing
 unchanged after the move.
 
@@ -165,11 +165,11 @@ Fixed with the standard desktop-app pattern (same one Slack/VS Code/
 GitHub Desktop use): a registered custom URL scheme.
 
 - `desktop/src-tauri/Cargo.toml` — added `tauri-plugin-deep-link`.
-- `desktop/src-tauri/tauri.conf.json` — `plugins.deep-link.desktop.schemes: ["applyr"]`.
+- `desktop/src-tauri/tauri.conf.json` — `plugins.deep-link.desktop.schemes: ["aplyx"]`.
 - `desktop/src-tauri/capabilities/default.json` — added
   `deep-link:default` permission.
 - `desktop/src/lib/AuthContext.tsx` — `AUTH_CALLBACK_URL =
-  "applyr://auth-callback"`; `signUpWithPassword` passes it as
+  "aplyx://auth-callback"`; `signUpWithPassword` passes it as
   `emailRedirectTo`; `signInWithGoogle` uses `skipBrowserRedirect:
   true` and opens the OAuth URL in the *system* browser via
   `@tauri-apps/plugin-opener`'s `openUrl` (Google blocks OAuth from
@@ -183,8 +183,8 @@ GitHub Desktop use): a registered custom URL scheme.
 (required — macOS only recognizes a custom URL scheme once the app is
 bundled and installed there; `tauri dev`'s raw binary can't register
 it), launched it once, and confirmed via `lsregister -dump` that
-macOS claims `applyr:` for the bundle. Fired a test `open
-"applyr://auth-callback?test=1"` — routed silently to the running app
+macOS claims `aplyx:` for the bundle. Fired a test `open
+"aplyx://auth-callback?test=1"` — routed silently to the running app
 with no browser tab opening and no crash. **Not yet verified**: an
 actual real sign-up completing end-to-end (the Supabase dashboard
 still needs the redirect URL added — see Next steps).
@@ -232,7 +232,7 @@ logo and a less-orange palette. All three addressed:
 - Verified: bridge CLI round-trips (`findRoot`, `readSupabaseConfig`),
   Supabase project healthy (auth/v1/health 200, email auth on, Google
   provider still off), fresh debug bundle installed to /Applications,
-  `applyr://auth-callback?test=1` routes into the running instance
+  `aplyx://auth-callback?test=1` routes into the running instance
   (single process, no crash). End-to-end sign-up still pending the
   dashboard redirect-URL step below.
 
@@ -241,7 +241,7 @@ brand mark: dark rounded badge, pixel-block letter A fading lavender →
 purple → violet → pink with circuit traces (recreated as hand-authored
 SVG in `Logo.tsx` + `assets/logo-mark.svg` + `public/favicon.svg`;
 full Tauri icon set regenerated via `tauri icon` from a 1024px
-rsvg-convert render). Wordmark now renders "applyr" with the pink "r".
+rsvg-convert render). Wordmark now renders "aplyx" with the pink "r".
 
 **Palette** — `styles/tokens.css` reworked from the warm cream/orange
 neutrals to the TUI's language (app/src/theme.ts): violet accent
@@ -294,10 +294,10 @@ a theme setting (system/light/dark, beige light), and a font setting
   same city pool. Also fixed pre-existing duplicates in US_CITIES
   (309 -> 274 entries; exact repeats across regional groupings).
 - **Theme + font settings**: Settings → Appearance. Theme
-  system/light/dark persisted in localStorage (applyr.theme), applied
+  system/light/dark persisted in localStorage (aplyx.theme), applied
   as data-theme on <html> pre-first-paint (src/lib/uiPrefs.ts +
   main.tsx). Light theme re-grounded on warm beige (#f6f1e6 family) per
-  operator; dark unchanged. Font system/geist (applyr.font →
+  operator; dark unchanged. Font system/geist (aplyx.font →
   data-font); Geist + Geist Mono variable woff2 bundled from the
   `geist` npm package (SIL OFL) — no CDN fetch. Note: the TUI's font
   cannot be set by the app — terminal emulators own their font; Geist
@@ -308,7 +308,7 @@ a theme setting (system/light/dark, beige light), and a font setting
   ~7/row, hover-× removal, outside-click closes dropdown, zero console
   errors); theme + font toggles verified live (localStorage + data-*
   attributes); rebuilt debug bundle reinstalled to /Applications and
-  `applyr://auth-callback?test=2` routed into the single running
+  `aplyx://auth-callback?test=2` routed into the single running
   instance. Also hardened ImportOrFreshStep (import failure no longer
   strands "Importing…"; error shown with start-fresh fallback).
 
@@ -329,7 +329,7 @@ a theme setting (system/light/dark, beige light), and a font setting
 ## Operator actions — what's left
 
 1. **Add the redirect URL in Supabase** — dashboard → Authentication →
-   URL Configuration → Redirect URLs → add `applyr://auth-callback`.
+   URL Configuration → Redirect URLs → add `aplyx://auth-callback`.
    Without this Supabase rejects the redirect even though the app is
    ready to receive it. **This is the next step to unblock testing.**
 2. **Apply migration `0002_onboarding_completed.sql`** — same process
@@ -352,7 +352,7 @@ a theme setting (system/light/dark, beige light), and a font setting
    in Testing mode — no Google review needed for personal/beta use),
    enter the client ID/secret in Supabase → Authentication → Providers
    → Google.
-5. **Re-test sign-up** using the installed `/Applications/applyr.app`
+5. **Re-test sign-up** using the installed `/Applications/aplyx.app`
    (not `npm run tauri dev` — the dev binary can't receive the deep
    link) and confirm the confirmation-email click actually lands back
    in the app signed in.
@@ -426,7 +426,7 @@ identical in shape to the already-verified local one and typechecks
 against the real `SupabaseAdapter`, but wasn't exercised against a
 real signed-in session this pass to avoid mutating the live test
 account's row ahead of the migration existing to receive the write.
-Rebuilt debug bundle reinstalled to `/Applications/applyr.app`.
+Rebuilt debug bundle reinstalled to `/Applications/aplyx.app`.
 
 ## Desktop app install, all three platforms (2026-07-17)
 
@@ -450,11 +450,11 @@ Visual C++ Build Tools via winget on Windows, probed via `vswhere`),
 builds `packages/core` → the desktop frontend → the Tauri app in
 **release** mode (not the `--debug` used for local dev iteration
 earlier in this project), then installs the resulting bundle:
-- macOS: `/Applications/applyr.app`, falling back to
+- macOS: `/Applications/aplyx.app`, falling back to
   `~/Applications` if `/Applications` isn't writable (no sudo).
 - Linux: `apt install ./*.deb` or `dnf install ./*.rpm` if available
   (resolves runtime deps automatically); else falls back to an
-  AppImage + a generated `~/.local/share/applications/applyr.desktop`
+  AppImage + a generated `~/.local/share/applications/aplyx.desktop`
   entry so it shows up in the app launcher, matching a "real install"
   feel rather than a bare executable.
 - Windows: prefers the NSIS `.exe` over the MSI specifically because
@@ -469,7 +469,7 @@ has no `prepare`/`postinstall` hook, so its `dist/` was never built
 automatically — the TUI's own install step (`build_node_surface app`)
 silently relied on `packages/core/dist` already existing from a prior
 build, which is never true on a genuinely fresh clone. `app`'s `tsc`
-build would have failed to resolve `@applyr/core/*` imports. Both
+build would have failed to resolve `@aplyx/core/*` imports. Both
 `install.sh` and `install.ps1` now run `npm run build:core` before
 building either the TUI or the desktop app.
 
@@ -486,7 +486,7 @@ non-fatal step and must never be able to take down the rest of the
 installer.
 
 **Uninstall** (`scripts/install/uninstall.py`) now also removes the
-desktop app if present — `/Applications/applyr.app` (or
+desktop app if present — `/Applications/aplyx.app` (or
 `~/Applications`) on macOS, the AppImage + `.desktop` entry (or a
 "remove via apt/dnf" hint for package-manager installs) on Linux, and
 the registered per-user uninstaller via the registry on Windows. All
@@ -496,7 +496,7 @@ best-effort — never fails the overall uninstall.
 testable here): cleared any prior install and the release build cache,
 ran `install_desktop.sh` fresh — Rust dependency tree downloaded and
 compiled clean (~78s first build, ~27s on a warm-cache re-run),
-`.app` + `.dmg` bundled, installed to `/Applications/applyr.app`,
+`.app` + `.dmg` bundled, installed to `/Applications/aplyx.app`,
 launched and confirmed running. Also ran the full `install.sh`
 non-interactively to confirm the new opt-in prompt degrades cleanly
 (clear skip message, rest of the install unaffected) and doesn't

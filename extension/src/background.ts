@@ -26,7 +26,7 @@ async function callBridge(
   if (!token) {
     return {
       ok: false,
-      error: "bridge token not set — open the applyr extension options and paste the token from config/extension_bridge.json",
+      error: "bridge token not set — open the aplyx extension options and paste the token from config/extension_bridge.json",
     };
   }
   let response: Response;

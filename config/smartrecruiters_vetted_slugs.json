@@ -1,0 +1,11 @@
+{
+  "_provenance": "Project-owned vetted SmartRecruiters company-slug list. Each slug was verified against https://api.smartrecruiters.com/v1/companies/{slug}/postings (HTTP 200 with a non-empty, non-junk content array) on the verified_at date. Additions are code changes: verify the endpoint by hand, update verified_at, and review in a PR. This list is never fetched from a remote source at run time.",
+  "verified_at": "2026-07-21",
+  "slugs": [
+    "Docusign",
+    "Dominos",
+    "Equinox",
+    "Visa",
+    "Wayfair"
+  ]
+}

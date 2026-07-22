@@ -22,8 +22,8 @@ import os
 import sys
 import tempfile
 
-# APPLYR_LOG_DIR (Settings screen / env) relocates the log directory.
-HEARTBEAT = os.path.join(os.environ.get("APPLYR_LOG_DIR", "logs"), "heartbeat.json")
+# APLYX_LOG_DIR (Settings screen / env) relocates the log directory.
+HEARTBEAT = os.path.join(os.environ.get("APLYX_LOG_DIR", os.environ.get("FLUX_LOG_DIR", "logs")), "heartbeat.json")
 
 
 def main(argv=None) -> int:

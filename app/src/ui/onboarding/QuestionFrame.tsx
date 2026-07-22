@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { theme } from "../../theme.js";
-import { PRIVACY_LINE } from "@applyr/core/onboarding/fields.js";
+import { PRIVACY_LINE } from "@aplyx/core/onboarding/fields.js";
 
 /**
  * Shared chrome for a page: the persistent privacy line, the page

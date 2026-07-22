@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { FieldDef } from "@applyr/core/onboarding/fields.js";
-import { US_CITIES } from "@applyr/core/data/usCities.js";
+import type { FieldDef } from "@aplyx/core/onboarding/fields.js";
+import { US_CITIES } from "@aplyx/core/data/usCities.js";
 import { findRoot, listCompanies } from "../lib/bridge";
 import { TagSearchInput } from "./TagSearchInput";
 import "./formFields.css";

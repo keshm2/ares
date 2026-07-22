@@ -12,7 +12,7 @@ Determine what your harness can actually do, then follow the
   perform that role inline, following it exactly.
 - **No browser-automation tools** (no Playwright/browser tools in your
   toolset): fetch and process API-fed boards only (Ashby, Lever,
-  Greenhouse, SimplifyJobs, Workday CXS). Route any job whose application would
+  Greenhouse, SmartRecruiters, Amazon, Oracle, SimplifyJobs, Workday CXS). Route any job whose application would
   require a browser to `needs_review` with reasoning
   "harness lacks browser automation: <title> at <company>; user to
   apply manually" — the standard needs_review flow (applied_jobs
@@ -129,6 +129,66 @@ not optional narration, and never bundle them into a larger sentence.
      apply manually". Never invoke @resume-tailor or any form-filling
      for a Workday job. needs_review items are not applications and do
      not count against the 25-per-session cap.
+3a. For SmartRecruiters companies: use the deterministic fetch helper —
+   never scrape with Playwright:
+   `python3 scripts/jobs/fetch_smartrecruiters_listings.py --limit 200`
+   It reads config/targets.json "smartrecruiters_company_slugs" (company
+   identifiers, e.g. "Equinox" from
+   jobs.smartrecruiters.com/Equinox/...) and prints one raw-job JSON
+   object per line (source "smartrecruiters") via the public
+   SmartRecruiters Postings API, paginating automatically.
+   - If "smartrecruiters_company_slugs" is missing, empty, or
+     placeholder-only ("REPLACE_ME"), the helper warns and exits 0 with
+     no output — skip the board and continue. On a non-zero exit (every
+     company failed), log one warning, skip the board, continue the run.
+   - SmartRecruiters listings carry NO JD text (confirmed against the
+     live API — only the per-posting detail endpoint has it). After role
+     filtering (step 8) and BEFORE the fit gate (step 10), fetch the JD
+     per surviving candidate:
+     `python3 scripts/jobs/fetch_smartrecruiters_listings.py --jd-url '<posting-url>'`
+     then re-canonicalize and upsert with the fetched jd_text. Never
+     fit-gate a SmartRecruiters job with empty jd_text. If the JD fetch
+     fails, drop the posting with a logged warning (no Playwright
+     fallback needed — the detail endpoint is as reliable as the list
+     endpoint, same public API).
+3b. For Amazon (company-specific board, phase 16B): use the
+   deterministic fetch helper — never scrape with Playwright:
+   `python3 scripts/jobs/fetch_amazon_listings.py --search "<query>" --limit 200`
+   Amazon is a single company, not a multi-tenant ATS — there is no
+   per-company slug to configure; run this whenever "amazon" is present
+   in config/targets.json "boards" (same convention as linkedin/indeed/
+   wellfound/handshake — a plain board-name toggle, no further config).
+   Prints one raw-job JSON object per line (source "amazon") via the
+   public amazon.jobs search API, paginating automatically.
+   - The list response carries FULL JD text already (confirmed against
+     the live API) — no separate per-posting detail fetch needed, unlike
+     Workday/SmartRecruiters/Oracle.
+   - Pass the same query used for role/level prefiltering (step 0/8) as
+     `--search` so the fetch itself is already narrowed, rather than
+     pulling Amazon's entire (very large) global job list.
+3c. For Oracle Recruiting Cloud tenants (phase 16B — a distinct, more
+   modern product from the legacy Taleo ATS already in the source
+   enum): use the deterministic fetch helper — never scrape with
+   Playwright:
+   `python3 scripts/jobs/fetch_oracle_listings.py --search "<query>" --limit 200`
+   It reads config/targets.json "oracle_tenants" ("<host>/<siteNumber>"
+   strings, e.g. "eeho.fa.us2.oraclecloud.com/CX_45001" for Oracle's own
+   careers site) and prints one raw-job JSON object per line (source
+   "oracle") via the tenants' public Fusion HCM REST API.
+   - If "oracle_tenants" is missing, empty, or placeholder-only
+     ("REPLACE_ME"), the helper warns and exits 0 with no output — skip
+     the board and continue. On a non-zero exit (every tenant failed),
+     log one warning, skip the board, continue the run.
+   - Oracle listings carry NO JD text (confirmed against the live API —
+     only the per-requisition detail endpoint has it). After role
+     filtering (step 8) and BEFORE the fit gate (step 10), fetch the JD
+     per surviving candidate:
+     `python3 scripts/jobs/fetch_oracle_listings.py --jd-url '<posting-url>'`
+     then re-canonicalize and upsert with the fetched jd_text. Never
+     fit-gate an Oracle job with empty jd_text. If the JD fetch fails,
+     drop the posting with a logged warning (no Playwright fallback
+     needed — the detail endpoint is as reliable as the list endpoint,
+     same public API).
 4. For LinkedIn, Indeed, Handshake, Wellfound: use Playwright MCP to
    navigate to the board with role/location filters and scrape job
    listings, full JD text, and application URLs. (Greenhouse moved to
@@ -513,7 +573,8 @@ After all applications:
 - applied_jobs.json entries must include: job_id, company, title, url,
   date_applied, status (applied|failed|needs_review), role_type
   (internship|new_grad), source (linkedin|indeed|greenhouse|lever|
-  wellfound|handshake|ashbyhq|simplify|workday), resume_used
+  wellfound|handshake|ashbyhq|simplify|workday|smartrecruiters|amazon|
+  oracle), resume_used
   (swe|ai_ml|balanced|cyber|networking_cyber),
   ats_score (number), location_tier (preferred|fallback),
   cover_letter_used (bool). When status is "failed" or "needs_review",

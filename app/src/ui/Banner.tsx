@@ -20,7 +20,7 @@ export function bannerHeight(columns: number, rows: number): number {
 }
 
 /**
- * The persistent applyr banner. Violet→maroon gradient by row, centered
+ * The persistent aplyx banner. Violet→maroon gradient by row, centered
  * to the current terminal width; collapses to a centered one-line
  * wordmark when the terminal is too narrow or too short for the art
  * (never corrupts layout).
@@ -30,7 +30,7 @@ export const Banner = React.memo(function Banner({ columns, rows }: { columns: n
     return (
       <Box paddingX={1} justifyContent="center">
         <Text bold color={theme.accent}>
-          APPLYR
+          APLYX
         </Text>
         <Text dimColor> — job application agent</Text>
       </Box>

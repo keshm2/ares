@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { SupabaseAdapter } from "@applyr/core/adapters/supabase.js";
-import { FIELD_IDS } from "@applyr/core/onboarding/fields.js";
+import { SupabaseAdapter } from "@aplyx/core/adapters/supabase.js";
+import { FIELD_IDS } from "@aplyx/core/onboarding/fields.js";
 import { hasLocalInstall, findRoot, readProfileField } from "../../../lib/bridge";
 import "../../../components/formFields.css";
 
@@ -41,7 +41,7 @@ export function ImportOrFreshStep({
   }
 
   if (hasLocal === undefined) {
-    return <p className="field-help">Checking for a local applyr installation on this machine&hellip;</p>;
+    return <p className="field-help">Checking for a local aplyx installation on this machine&hellip;</p>;
   }
 
   return (
@@ -51,7 +51,7 @@ export function ImportOrFreshStep({
           <div>
             <div className="option-card-title">{importing ? "Importing…" : "Import from this machine"}</div>
             <div className="option-card-detail">
-              Bring over your profile from the local applyr install found here.
+              Bring over your profile from the local aplyx install found here.
             </div>
           </div>
         </button>

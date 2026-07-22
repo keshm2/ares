@@ -113,12 +113,12 @@ export function gradientColor(phase: number, stops: readonly string[] = BANNER_G
 
 /** ASCII banner — the one loud element. Rows fade violet → maroon. */
 export const BANNER_ROWS = [
-  " █████╗ ██████╗ ██████╗ ██╗     ██╗   ██╗██████╗ ",
-  "██╔══██╗██╔══██╗██╔══██╗██║     ╚██╗ ██╔╝██╔══██╗",
-  "███████║██████╔╝██████╔╝██║      ╚████╔╝ ██████╔╝",
-  "██╔══██║██╔═══╝ ██╔═══╝ ██║       ╚██╔╝  ██╔══██╗",
-  "██║  ██║██║     ██║     ███████╗   ██║   ██║  ██║",
-  "╚═╝  ╚═╝╚═╝     ╚═╝     ╚══════╝   ╚═╝   ╚═╝  ╚═╝",
+  " █████╗ ██████╗ ██╗  ██╗   ██╗██╗  ██╗",
+  "██╔══██╗██╔══██╗██║  ╚██╗ ██╔╝╚██╗██╔╝",
+  "███████║██████╔╝██║   ╚████╔╝  ╚███╔╝ ",
+  "██╔══██║██╔═══╝ ██║    ╚██╔╝   ██╔██╗ ",
+  "██║  ██║██║     ███████╗██║   ██╔╝ ██╗",
+  "╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝   ╚═╝  ╚═╝",
 ] as const;
 
 export const BANNER_GRADIENT = [
@@ -142,7 +142,7 @@ export const SPARKLE_GRADIENT = [theme.accent, "#FFFFFF"] as const;
 
 /** Which coding-agent CLI a run uses — mirrors the four harnesses
  *  scripts/runtime/run_job_agent.py can invoke (config/harness.json /
- *  APPLYR_HARNESS). "auto" means neither an env override nor
+ *  APLYX_HARNESS). "auto" means neither an env override nor
  *  config/harness.json name a specific one (the Python side then
  *  auto-detects a CLI on PATH) — there's no single harness to color for,
  *  so it gets its own combined wave instead of guessing one. */
@@ -222,9 +222,9 @@ export const MIN_COLUMNS = 76;
 export const MIN_ROWS = 12;
 
 /** Build/release marker shown in the side panel footer. Re-exported from
- *  @applyr/core so the TUI and the desktop app's Settings screen always
+ *  @aplyx/core so the TUI and the desktop app's Settings screen always
  *  report the same build from one source (see packages/core/src/version.ts). */
-export { BUILD_MARKER } from "@applyr/core/version.js";
+export { BUILD_MARKER } from "@aplyx/core/version.js";
 
 /** Side panel width — narrow enough to coexist with content on 64-col+
  *  terminals. The panel hides below that width (see App showSidebar). */

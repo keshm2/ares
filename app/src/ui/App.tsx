@@ -14,10 +14,10 @@ import { WelcomeScreen, type WelcomeOption } from "./WelcomeScreen.js";
 import { KeyHints, AutoSparkleText } from "./KeyHints.js";
 import { SidePanel, TopStatusBar } from "./SidePanel.js";
 import { UpdateBox } from "./UpdateBox.js";
-import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "@applyr/core/state.js";
-import { displayName } from "@applyr/core/settings.js";
+import { loadState, isResolved, lastRunLine, latestSessionLog, readHeartbeat } from "@aplyx/core/state.js";
+import { displayName } from "@aplyx/core/settings.js";
 import { pendingConversionCount } from "../resumes.js";
-import type { ApplyrState } from "@applyr/core/state.js";
+import type { AplyxState } from "@aplyx/core/state.js";
 import { theme, MIN_COLUMNS, MIN_ROWS, SELECT_MARKER, SIDE_PANEL_WIDTH } from "../theme.js";
 
 export type Tab = "status" | "jobs" | "review" | "letters" | "history" | "resumes" | "settings";
@@ -62,7 +62,7 @@ const WELCOME_OPTIONS: Array<WelcomeOption & { tab: Tab; mode?: Mode }> = [
   {
     label: "Interest letters",
     description:
-      "Answer the \"why do you want to work here?\" questions applyr parked instead of guessing. Write your own, or have applyr draft one for you to edit and approve.",
+      "Answer the \"why do you want to work here?\" questions aplyx parked instead of guessing. Write your own, or have aplyx draft one for you to edit and approve.",
     tab: "letters",
   },
   {
@@ -77,12 +77,12 @@ const WELCOME_OPTIONS: Array<WelcomeOption & { tab: Tab; mode?: Mode }> = [
   },
   {
     label: "Resumes",
-    description: "See which base resumes applyr can find, open the data/resumes/ folder, and convert a newly added PDF to markdown so the tailoring agent can use it.",
+    description: "See which base resumes aplyx can find, open the data/resumes/ folder, and convert a newly added PDF to markdown so the tailoring agent can use it.",
     tab: "resumes",
   },
   {
     label: "Settings",
-    description: "See what everything is currently set to, then change it: personal info (and the name applyr calls you), Discord webhooks, and environment overrides like the log directory.",
+    description: "See what everything is currently set to, then change it: personal info (and the name aplyx calls you), Discord webhooks, and environment overrides like the log directory.",
     tab: "settings",
   },
 ];
@@ -127,7 +127,7 @@ export function App({
   const { exit } = useApp();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [mode, setMode] = useState<Mode>("manual");
-  const [state, setState] = useState<ApplyrState>(() => loadState(root));
+  const [state, setState] = useState<AplyxState>(() => loadState(root));
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [childInputActive, setChildInputActive] = useState(false);
   const [runInProgress, setRunInProgress] = useState(false);
@@ -138,8 +138,8 @@ export function App({
   // (which runs scripts/install/update.py after the TUI exits the alt screen).
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const showUpdateBox = Boolean(updateVersion) && !updateDismissed;
-  // The welcome walkthrough opens every plain `applyr` launch; jumping
-  // straight to a screen (`applyr review`) skips it.
+  // The welcome walkthrough opens every plain `aplyx` launch; jumping
+  // straight to a screen (`aplyx review`) skips it.
   const [welcome, setWelcome] = useState(initialTab === "status");
   const [welcomeCursor, setWelcomeCursor] = useState(() => welcomeIndexFor(initialTab, "manual"));
   const [size, setSize] = useState(stdoutSize);
@@ -256,12 +256,12 @@ export function App({
     return (
       <Box flexDirection="column" paddingX={1} paddingTop={2} alignItems="center">
         <Text bold color={theme.accent}>
-          applyr
+          aplyx
         </Text>
         <Text dimColor>terminal too small</Text>
         <Box marginTop={1} flexDirection="column" alignItems="center">
           <Text dimColor>need at least {MIN_COLUMNS}×{MIN_ROWS}, have {columns}×{rows}</Text>
-          <Text dimColor>resize or widen the window, then reopen with `applyr`</Text>
+          <Text dimColor>resize or widen the window, then reopen with `aplyx`</Text>
         </Box>
       </Box>
     );
@@ -492,6 +492,7 @@ export function App({
                     onInputActiveChange={setChildInputActive}
                     onSettingsChange={refresh}
                     contentRows={contentRows}
+                    columns={contentCols}
                   />
                 )}
               </Box>

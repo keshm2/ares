@@ -1,5 +1,5 @@
 #!/bin/bash
-# install_desktop.sh — installs the applyr desktop app (Tauri + React) for
+# install_desktop.sh — installs the aplyx desktop app (Tauri + React) for
 # macOS and Linux.
 #
 # Prefers downloading a prebuilt bundle from this checkout's matching
@@ -35,25 +35,34 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
+# Pin this checkout's location to ~/.aplyx/root, same as install.sh —
+# written here too since this script is documented as independently
+# re-runnable on its own, not only as install.sh's opt-in step. The
+# desktop app (Finder/Dock-launched, no shell env vars, no meaningful
+# working directory) reads this as its primary way to find the checkout;
+# see packages/core/src/project.ts's findProjectRoot().
+mkdir -p "$HOME/.aplyx"
+printf '%s' "$PROJECT_ROOT" > "$HOME/.aplyx/root"
+
 [ -f "desktop/package.json" ] || fail "desktop/ not found in this checkout — nothing to install."
 
 OS="$(uname -s)"
 SUDO=""
 [ "$(id -u 2>/dev/null || echo 0)" -ne 0 ] && command -v sudo >/dev/null 2>&1 && SUDO="sudo"
-REPO="keshm2/applyr"
+REPO="keshm2/aplyx"
 
 # --- macOS: install an already-built .app (shared by the prebuilt-download
 # and build-from-source paths) ------------------------------------------------
-install_macos_app() { # <path to a built/extracted applyr.app>
+install_macos_app() { # <path to a built/extracted aplyx.app>
   local app_src="$1"
   local dest="/Applications"
   [ -w "$dest" ] || dest="$HOME/Applications"
   mkdir -p "$dest"
-  osascript -e 'quit app "applyr"' >/dev/null 2>&1 || true
-  rm -rf "$dest/applyr.app"
-  cp -R "$app_src" "$dest/applyr.app"
-  say "installed: $dest/applyr.app"
-  say "open it from Finder/Launchpad, or: open '$dest/applyr.app'"
+  osascript -e 'quit app "aplyx"' >/dev/null 2>&1 || true
+  rm -rf "$dest/aplyx.app"
+  cp -R "$app_src" "$dest/aplyx.app"
+  say "installed: $dest/aplyx.app"
+  say "open it from Finder/Launchpad, or: open '$dest/aplyx.app'"
 }
 
 # --- Linux: install whichever bundle format is available (shared by both
@@ -75,26 +84,26 @@ install_linux_bundle() { # <dir containing candidate .deb/.rpm/.AppImage files>
     say "installed via dnf: $rpm"
     return 0
   elif [ -n "$appimage" ]; then
-    local appdir="$HOME/.local/share/applyr"
+    local appdir="$HOME/.local/share/aplyx"
     mkdir -p "$appdir" "$HOME/.local/share/applications" "$HOME/.local/bin"
-    cp "$appimage" "$appdir/applyr.AppImage"
-    chmod +x "$appdir/applyr.AppImage"
-    ln -sf "$appdir/applyr.AppImage" "$HOME/.local/bin/applyr-app"
+    cp "$appimage" "$appdir/aplyx.AppImage"
+    chmod +x "$appdir/aplyx.AppImage"
+    ln -sf "$appdir/aplyx.AppImage" "$HOME/.local/bin/aplyx-app"
     local icon_src="desktop/src-tauri/icons/128x128.png"
     [ -f "$icon_src" ] && cp "$icon_src" "$appdir/icon.png"
-    cat > "$HOME/.local/share/applications/applyr.desktop" <<DESKTOP
+    cat > "$HOME/.local/share/applications/aplyx.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=applyr
-Comment=applyr desktop app
-Exec=$appdir/applyr.AppImage
+Name=aplyx
+Comment=aplyx desktop app
+Exec=$appdir/aplyx.AppImage
 Icon=$appdir/icon.png
 Categories=Office;
 Terminal=false
 DESKTOP
     command -v update-desktop-database >/dev/null 2>&1 \
       && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
-    say "installed: $appdir/applyr.AppImage (find \"applyr\" in your application launcher, or run: applyr-app)"
+    say "installed: $appdir/aplyx.AppImage (find \"aplyx\" in your application launcher, or run: aplyx-app)"
     return 0
   fi
   return 1
@@ -138,13 +147,13 @@ try_prebuilt_install() {
     [ -n "$asset_url" ] || { say "no prebuilt macOS ($arch) bundle in $tag — will build from source instead."; return 1; }
 
     say "downloading the prebuilt desktop app…"
-    curl -fsSL -o "$work_dir/applyr.dmg" "$asset_url" \
+    curl -fsSL -o "$work_dir/aplyx.dmg" "$asset_url" \
       || { warn "download failed — will build from source instead."; return 1; }
     local mount_dir="$work_dir/mnt"
     mkdir -p "$mount_dir"
-    hdiutil attach "$work_dir/applyr.dmg" -mountpoint "$mount_dir" -nobrowse -quiet \
+    hdiutil attach "$work_dir/aplyx.dmg" -mountpoint "$mount_dir" -nobrowse -quiet \
       || { warn "couldn't mount the downloaded .dmg — will build from source instead."; return 1; }
-    install_macos_app "$mount_dir/applyr.app"
+    install_macos_app "$mount_dir/aplyx.app"
     hdiutil detach "$mount_dir" -quiet >/dev/null 2>&1 || true
     say "(prebuilt — no Rust or Xcode Command Line Tools needed)"
     return 0
@@ -303,7 +312,7 @@ BUNDLE_DIR="desktop/src-tauri/target/release/bundle"
 
 # --- 4. Install the built bundle ------------------------------------------------
 if [ "$OS" = "Darwin" ]; then
-  APP_SRC="$BUNDLE_DIR/macos/applyr.app"
+  APP_SRC="$BUNDLE_DIR/macos/aplyx.app"
   [ -d "$APP_SRC" ] || fail "expected bundle not found at $APP_SRC — build may have failed silently."
   install_macos_app "$APP_SRC"
 elif [ "$OS" = "Linux" ]; then

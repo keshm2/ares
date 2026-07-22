@@ -38,12 +38,12 @@ jq -e . "$TARGETS" >/dev/null 2>&1 || fail "invalid JSON in $TARGETS"
 DISCORD_ENABLED=1
 if [ ! -f "$DISCORD" ]; then
   DISCORD_ENABLED=0
-  warn "$DISCORD missing — Discord reporting disabled; outcomes stay local (enable via 'applyr setup')"
+  warn "$DISCORD missing — Discord reporting disabled; outcomes stay local (enable via 'aplyx setup')"
 else
   jq -e . "$DISCORD" >/dev/null 2>&1 || fail "invalid JSON in $DISCORD"
   if [ "$(jq -r 'if has("enabled") then .enabled else true end' "$DISCORD")" = "false" ]; then
     DISCORD_ENABLED=0
-    warn "Discord reporting disabled in $DISCORD — outcomes stay local (enable via 'applyr setup')"
+    warn "Discord reporting disabled in $DISCORD — outcomes stay local (enable via 'aplyx setup')"
   fi
 fi
 
@@ -106,8 +106,11 @@ check_string_nonempty "$TARGETS" fallback_scope
 check_array_nonempty "$TARGETS" boards
 check_array_or_absent "$TARGETS" ashby_company_slugs
 check_array_or_absent "$TARGETS" lever_company_slugs
+check_array_or_absent "$TARGETS" greenhouse_company_slugs
+check_array_or_absent "$TARGETS" smartrecruiters_company_slugs
 check_array_or_absent "$TARGETS" simplify_feeds
 check_array_or_absent "$TARGETS" workday_tenants
+check_array_or_absent "$TARGETS" oracle_tenants
 check_object        "$TARGETS" safe_fields
 
 # Required safe_fields keys for form filling.
@@ -190,6 +193,8 @@ key_absent() {
 
 ASHBY_PLACEHOLDER="$(placeholder_slugs "$TARGETS" ashby_company_slugs)"
 LEVER_PLACEHOLDER="$(placeholder_slugs "$TARGETS" lever_company_slugs)"
+GREENHOUSE_PLACEHOLDER="$(placeholder_slugs "$TARGETS" greenhouse_company_slugs)"
+SMARTRECRUITERS_PLACEHOLDER="$(placeholder_slugs "$TARGETS" smartrecruiters_company_slugs)"
 
 if key_absent "$TARGETS" ashby_company_slugs; then
   warn "ashby_company_slugs is not configured — Ashby board will be skipped this run"
@@ -200,6 +205,16 @@ if key_absent "$TARGETS" lever_company_slugs; then
   warn "lever_company_slugs is not configured — Lever board will be skipped this run"
 elif [ -n "$LEVER_PLACEHOLDER" ]; then
   warn "lever_company_slugs contains placeholder value(s): $LEVER_PLACEHOLDER — Lever board will be skipped this run"
+fi
+if key_absent "$TARGETS" greenhouse_company_slugs; then
+  warn "greenhouse_company_slugs is not configured — Greenhouse board will be skipped this run"
+elif [ -n "$GREENHOUSE_PLACEHOLDER" ]; then
+  warn "greenhouse_company_slugs contains placeholder value(s): $GREENHOUSE_PLACEHOLDER — Greenhouse board will be skipped this run"
+fi
+if key_absent "$TARGETS" smartrecruiters_company_slugs; then
+  warn "smartrecruiters_company_slugs is not configured — SmartRecruiters board will be skipped this run"
+elif [ -n "$SMARTRECRUITERS_PLACEHOLDER" ]; then
+  warn "smartrecruiters_company_slugs contains placeholder value(s): $SMARTRECRUITERS_PLACEHOLDER — SmartRecruiters board will be skipped this run"
 fi
 
 # SimplifyJobs feeds (phase 5): same warn-and-skip contract as the slug
@@ -212,6 +227,16 @@ if key_absent "$TARGETS" workday_tenants; then
   warn "workday_tenants is not configured — Workday board will be skipped this run"
 elif [ -n "$WORKDAY_PLACEHOLDER" ]; then
   warn "workday_tenants contains placeholder value(s): $WORKDAY_PLACEHOLDER — Workday board will be skipped this run"
+fi
+
+# Oracle Recruiting Cloud tenants (phase 16B): same warn-and-skip contract.
+# Tenant strings are parsed/validated by scripts/jobs/fetch_oracle_listings.py
+# at fetch time.
+ORACLE_PLACEHOLDER="$(placeholder_slugs "$TARGETS" oracle_tenants)"
+if key_absent "$TARGETS" oracle_tenants; then
+  warn "oracle_tenants is not configured — Oracle board will be skipped this run"
+elif [ -n "$ORACLE_PLACEHOLDER" ]; then
+  warn "oracle_tenants contains placeholder value(s): $ORACLE_PLACEHOLDER — Oracle board will be skipped this run"
 fi
 
 SIMPLIFY_PLACEHOLDER="$(placeholder_slugs "$TARGETS" simplify_feeds)"

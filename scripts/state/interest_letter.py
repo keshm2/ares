@@ -4,7 +4,7 @@
 Some applications ask a free-text motivation question ("Why do you want to
 work at X?"). The agent must never invent that answer, and a run is a
 headless subprocess that cannot stop and ask: the scheduler fires every 30
-minutes and a wedged run is killed at APPLYR_LOCK_MAX_AGE_MIN. So the
+minutes and a wedged run is killed at APLYX_LOCK_MAX_AGE_MIN. So the
 interaction is asynchronous — the run *parks* the job here and moves on, the
 user answers later in the TUI, and the next run applies with the approved
 text.

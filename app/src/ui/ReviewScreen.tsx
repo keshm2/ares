@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { loadState, isResolved, isDismissed, registryByJobId, hasAppliedOrFailed, todayIso } from "@applyr/core/state.js";
-import type { ApplyrState, QueueEntry, AppliedJob } from "@applyr/core/state.js";
-import { appendAppliedJob, recordEvent, syncInternshipTracker, openUrl, helperError } from "@applyr/core/helpers.js";
+import { loadState, isResolved } from "@aplyx/core/state.js";
+import type { AplyxState, QueueEntry } from "@aplyx/core/state.js";
+import { openUrl, helperError } from "@aplyx/core/helpers.js";
+import { markQueueEntryApplied, dismissQueueEntry } from "@aplyx/core/reviewActions.js";
 import { theme, statusGlyph, SELECT_MARKER } from "../theme.js";
 import { DetailPane, PaneRow, PaneRule, paneLayout } from "./Pane.js";
 
@@ -28,7 +29,7 @@ interface Props {
  * derives "resolved" instead of deleting entries.
  */
 export function ReviewScreen({ root, active, refreshNonce, onStateChange, contentRows = 20, columns = 0 }: Props) {
-  const [state, setState] = useState<ApplyrState>(() => loadState(root));
+  const [state, setState] = useState<AplyxState>(() => loadState(root));
   const [cursor, setCursor] = useState(0);
   const [offset, setOffset] = useState(0);
   const [showResolved, setShowResolved] = useState(false);
@@ -83,96 +84,11 @@ export function ReviewScreen({ root, active, refreshNonce, onStateChange, conten
   };
 
   const markApplied = (entry: QueueEntry) => {
-    const reg = registryByJobId(state.registry, entry.job_id);
-    if (!reg?.job_key) {
-      throw new Error(
-        `Cannot mark applied: no registry record / job_key for "${entry.company} — ${entry.title}" (job_id=${entry.job_id}). Canonicalize the job first.`,
-      );
-    }
-    const missing: string[] = [];
-    if (!entry.job_id) missing.push("job_id");
-    if (!entry.company) missing.push("company");
-    if (!entry.title) missing.push("title");
-    if (!entry.url) missing.push("url");
-    if (!entry.role_type) missing.push("role_type");
-    if (!entry.source) missing.push("source");
-    if (!entry.resume_used) missing.push("resume_used");
-    if (typeof entry.ats_score !== "number") missing.push("ats_score");
-    if (!entry.location_tier) missing.push("location_tier");
-    if (missing.length > 0) {
-      throw new Error(
-        `Cannot mark applied: missing required field(s) ${missing.join(", ")} for "${entry.company ?? entry.job_id}". Refusing to fabricate values.`,
-      );
-    }
-    const reasoning = "Marked applied manually via TUI review-queue triage";
-    const record: AppliedJob = {
-      job_id: entry.job_id,
-      company: entry.company,
-      title: entry.title,
-      url: entry.url,
-      date_applied: todayIso(),
-      status: "applied",
-      role_type: entry.role_type,
-      source: entry.source,
-      resume_used: entry.resume_used,
-      ats_score: entry.ats_score,
-      location_tier: entry.location_tier,
-      cover_letter_used: entry.cover_letter_used ?? false,
-      reasoning,
-    };
-    // Append the applied_jobs entry first — it is the dedup set the agent
-    // reads before every run, so it must be durable even if the event
-    // write that follows fails. A missing event is recoverable; a missing
-    // applied_jobs entry risks re-applying to the same job.
-    appendAppliedJob(root, record);
-    recordEvent(root, {
-      job_key: reg.job_key,
-      status: "applied",
-      reasoning,
-      company: entry.company,
-      title: entry.title,
-      url: entry.url,
-    });
-    // Best-effort Sheets sync — mirrors the agent path. Only the
-    // user-facing tracker fields are sent; internal-only fields stay local.
-    // A disabled/unconfigured/failed sync is a warning, not an error: the
-    // application is already recorded above and must stand regardless.
-    const sync = syncInternshipTracker(root, {
-      company: entry.company,
-      title: entry.title,
-      date_applied: record.date_applied,
-      internship_term: reg.internship_term,
-    });
-    const base = `Recorded applied: ${entry.company} — ${entry.title}`;
-    setMessage(sync.synced ? `${base} (synced to tracker)` : `${base} — ${sync.message}`);
+    setMessage(markQueueEntryApplied(root, entry).message);
   };
 
   const dismiss = (entry: QueueEntry) => {
-    const fresh = loadState(root);
-    if (hasAppliedOrFailed(fresh, entry)) {
-      setMessage(
-        `Cannot dismiss: "${entry.company} — ${entry.title}" already has an applied/failed outcome; dismiss would overwrite it with skipped_unfit.`,
-      );
-      return;
-    }
-    if (isDismissed(fresh, entry)) {
-      setMessage(`Already dismissed: "${entry.company} — ${entry.title}" is already marked skipped_unfit.`);
-      return;
-    }
-    const reg = registryByJobId(fresh.registry, entry.job_id);
-    if (!reg?.job_key) {
-      setMessage("Cannot dismiss: no registry record for this job (no job_key to record against).");
-      return;
-    }
-    recordEvent(root, {
-      job_key: reg.job_key,
-      status: "skipped_unfit",
-      reasoning: "Dismissed by operator in TUI review-queue triage",
-      company: entry.company,
-      title: entry.title,
-      url: entry.url,
-    });
-    setMessage(`Dismissed: ${entry.company} — ${entry.title}`);
+    setMessage(dismissQueueEntry(root, entry).message);
   };
 
   useInput(

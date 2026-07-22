@@ -9,7 +9,7 @@ Some applications ask a free-text motivation question ("Why do you want to
 work at X?", "Why this role?"). Today `job-scraper.md` Phase 3 fills forms
 from `safe_fields` only and has no notion of such a question, so the agent
 either invents an answer or the field blocks the submit. The user wants to
-either type the answer themselves or have applyr draft one, review/edit it,
+either type the answer themselves or have aplyx draft one, review/edit it,
 then submit.
 
 ## The hard constraint

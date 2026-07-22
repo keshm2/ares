@@ -1,9 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { QueueEntry } from "@aplyx/core/stateDerive.js";
+import type { ResumeFile } from "@aplyx/core/resumes.js";
+import type { JobSource, SearchJob, SourceResult, SearchResult, FitResult } from "@aplyx/core/jobs.js";
+
+export type { ResumeFile, JobSource, SearchJob, SourceResult, SearchResult, FitResult };
 
 /**
  * Thin typed wrappers around the Rust IPC commands defined in
  * desktop/src-tauri/src/lib.rs, which themselves shell out to the shared
- * @applyr/core bridge CLI (packages/core/src/bridge.ts). This is the only
+ * @aplyx/core bridge CLI (packages/core/src/bridge.ts). This is the only
  * module in the frontend that calls invoke() directly — every screen goes
  * through here instead, so the IPC surface stays in one place.
  */
@@ -13,14 +18,67 @@ export interface SupabaseConfig {
   anonKey: string;
 }
 
+/** Persisted across launches — a Finder/Dock-launched app has no shell
+ *  env vars, no meaningful working directory, and (now that the bridge is
+ *  bundled as a Tauri resource so a downloaded install works at all — see
+ *  desktop/src-tauri/src/lib.rs) a compiled bridge that lives inside the
+ *  app bundle, nowhere near the user's actual checkout. Auto-detection
+ *  (findProjectRoot in @aplyx/core/project.js) only ever succeeds when
+ *  launched from a terminal inside the repo (`tauri dev`); everyone else
+ *  picks their folder once via setLocalRoot() and this remembers it. */
+const LOCAL_ROOT_STORAGE_KEY = "aplyx.localRoot";
+
+function readStoredRoot(): string | undefined {
+  try {
+    return localStorage.getItem(LOCAL_ROOT_STORAGE_KEY) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 let cachedRoot: string | undefined;
 
-/** The local applyr installation root, resolved once per app session. */
+/** The local aplyx installation root: a remembered manual pick first, then
+ *  auto-detection, resolved once per app session. */
 export async function findRoot(): Promise<string> {
   if (cachedRoot) return cachedRoot;
+  const stored = readStoredRoot();
+  if (stored) {
+    cachedRoot = stored;
+    return cachedRoot;
+  }
   const result = await invoke<{ root: string }>("find_root");
   cachedRoot = result.root;
   return cachedRoot;
+}
+
+/** Validates `dir` as a real aplyx checkout (same check findProjectRoot
+ *  does) and remembers it in localStorage so future launches use it
+ *  directly instead of relying on auto-detection — the recovery path
+ *  when findRoot() fails. Throws with a clear message when `dir` doesn't
+ *  look like a checkout. */
+export async function setLocalRoot(dir: string): Promise<string> {
+  const result = await invoke<{ root: string }>("validate_root", { dir });
+  cachedRoot = result.root;
+  try {
+    localStorage.setItem(LOCAL_ROOT_STORAGE_KEY, result.root);
+  } catch {
+    // best-effort persistence — the current session still works via
+    // cachedRoot even if localStorage is unavailable.
+  }
+  return result.root;
+}
+
+/** Forgets the remembered root (Settings' "change installation folder",
+ *  or recovering from a moved/deleted checkout) so the next findRoot()
+ *  re-runs auto-detection / prompts the picker again. */
+export function forgetLocalRoot(): void {
+  cachedRoot = undefined;
+  try {
+    localStorage.removeItem(LOCAL_ROOT_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 export async function ensureTargetsFile(root: string): Promise<void> {
@@ -52,7 +110,7 @@ export async function readSupabaseConfig(root: string): Promise<SupabaseConfig |
   return result ?? undefined;
 }
 
-/** True when a local applyr installation was found — i.e. findRoot()
+/** True when a local aplyx installation was found — i.e. findRoot()
  *  resolved instead of throwing. Used to decide whether "Run locally" can
  *  proceed straight to onboarding or needs an install-location step first. */
 export async function hasLocalInstall(): Promise<boolean> {
@@ -118,10 +176,44 @@ export async function importResumeFile(root: string, sourcePath: string, stem: s
   await invoke("import_resume_file", { root, sourcePath, stem });
 }
 
-export async function convertResume(root: string, stem: string): Promise<{ ok: boolean; error?: string }> {
-  return invoke("convert_resume", { root, stem });
+export async function convertResume(root: string, stem: string, description = ""): Promise<{ ok: boolean; error?: string }> {
+  return invoke("convert_resume", { root, stem, description });
 }
 
 export async function openExtensionFolder(root: string): Promise<void> {
   await invoke("open_extension_folder", { root });
+}
+
+export async function searchJobs(
+  root: string,
+  query: string,
+  sources: Partial<Record<JobSource, boolean>>,
+): Promise<SearchResult> {
+  return invoke<SearchResult>("search_jobs", { root, query, sources });
+}
+
+export async function checkJobFit(root: string, job: SearchJob): Promise<FitResult> {
+  return invoke<FitResult>("check_job_fit", { root, job });
+}
+
+export async function saveJobForReview(root: string, job: SearchJob): Promise<"saved" | "already_saved"> {
+  const result = await invoke<{ result: "saved" | "already_saved" }>("save_job_for_review", { root, job });
+  return result.result;
+}
+
+export async function markQueueEntryApplied(root: string, entry: QueueEntry): Promise<{ message: string }> {
+  return invoke<{ message: string }>("mark_queue_entry_applied", { root, entry });
+}
+
+export async function dismissQueueEntry(root: string, entry: QueueEntry): Promise<{ message: string }> {
+  return invoke<{ message: string }>("dismiss_queue_entry", { root, entry });
+}
+
+export async function listResumeDetails(root: string): Promise<ResumeFile[]> {
+  const result = await invoke<{ files: ResumeFile[] }>("list_resume_details", { root });
+  return result.files;
+}
+
+export async function openResumesFolder(root: string): Promise<void> {
+  await invoke("open_resumes_folder", { root });
 }

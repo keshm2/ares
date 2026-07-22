@@ -1,0 +1,319 @@
+/* Shared list + detail layout for the Jobs/Review/History/Resumes screens —
+ * one list column, one detail column that appears once a row is selected. */
+
+/* Jobs screen search-in-flight indicator: a rotating ring + a phrase that
+ * crossfades to the next one every 1.8s (see JobsScreen.tsx's
+ * SEARCH_PHRASES / searchPhrase state) — the phrase span is remounted
+ * with a fresh `key` each rotation so this animation restarts cleanly
+ * instead of relying on manual opacity state. */
+@keyframes aplyx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes aplyx-fade-in-out {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.search-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.search-spinner {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: aplyx-spin 0.7s linear infinite;
+}
+
+.search-loading-text {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  animation: aplyx-fade-in-out 1.8s ease-in-out;
+}
+
+.data-screen {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+
+.data-list-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.data-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Fades in when the list first appears (empty → results), softening
+   * the loading→results swap. Persists across in-place updates (sort,
+   * filter, two-phase search refresh) so those stay immediate. */
+  animation: aplyx-fade-in var(--duration-normal) var(--ease-out) both;
+}
+
+.data-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-align: left;
+  width: 100%;
+}
+
+.data-row:hover {
+  border-color: var(--border-strong);
+}
+
+.data-row.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.data-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.data-row-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-row-sub {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-row-meta {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  text-align: right;
+}
+
+.data-empty {
+  padding: var(--space-5);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.2rem var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge-good {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.status-badge-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.status-badge-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.status-badge-muted {
+  background: var(--border);
+  color: var(--text-faint);
+}
+
+.data-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.data-toolbar-spacer {
+  flex: 1;
+}
+
+.source-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.3rem var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+.source-toggle.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.btn:hover {
+  border-color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn-primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger-soft);
+}
+
+.btn-danger:hover {
+  border-color: var(--danger);
+}
+
+.btn-sm {
+  padding: 0.3rem var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.detail-col {
+  width: 20rem;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* Fades + rises in when a row is selected and the pane mounts, so the
+   * detail column arrives calmly instead of snapping in. In-place
+   * updates (selecting a different row) don't remount, so they stay
+   * immediate. */
+  animation: aplyx-fade-rise var(--duration-normal) var(--ease-out) both;
+}
+
+.detail-title {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.detail-row-label {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.detail-row-value {
+  font-size: var(--text-sm);
+  color: var(--text);
+  word-break: break-word;
+}
+
+.detail-rule {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
+.detail-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.message-banner {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+.message-banner-error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+@media (max-width: 900px) {
+  .data-screen {
+    flex-direction: column;
+  }
+
+  .detail-col {
+    width: 100%;
+  }
+}

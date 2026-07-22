@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { SupabaseAdapter } from "@applyr/core/adapters/supabase.js";
+import { SupabaseAdapter } from "@aplyx/core/adapters/supabase.js";
 import { useAuth } from "../../../lib/AuthContext";
 import { getSupabaseClient } from "../../../lib/supabaseClient";
 import { WizardShell } from "../../../components/WizardShell";

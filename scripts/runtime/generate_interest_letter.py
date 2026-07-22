@@ -98,7 +98,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("job_key")
     ap.add_argument("--resume", default=None, help="resume stem, e.g. base_resume_swe")
-    ap.add_argument("--root", default=os.environ.get("APPLYR_ROOT", "."))
+    ap.add_argument("--root", default=os.environ.get("APLYX_ROOT", os.environ.get("FLUX_ROOT", ".")))
     args = ap.parse_args(argv)
     root = os.path.abspath(args.root)
 

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
-import { latestSessionLog } from "@applyr/core/state.js";
-import { py } from "@applyr/core/platform.js";
+import { latestSessionLog } from "@aplyx/core/state.js";
+import { py } from "@aplyx/core/platform.js";
 
 /**
  * Trigger a run via the cross-platform runner and stream the session log

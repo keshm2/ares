@@ -78,7 +78,7 @@ def main(argv: list) -> None:
     if not os.path.isfile(discord_path):
         discord_enabled = False
         warn(f"{discord_path} missing — Discord reporting disabled; outcomes "
-             "stay local (enable via 'applyr setup')")
+             "stay local (enable via 'aplyx setup')")
     else:
         discord = load_json(discord_path)
         if not isinstance(discord, dict):
@@ -86,7 +86,7 @@ def main(argv: list) -> None:
         if discord.get("enabled", True) is False:
             discord_enabled = False
             warn(f"Discord reporting disabled in {discord_path} — outcomes stay "
-                 "local (enable via 'applyr setup')")
+                 "local (enable via 'aplyx setup')")
 
     # --- targets.json field validation -------------------------------------
     def is_array(v):
@@ -134,8 +134,11 @@ def main(argv: list) -> None:
     check_array_nonempty("boards")
     check_array_or_absent("ashby_company_slugs")
     check_array_or_absent("lever_company_slugs")
+    check_array_or_absent("greenhouse_company_slugs")
+    check_array_or_absent("smartrecruiters_company_slugs")
     check_array_or_absent("simplify_feeds")
     check_array_or_absent("workday_tenants")
+    check_array_or_absent("oracle_tenants")
     check_object(targets, targets_path, "safe_fields")
 
     for k in SAFE_KEYS:
@@ -194,6 +197,8 @@ def main(argv: list) -> None:
     for key, board in (
         ("ashby_company_slugs", "Ashby"),
         ("lever_company_slugs", "Lever"),
+        ("greenhouse_company_slugs", "Greenhouse"),
+        ("smartrecruiters_company_slugs", "SmartRecruiters"),
     ):
         if key_absent(key):
             warn(f"{key} is not configured — {board} board will be skipped this run")
@@ -204,6 +209,7 @@ def main(argv: list) -> None:
 
     for key, board in (
         ("workday_tenants", "Workday"),
+        ("oracle_tenants", "Oracle"),
         ("simplify_feeds", "SimplifyJobs"),
     ):
         if key_absent(key):

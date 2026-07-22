@@ -86,7 +86,7 @@ jq -n --arg company "$COMPANY" --arg title "$TITLE" --arg role_type "$ROLE_TYPE"
         {name: "Source", value: $source, inline: true},
         {name: "Apply URL", value: $url}
       ],
-      footer: {text: ("applyr • " + $timestamp)}
+      footer: {text: ("aplyx • " + $timestamp)}
     }]
   }' | curl -H "Content-Type: application/json" -X POST "$WEBHOOK_URL?wait=true" -d @-
 ```
@@ -107,7 +107,7 @@ jq -n --arg company "$COMPANY" --arg title "$TITLE" --arg source "$SOURCE" \
         {name: "Reasoning", value: $reasoning},
         {name: "Apply URL", value: $url}
       ],
-      footer: {text: ("applyr • " + $timestamp)}
+      footer: {text: ("aplyx • " + $timestamp)}
     }]
   }' | curl -H "Content-Type: application/json" -X POST "$WEBHOOK_URL?wait=true" -d @-
 ```
@@ -128,7 +128,7 @@ jq -n --arg company "$COMPANY" --arg title "$TITLE" --arg source "$SOURCE" \
         {name: "Reasoning", value: $reasoning},
         {name: "Apply URL", value: $url}
       ],
-      footer: {text: ("applyr • " + $timestamp)}
+      footer: {text: ("aplyx • " + $timestamp)}
     }]
   }' | curl -H "Content-Type: application/json" -X POST "$WEBHOOK_URL?wait=true" -d @-
 ```

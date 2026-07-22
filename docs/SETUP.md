@@ -12,31 +12,31 @@ examples before running the agent.
 One command from a fresh GitHub download detects your coding agent and
 builds the optional TUI + browser extension. Your profile, job
 targets, and resumes are filled in by a guided wizard the first time
-you run `applyr` — see section 1.
+you run `aplyx` — see section 1.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.sh | bash
 
 # Or from an unpacked release archive (no git clone required):
 bash scripts/install/install.sh
 
-# Or via npm (installs the `applyr` TUI command; on first run with no
+# Or via npm (installs the `aplyx` TUI command; on first run with no
 # core checkout found it installs one automatically — opt out with
-# --no-core or APPLYR_SKIP_CORE=1):
-npm install -g @keshm/applyr
+# --no-core or APLYX_SKIP_CORE=1):
+npm install -g @keshm/aplyx
 ```
 
 ```powershell
 # Windows PowerShell (native, no WSL):
-irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.ps1 | iex
 # Or from an unpacked release archive:
 powershell -ExecutionPolicy Bypass -File .\scripts\install\install.ps1
 ```
 
-**Automatic updates.** Every scheduled run and `applyr` launch checks
+**Automatic updates.** Every scheduled run and `aplyx` launch checks
 GitHub `main`'s `VERSION` file and self-updates on a newer build
 (fail-open); config/`data/`/`logs/` are never touched. Run one
-manually with `applyr update`, or opt out with `APPLYR_AUTO_UPDATE=0`.
+manually with `aplyx update`, or opt out with `APLYX_AUTO_UPDATE=0`.
 The installer also creates a `data/resumes/` folder for your base
 resumes — everything you enter (wizard, Settings, or by hand) stays in
 gitignored local files and never leaves your machine.
@@ -44,8 +44,8 @@ gitignored local files and never leaves your machine.
 **Release archive:**
 
 ```bash
-curl -L -o applyr-0.9.7a.zip https://github.com/keshm2/applyr/archive/refs/tags/0.9.7a.zip && \
-  unzip applyr-0.9.7a.zip && cd applyr-0.9.7a   # or the release page's "Source code" assets
+curl -L -o aplyx-0.9.7a.zip https://github.com/keshm2/aplyx/archive/refs/tags/0.9.7a.zip && \
+  unzip aplyx-0.9.7a.zip && cd aplyx-0.9.7a   # or the release page's "Source code" assets
 ```
 
 **Desktop app (early preview, optional).** Near the end of the install,
@@ -70,21 +70,21 @@ checkout. Installs to `/Applications` (macOS, falling back to
 `~/Applications` if that's not writable), via `apt`/`dnf`/an AppImage +
 app-launcher entry (Linux), or a per-user installer with no admin prompt
 (Windows). A failure here never affects the TUI — retry any time with
-the same command. `applyr uninstall` removes it too, if present.
+the same command. `aplyx uninstall` removes it too, if present.
 
-**Uninstall.** `applyr uninstall` (or `bash scripts/install/uninstall.sh`)
-removes the schedule and `applyr` command, then asks before deleting
+**Uninstall.** `aplyx uninstall` (or `bash scripts/install/uninstall.sh`)
+removes the schedule and `aplyx` command, then asks before deleting
 the install directory (config/data/resumes); `--keep-data` keeps it,
 `--yes` skips the prompt. npm installs also run
-`npm uninstall -g @keshm/applyr`.
+`npm uninstall -g @keshm/aplyx`.
 
-applyr runs under your choice of coding agent — **opencode**,
+aplyx runs under your choice of coding agent — **opencode**,
 **Claude Code** (full), **Codex CLI**, and **GitHub Copilot CLI**
 (degraded — see §2.8). The installer detects what you have and asks
 which you'd prefer if more than one is present, writing the choice to
 `config/harness.json` (change any time by editing that file or setting
-`APPLYR_HARNESS=opencode|claude|codex|copilot`). Then set up your
-profile (section 1, or just run `applyr`) and start a run with
+`APLYX_HARNESS=opencode|claude|codex|copilot`). Then set up your
+profile (section 1, or just run `aplyx`) and start a run with
 `bash scripts/runtime/run_job_agent.sh`. Per-harness specifics are in
 §2.8; every harness's agent definitions are generated from `agents/`
 (see `agents/README.md`) — edit sources there, never the generated
@@ -92,19 +92,19 @@ files.
 
 ## 1. Set up your profile, job targets, and resumes
 
-The easiest path: run `applyr`. A fresh install auto-launches a guided
+The easiest path: run `aplyx`. A fresh install auto-launches a guided
 wizard covering personal info, work eligibility, job targets (roles,
 locations, target companies), and resumes — each answer saves as you
 go, so quitting partway through and relaunching resumes right where
 you left off, at the same completion percentage. Reopen it any time
-with `applyr setup`. (The wizard creates `config/targets.json` from
+with `aplyx setup`. (The wizard creates `config/targets.json` from
 `config/targets.example.json` for you; copy
 `config/discord_config.example.json` to `config/discord_config.json`
 by hand only if you want to configure Discord before ever opening the
 TUI.)
 
 Everything the wizard writes stays editable afterward from the
-running app's **Config** tab (`applyr` → tab 5, see §2.9): personal
+running app's **Config** tab (`aplyx` → tab 5, see §2.9): personal
 info, company targets (`role_keywords`, `level_keywords`,
 `season_keywords`, `preferred_locations`, Ashby/Lever slugs,
 `workday_tenants`), Discord webhooks, and environment overrides. Prefer
@@ -113,7 +113,7 @@ carries an inert `_help` object with doc strings for the less obvious
 fields, right next to the fields themselves.
 
 **Resumes.** Drop any file into `data/resumes/` — no required filename
-anymore. The TUI's **Resumes** screen (`applyr resumes`, or press `5`)
+anymore. The TUI's **Resumes** screen (`aplyx resumes`, or press `5`)
 lists everything and converts a PDF to markdown on the spot (press
 `c`), prompting for an optional short description so non-standard
 resumes stay distinguishable later. `resume-tailor.md`'s category
@@ -135,16 +135,19 @@ bash scripts/validate/validate_local_config.sh
 ```
 
 Prints `validate_local_config: OK` on success; any `ERROR` line names
-the file/field to fix (exit 1). Placeholder Ashby/Lever slugs are
-auto-seeded (2.1); other placeholder state (e.g. `simplify_feeds`)
-warns but doesn't block the run.
+the file/field to fix (exit 1). Placeholder Ashby/Lever/Greenhouse/
+SmartRecruiters slugs are auto-seeded (2.1); other placeholder state
+(e.g. `simplify_feeds`) warns but doesn't block the run.
 
 ### 2.1 Vetted slug auto-seeding
 
-When `ashby_company_slugs`/`lever_company_slugs` is unset, empty, or
-placeholder-only, the validator seeds it from the project-owned vetted
-lists (`config/ashby_vetted_slugs.json`, `config/lever_vetted_slugs.json`)
-so a fresh clone has real coverage on the first run. Never overwrites
+When `ashby_company_slugs`/`lever_company_slugs`/
+`greenhouse_company_slugs`/`smartrecruiters_company_slugs` is unset,
+empty, or placeholder-only, the validator seeds it from the
+project-owned vetted lists (`config/ashby_vetted_slugs.json`,
+`config/lever_vetted_slugs.json`, `config/greenhouse_vetted_slugs.json`,
+`config/smartrecruiters_vetted_slugs.json`) so a fresh clone has real
+coverage on the first run. Never overwrites
 a non-placeholder value; deterministic and idempotent (one atomic
 write, a second run does nothing); prints a visible `WARNING` so
 you're not surprised. Run directly with
@@ -165,14 +168,14 @@ helpers.
 cd app
 npm install
 npm run build
-node dist/cli.js help      # or: npm link && applyr help
+node dist/cli.js help      # or: npm link && aplyx help
 ```
 
-Commands: `applyr setup` (reopens the guided wizard that auto-launches
-on a fresh run, then validates; `--check` validates only), `applyr
-status` (outcome counts, review queue, last run), `applyr review`
-(triage: open posting, mark applied, or dismiss), `applyr history`
-(browse outcomes), `applyr run` (trigger a run, stream the session log).
+Commands: `aplyx setup` (reopens the guided wizard that auto-launches
+on a fresh run, then validates; `--check` validates only), `aplyx
+status` (outcome counts, review queue, last run), `aplyx review`
+(triage: open posting, mark applied, or dismiss), `aplyx history`
+(browse outcomes), `aplyx run` (trigger a run, stream the session log).
 
 The app opens on a **welcome menu** (`w` returns any time, `?` shows
 the full key reference). The Jobs screen always opens **browsing,
@@ -187,14 +190,14 @@ automatic (shown in the shell).
   query, opens a posting in the browser, runs the fit gate, saves to
   the review queue (the only state write).
 - **Automatic** — agent-driven: before a run starts you set this
-  cycle's cap (1–25, `APPLYR_SESSION_CAP`), which can only lower, never
+  cycle's cap (1–25, `APLYX_SESSION_CAP`), which can only lower, never
   raise, the 25-per-session max (`run_job_agent.sh` clamps/falls back
   accordingly); tier-colored by cost, with an animated **MAX** warning
-  at 25. `p` adds an optional extra prompt (`APPLYR_EXTRA_PROMPT`,
+  at 25. `p` adds an optional extra prompt (`APLYX_EXTRA_PROMPT`,
   500-char cap) that focuses a run without overriding `AGENTS.md` or
   the session cap.
 
-**Small test cycle (recommended first run):** `applyr` → any key → `2`
+**Small test cycle (recommended first run):** `aplyx` → any key → `2`
 (Jobs) → `m` (AUTO) → `e` → `5` → `enter` → optionally `p` → `s`.
 Outcomes land in Status/Review/History and Discord as usual.
 
@@ -204,7 +207,7 @@ Runs the agent every 30 minutes, 24/7, via a launchd user agent
 (macOS). Overlap protection lives in `run_job_agent.sh`: a tick landing
 mid-run logs `skipped_overlap` and exits 0; a dead holder's lock is
 reclaimed immediately; a hung run older than 60 minutes
-(`APPLYR_LOCK_MAX_AGE_MIN`) is terminated and reclaimed.
+(`APLYX_LOCK_MAX_AGE_MIN`) is terminated and reclaimed.
 
 ```bash
 bash scripts/runtime/scheduler.sh install     # write + load the plist (runs immediately)
@@ -256,7 +259,7 @@ First bridge start generates `config/extension_bridge.json`
 **Options** page, paste the token, and click **Test connection**.
 
 **Use it:** on a Greenhouse/Lever/Ashby/Workday posting, a small
-**applyr** panel appears (bottom-right) — **Fit check** (verdict +
+**aplyx** panel appears (bottom-right) — **Fit check** (verdict +
 score + duplicate warning), **Autofill from profile** (fills mapped
 empty fields, amber for unanswerable ones, never overwrites), **Save
 for review** (`needs_review` entry), and **I submitted this — record
@@ -265,12 +268,12 @@ it** (`applied` outcome, dedup-guarded, syncs the Sheet tracker).
 
 ## 2.7 Two users on one machine
 
-applyr is **single-user by design**: everything personal lives in the
+aplyx is **single-user by design**: everything personal lives in the
 clone (`config/`, `data/` incl. resumes, `logs/`, `.playwright-mcp/`).
 For two people on one machine, use **two separate clones** (e.g.
-`~/applyr-alice`, `~/applyr-bob`), pointing the TUI at the right one
-with `APPLYR_ROOT`. Caveat: the launchd schedule (§2.5) uses the fixed
-label `com.applyr.job-agent`, so only **one** clone per macOS user
+`~/aplyx-alice`, `~/aplyx-bob`), pointing the TUI at the right one
+with `APLYX_ROOT`. Caveat: the launchd schedule (§2.5) uses the fixed
+label `com.aplyx.job-agent`, so only **one** clone per macOS user
 account can have it installed — run the second on demand or under
 another OS user account. Profile-based multi-user is deferred — see
 `AGENTS.md`'s "Single-user deployment" section.
@@ -281,7 +284,7 @@ Pick one of the four agents, install it, run
 `bash scripts/install/install.sh` — the installer detects it and
 writes `config/harness.json` (asking if more than one is present).
 Change any time via that file or
-`APPLYR_HARNESS=opencode|claude|codex|copilot`. Business logic is
+`APLYX_HARNESS=opencode|claude|codex|copilot`. Business logic is
 identical under every agent — only the thin adapter in
 `scripts/runtime/run_job_agent.sh` differs; see `AGENTS.md`'s "Harness
 capability matrix" for the degraded paths.
@@ -326,7 +329,7 @@ python3 scripts/validate/run_conformance.py --harness all   # + installed CLIs (
 
 ## 2.9 Settings screen (TUI Config tab)
 
-`applyr` → tab 5 (**Config**) shows every setting's current value
+`aplyx` → tab 5 (**Config**) shows every setting's current value
 before you change it, in four sections:
 
 - **Personal info** — the `safe_fields` in `config/targets.json`, plus
@@ -337,11 +340,11 @@ before you change it, in four sections:
   hand-edit-only, now live-editable the same way as personal info.
 - **Discord webhooks** — the enabled switch (enter toggles) and the
   four per-outcome webhook URLs.
-- **Environment** — persisted `APPLYR_*` overrides saved to
+- **Environment** — persisted `APLYX_*` overrides saved to
   `config/env.json` (gitignored) and exported by every run; a real
   shell env var always wins, clearing returns to default. Includes
-  `APPLYR_LOG_DIR`, `APPLYR_SESSION_CAP`, `APPLYR_KEEP_SESSION_LOGS`,
-  `APPLYR_LOCK_MAX_AGE_MIN`, `APPLYR_AUTO_UPDATE`, `APPLYR_HARNESS`.
+  `APLYX_LOG_DIR`, `APLYX_SESSION_CAP`, `APLYX_KEEP_SESSION_LOGS`,
+  `APLYX_LOCK_MAX_AGE_MIN`, `APLYX_AUTO_UPDATE`, `APLYX_HARNESS`.
 
 ## 3. Google Sheets sync (optional)
 

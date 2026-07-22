@@ -24,7 +24,7 @@ export async function getSupabaseClient(): Promise<SupabaseClient | undefined> {
     // email-confirmation and Google OAuth callbacks with
     // exchangeCodeForSession(), which only exists in the PKCE flow — the
     // default implicit flow puts tokens in a URL fragment instead of
-    // issuing a ?code=, so the applyr:// deep-link callback could never
+    // issuing a ?code=, so the aplyx:// deep-link callback could never
     // complete a session under it.
     auth: { persistSession: true, autoRefreshToken: true, flowType: "pkce" },
   });

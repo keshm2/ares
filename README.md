@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/applyr-banner.png" alt="applyr" width="600" />
+  <img src="docs/assets/aplyx-banner.png" alt="aplyx" width="600" />
 </p>
 
-# applyr
+# aplyx
 
 A local job-application agent for internship and new-grad roles.
 It scrapes public boards, skips anything you've already seen,
@@ -10,7 +10,7 @@ tailors a resume and cover letter, applies on your behalf, pings
 Discord with the outcome, and appends successful applications to
 a Google Sheet tracker.
 
-It's built on top of a coding agent — applyr is the workflow, the
+It's built on top of a coding agent — aplyx is the workflow, the
 agent is the executor.
 
 > **Build 0.8.43a** — see [Release notes](docs/RELEASE.md) and
@@ -18,7 +18,7 @@ agent is the executor.
 
 ## You need a coding agent
 
-applyr doesn't work without one. It drives whichever you already
+aplyx doesn't work without one. It drives whichever you already
 have installed. Full capability (browser-automated applies
 included) with **[opencode](https://opencode.ai)** or
 **[Claude Code](https://claude.com/claude-code)**.
@@ -33,33 +33,33 @@ up whatever you have and asks if you have more than one.
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/keshm2/applyr/main/scripts/install/install.ps1 | iex
+irm https://raw.githubusercontent.com/keshm2/aplyx/main/scripts/install/install.ps1 | iex
 ```
 
 **Or via npm:**
 
 ```bash
-npm install -g @keshm/applyr
-applyr
+npm install -g @keshm/aplyx
+aplyx
 ```
 
 **Or from a release archive** — see [docs/SETUP.md §1.4](docs/SETUP.md)
 for the full curl/PowerShell snippets.
 
-The installer drops applyr in `~/applyr` (or `%USERPROFILE%\applyr`
-on Windows; override with `APPLYR_HOME`), asks for your coding
+The installer drops aplyx in `~/aplyx` (or `%USERPROFILE%\aplyx`
+on Windows; override with `APLYX_HOME`), asks for your coding
 agent, your profile (kept **locally only** — gitignored files on
 your machine, never uploaded), and whether you want Discord
 status updates, creates the `data/resumes/` folder (add your base
 resumes there — see [docs/SETUP.md](docs/SETUP.md) for the expected
-filenames), and puts `applyr` on your PATH. When it finishes, just
-type `applyr`.
+filenames), and puts `aplyx` on your PATH. When it finishes, just
+type `aplyx`.
 
 You'll also need `python3`, `jq`, and (for the TUI) `node` ≥ 22
 with `npm`. No `git` required.
@@ -80,11 +80,11 @@ your review queue, and you apply by hand.
 ## Using it
 
 ```bash
-applyr                    # open the TUI (press ? for keys)
-applyr status             # one-shot pipeline overview
-applyr run                # one agent run in this terminal
-applyr setup [--check]    # config wizard / validate only
-applyr review | history   # jump straight to a screen
+aplyx                    # open the TUI (press ? for keys)
+aplyx status             # one-shot pipeline overview
+aplyx run                # one agent run in this terminal
+aplyx setup [--check]    # config wizard / validate only
+aplyx review | history   # jump straight to a screen
 
 bash scripts/runtime/scheduler.sh install    # 30-minute always-on schedule (launchd)
 ```
@@ -92,12 +92,12 @@ bash scripts/runtime/scheduler.sh install    # 30-minute always-on schedule (lau
 Updates happen automatically — each run and TUI launch checks for
 a newer build and installs it before continuing (your config,
 data, logs, and resumes are never touched). Opt out with
-`APPLYR_AUTO_UPDATE=0`, force one with `applyr update`. To
-uninstall: `applyr uninstall`.
+`APLYX_AUTO_UPDATE=0`, force one with `aplyx update`. To
+uninstall: `aplyx uninstall`.
 
 ## Safety & privacy
 
-These are how applyr is wired, not suggestions:
+These are how aplyx is wired, not suggestions:
 
 - **Personal data stays local.** Live configs, `data/` (incl.
   resumes), and `logs/` are gitignored and never leave your machine.

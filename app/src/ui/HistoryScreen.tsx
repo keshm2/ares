@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import type { ApplyrState } from "@applyr/core/state.js";
-import { openUrl, helperError } from "@applyr/core/helpers.js";
+import type { AplyxState } from "@aplyx/core/state.js";
+import { openUrl, helperError } from "@aplyx/core/helpers.js";
 import { statusColor, statusGlyph, theme, SELECT_MARKER } from "../theme.js";
 import { DetailPane, PaneRow, PaneRule, paneLayout } from "./Pane.js";
 
@@ -11,7 +11,7 @@ export function HistoryScreen({
   contentRows = 20,
   columns = 0,
 }: {
-  state: ApplyrState;
+  state: AplyxState;
   active: boolean;
   /** Rows the shell hands this screen — the list grows/shrinks with it. */
   contentRows?: number;

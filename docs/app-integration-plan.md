@@ -1,4 +1,4 @@
-# applyr app integration plan
+# aplyx app integration plan
 
 This document captures the planned **real app UI** that will sit in front
 of the current workflow before beta, with the TUI staying available as an
@@ -7,7 +7,7 @@ optional, faster surface for power users.
 ## Goal
 
 Ship a visually appealing, easier-to-use app that becomes the default face
-of applyr, without replacing the proven local-first helper core or the TUI.
+of aplyx, without replacing the proven local-first helper core or the TUI.
 
 The app should:
 
@@ -263,7 +263,7 @@ same UI shell.
 
 ### Do not build two products
 
-The app must not become a separate implementation of applyr.
+The app must not become a separate implementation of aplyx.
 
 One UI system, one shared core, two storage modes later.
 
@@ -292,5 +292,5 @@ The best path is:
 4. leave the TUI in place as the fast/power-user option
 5. plug hosted auth/storage into the same app later
 
-This gives applyr a real polished front door before beta without throwing
+This gives aplyx a real polished front door before beta without throwing
 away the current helper discipline or the TUI.

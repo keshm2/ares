@@ -96,7 +96,13 @@ export function MultiEntryAutocomplete({
         ) : null}
         {focused && suggestions.length > 0 ? (
           <Box flexDirection="column">
-            {offset > 0 ? <Text dimColor>↑ {offset} more</Text> : null}
+            {/* Both indicator rows are reserved whenever the list can
+             *  scroll at all (blank when that edge isn't reached yet) —
+             *  otherwise scrolling from an edge into the middle grows the
+             *  list by a row, then shrinks it back at the far edge. */}
+            {suggestions.length > maxVisible ? (
+              offset > 0 ? <Text dimColor>↑ {offset} more</Text> : <Text> </Text>
+            ) : null}
             {windowed.map((s, wi) => {
               const i = offset + wi;
               const hit = i === suggestionIndex;
@@ -114,8 +120,12 @@ export function MultiEntryAutocomplete({
                 </Text>
               );
             })}
-            {offset + maxVisible < suggestions.length ? (
-              <Text dimColor>↓ {suggestions.length - offset - maxVisible} more</Text>
+            {suggestions.length > maxVisible ? (
+              offset + maxVisible < suggestions.length ? (
+                <Text dimColor>↓ {suggestions.length - offset - maxVisible} more</Text>
+              ) : (
+                <Text> </Text>
+              )
             ) : null}
           </Box>
         ) : null}

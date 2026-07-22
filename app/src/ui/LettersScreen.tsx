@@ -148,7 +148,7 @@ export function LettersScreen({
         if (!selected) return;
         const r = discardLetter(root, selected.job_key);
         setRefresh((n) => n + 1);
-        setMessage(r.ok ? `Discarded — applyr won't apply to ${selected.company}.` : r.output);
+        setMessage(r.ok ? `Discarded — aplyx won't apply to ${selected.company}.` : r.output);
         return;
       }
       if (input === "R") setRefresh((n) => n + 1);
@@ -166,7 +166,7 @@ export function LettersScreen({
           <Text dimColor>No applications are waiting on an answer.</Text>
           <Box marginTop={1}>
             <Text dimColor wrap="wrap">
-              When a form asks "Why do you want to work here?", applyr parks that job here instead of
+              When a form asks "Why do you want to work here?", aplyx parks that job here instead of
               inventing an answer, and carries on with the rest of the run. Nothing is recorded and the
               job stays applicable — once you approve an answer, the next run submits it.
             </Text>

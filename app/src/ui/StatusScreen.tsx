@@ -1,11 +1,11 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { ApplyrState, Heartbeat } from "@applyr/core/state.js";
+import type { AplyxState, Heartbeat } from "@aplyx/core/state.js";
 import { theme, statusGlyph, statusColor } from "../theme.js";
 import { DetailPane, paneLayout } from "./Pane.js";
 
 interface Props {
-  state: ApplyrState;
+  state: AplyxState;
   lastRun: string;
   sessionLog?: string;
   unresolvedQueue: number;
@@ -135,7 +135,7 @@ export function StatusScreen({
   return (
     <Box flexDirection="column" paddingX={embedded ? 0 : 1}>
       <Text bold color={theme.accent}>
-        {embedded ? "Status" : "applyr — status"}
+        {embedded ? "Status" : "aplyx — status"}
       </Text>
 
       {pane.show ? (
@@ -161,7 +161,7 @@ export function StatusScreen({
 
       {embedded ? null : (
         <Box marginTop={1}>
-          <Text dimColor>Open the app with: applyr (screens: status · jobs · review · history · resumes · settings)</Text>
+          <Text dimColor>Open the app with: aplyx (screens: status · jobs · review · history · resumes · settings)</Text>
         </Box>
       )}
     </Box>

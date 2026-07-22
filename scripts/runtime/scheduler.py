@@ -5,8 +5,8 @@ Ported from scheduler.sh. Manages an always-on ~30-minute schedule that runs
 the job agent 24/7. Overlap protection lives in the runner itself; the
 scheduler only supplies cadence.
 
-  - macOS:   launchd user agent (label com.applyr.job-agent)
-  - Windows: Task Scheduler task (name applyr-job-agent) via schtasks
+  - macOS:   launchd user agent (label com.aplyx.job-agent)
+  - Windows: Task Scheduler task (name aplyx-job-agent) via schtasks
   - Linux:   prints the systemd user timer to install by hand
 
 Usage:
@@ -24,11 +24,12 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
-LABEL = "com.applyr.job-agent"
-OLD_LABEL = "com.ares.job-agent"
-TASK_NAME = "applyr-job-agent"
-INTERVAL = int(os.environ.get("APPLYR_SCHEDULE_INTERVAL_SEC",
-               os.environ.get("ARES_SCHEDULE_INTERVAL_SEC", "1800")) or "1800")
+LABEL = "com.aplyx.job-agent"
+OLD_LABELS = ("com.flux.job-agent", "com.ares.job-agent")
+TASK_NAME = "aplyx-job-agent"
+INTERVAL = int(os.environ.get("APLYX_SCHEDULE_INTERVAL_SEC",
+               os.environ.get("FLUX_SCHEDULE_INTERVAL_SEC",
+               os.environ.get("ARES_SCHEDULE_INTERVAL_SEC", "1800"))) or "1800")
 
 
 # ---------------------------------------------------------------- macOS ------
@@ -36,8 +37,9 @@ def _plist_path() -> str:
     return os.path.join(os.path.expanduser("~"), "Library", "LaunchAgents", f"{LABEL}.plist")
 
 
-def _old_plist_path() -> str:
-    return os.path.join(os.path.expanduser("~"), "Library", "LaunchAgents", f"{OLD_LABEL}.plist")
+def _old_plist_paths() -> list[str]:
+    return [os.path.join(os.path.expanduser("~"), "Library", "LaunchAgents", f"{label}.plist")
+            for label in OLD_LABELS]
 
 
 def _plist_body() -> str:
@@ -63,19 +65,20 @@ def _plist_body() -> str:
 
 
 def _mac_install() -> int:
-    plist, old_plist = _plist_path(), _old_plist_path()
+    plist = _plist_path()
     os.makedirs(os.path.dirname(plist), exist_ok=True)
     os.makedirs(os.path.join(PROJECT_ROOT, "logs"), exist_ok=True)
     with open(plist, "w", encoding="utf-8") as fh:
         fh.write(_plist_body())
     subprocess.run(["plutil", "-lint", plist], stdout=subprocess.DEVNULL, check=True)
     uid = os.getuid()  # type: ignore[attr-defined]
-    subprocess.run(["launchctl", "bootout", f"gui/{uid}/{OLD_LABEL}"],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    try:
-        os.remove(old_plist)
-    except OSError:
-        pass
+    for label, old_plist in zip(OLD_LABELS, _old_plist_paths()):
+        subprocess.run(["launchctl", "bootout", f"gui/{uid}/{label}"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            os.remove(old_plist)
+        except OSError:
+            pass
     subprocess.run(["launchctl", "bootout", f"gui/{uid}/{LABEL}"],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(["launchctl", "bootstrap", f"gui/{uid}", plist], check=True)
@@ -86,10 +89,10 @@ def _mac_install() -> int:
 
 def _mac_uninstall() -> int:
     uid = os.getuid()  # type: ignore[attr-defined]
-    for label in (LABEL, OLD_LABEL):
+    for label in (LABEL, *OLD_LABELS):
         subprocess.run(["launchctl", "bootout", f"gui/{uid}/{label}"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for p in (_plist_path(), _old_plist_path()):
+    for p in (_plist_path(), *_old_plist_paths()):
         try:
             os.remove(p)
         except OSError:
@@ -116,6 +119,9 @@ def _win_runner_cmd() -> str:
 
 def _win_install() -> int:
     os.makedirs(os.path.join(PROJECT_ROOT, "logs"), exist_ok=True)
+    for old_task in ("flux-job-agent", "ares-job-agent"):
+        subprocess.run(["schtasks", "/Delete", "/TN", old_task, "/F"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(["schtasks", "/Delete", "/TN", TASK_NAME, "/F"],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     r = subprocess.run(
@@ -131,8 +137,9 @@ def _win_install() -> int:
 
 
 def _win_uninstall() -> int:
-    subprocess.run(["schtasks", "/Delete", "/TN", TASK_NAME, "/F"],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for task in (TASK_NAME, "flux-job-agent", "ares-job-agent"):
+        subprocess.run(["schtasks", "/Delete", "/TN", task, "/F"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print(f"scheduler: uninstalled scheduled task '{TASK_NAME}'.")
     return 0
 
@@ -161,7 +168,7 @@ def _linux_note() -> int:
     sys.stderr.write(
         "scheduler: no built-in Linux scheduler — install a systemd user timer "
         f"running scripts/runtime/run_job_agent.sh every {minutes} min "
-        "(APPLYR_SCHEDULE_INTERVAL_SEC). See docs/SETUP.md section 5.\n"
+        "(APLYX_SCHEDULE_INTERVAL_SEC). See docs/SETUP.md section 5.\n"
     )
     return 1
 

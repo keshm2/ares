@@ -55,7 +55,7 @@ from datetime import datetime, timedelta, timezone
 
 DEFAULT_TARGETS = "config/targets.json"
 PLACEHOLDER = "replace_me"
-USER_AGENT = "applyr-job-agent/phase7"
+USER_AGENT = "aplyx-job-agent/phase7"
 PAGE_SIZE = 20  # CXS maximum per request
 
 

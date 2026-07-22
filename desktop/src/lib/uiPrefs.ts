@@ -13,8 +13,8 @@ import { useEffect, useState } from "react";
 export type ThemePref = "system" | "light" | "dark";
 export type FontPref = "system" | "geist";
 
-const THEME_KEY = "applyr.theme";
-const FONT_KEY = "applyr.font";
+const THEME_KEY = "aplyx.theme";
+const FONT_KEY = "aplyx.font";
 
 export function loadThemePref(): ThemePref {
   const raw = localStorage.getItem(THEME_KEY);
