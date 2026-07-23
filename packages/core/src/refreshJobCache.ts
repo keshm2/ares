@@ -99,9 +99,16 @@ function jobCacheRow(source: JobSource, slug: string, query: string, job: Search
 // look indistinguishable from hung. Chunking keeps each request small
 // and bounded, and gives per-chunk progress instead of one long silence.
 const UPSERT_CHUNK_SIZE = 200;
-const UPSERT_TIMEOUT_MS = 30_000;
+// The first real CI run aborted on the very first 200-row chunk (~1.8MB)
+// at the old 30s timeout, before any progress had even been logged —
+// most likely a slow/transient path from a fresh GitHub-hosted runner
+// to Supabase rather than anything about the request itself. Bumped to
+// 60s and given one retry (same "one retry clears most transient
+// blips" reasoning jobs.ts's fetchJson already uses for the live
+// per-source fetches) rather than assumed to be a payload problem again.
+const UPSERT_TIMEOUT_MS = 60_000;
 
-async function upsertChunk(url: string, secretKey: string, rows: ReturnType<typeof jobCacheRow>[]): Promise<void> {
+async function upsertChunkOnce(url: string, secretKey: string, rows: ReturnType<typeof jobCacheRow>[]): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSERT_TIMEOUT_MS);
   try {
@@ -129,9 +136,23 @@ async function upsertChunk(url: string, secretKey: string, rows: ReturnType<type
   }
 }
 
+async function upsertChunk(url: string, secretKey: string, rows: ReturnType<typeof jobCacheRow>[], attempt = 0): Promise<void> {
+  try {
+    await upsertChunkOnce(url, secretKey, rows);
+  } catch (err) {
+    if (attempt >= 1) throw err;
+    console.log(`    retrying chunk after: ${err instanceof Error ? err.message : String(err)}`);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return upsertChunk(url, secretKey, rows, attempt + 1);
+  }
+}
+
 async function upsert(url: string, secretKey: string, rows: ReturnType<typeof jobCacheRow>[]): Promise<void> {
+  const totalChunks = Math.ceil(rows.length / UPSERT_CHUNK_SIZE);
   for (let i = 0; i < rows.length; i += UPSERT_CHUNK_SIZE) {
+    const chunkNum = i / UPSERT_CHUNK_SIZE + 1;
     const chunk = rows.slice(i, i + UPSERT_CHUNK_SIZE);
+    console.log(`  upserting chunk ${chunkNum}/${totalChunks} (${chunk.length} rows)...`);
     await upsertChunk(url, secretKey, chunk);
     console.log(`  ...upserted ${Math.min(i + UPSERT_CHUNK_SIZE, rows.length)}/${rows.length}`);
   }
