@@ -192,6 +192,25 @@ async function main(): Promise<void> {
     console.error("Neither SUPABASE_URL nor a configured config/supabase.json was found — nothing to refresh against.");
     process.exit(1);
   }
+  // Diagnostic preflight — added after 3 consecutive live CI runs all
+  // failed the same way (every upsert attempt, including retries with
+  // real exponential backoff, hit HTTP 522 "connection timed out
+  // between Cloudflare and the origin"). This isolates whether it's
+  // GitHub Actions' network path to this Supabase project failing
+  // entirely (reads too) or something specific to the write/POST path —
+  // a plain GET was never actually tested from GitHub Actions before
+  // now, only from a different environment where it worked fine.
+  const preflightStart = Date.now();
+  try {
+    const preflight = await fetch(`${url}/rest/v1/job_cache?select=id&limit=1`, {
+      headers: { apikey: secretKey, Authorization: `Bearer ${secretKey}` },
+      signal: AbortSignal.timeout(30_000),
+    });
+    console.log(`preflight GET: HTTP ${preflight.status} in ${Date.now() - preflightStart}ms`);
+  } catch (err) {
+    console.log(`preflight GET failed in ${Date.now() - preflightStart}ms: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   const targets = await readJobCacheTargets(root);
 
   const sources: RefreshSource[] = [
