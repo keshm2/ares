@@ -129,20 +129,36 @@ async function upsertChunkOnce(url: string, secretKey: string, rows: ReturnType<
       body: JSON.stringify(rows),
     });
     if (!response.ok) {
-      throw new Error(`job_cache upsert failed: HTTP ${response.status} — ${await response.text()}`);
+      // Truncated — a non-2xx from the Supabase edge is sometimes a full
+      // Cloudflare HTML error page (confirmed live: a 522 "connection
+      // timed out" response body ran 100+ lines), not worth dumping
+      // whole into CI logs on every retry.
+      const body = (await response.text()).slice(0, 300);
+      throw new Error(`job_cache upsert failed: HTTP ${response.status} — ${body}`);
     }
   } finally {
     clearTimeout(timer);
   }
 }
 
+// 4 attempts, exponential backoff (2s/5s/10s between). Bumped up from a
+// single 1s-backoff retry after a live run hit HTTP 522 "connection
+// timed out between Cloudflare and the origin" on both the first
+// attempt AND that one retry, ~20s apart — whatever this is (transient
+// Supabase-side blip, cold-start, or something else on their end; the
+// request itself was small and well-formed, so this isn't a payload or
+// timeout-value problem), it didn't clear in under 20s, so it gets a
+// real chance to before this gives up and fails the whole run.
+const UPSERT_RETRY_BACKOFF_MS = [2_000, 5_000, 10_000];
+
 async function upsertChunk(url: string, secretKey: string, rows: ReturnType<typeof jobCacheRow>[], attempt = 0): Promise<void> {
   try {
     await upsertChunkOnce(url, secretKey, rows);
   } catch (err) {
-    if (attempt >= 1) throw err;
-    console.log(`    retrying chunk after: ${err instanceof Error ? err.message : String(err)}`);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (attempt >= UPSERT_RETRY_BACKOFF_MS.length) throw err;
+    const backoff = UPSERT_RETRY_BACKOFF_MS[attempt]!;
+    console.log(`    retry ${attempt + 1}/${UPSERT_RETRY_BACKOFF_MS.length} in ${backoff}ms after: ${err instanceof Error ? err.message : String(err)}`);
+    await new Promise((resolve) => setTimeout(resolve, backoff));
     return upsertChunk(url, secretKey, rows, attempt + 1);
   }
 }
