@@ -12,6 +12,21 @@ import { findRoot, searchJobs, checkJobFit, saveJobForReview, readProfileField }
 import "../../components/formFields.css";
 import "../../components/dataList.css";
 
+// Client-side pagination over whatever searchJobs() already returned
+// (now up to MAX_PAGE_SIZE=300, see jobs.ts) — no re-fetch per page,
+// just slicing the same in-memory, already-sorted result set. Default
+// 25, user-adjustable and remembered across sessions (localStorage,
+// same lightweight pattern uiPrefs.ts uses for theme/font — this is a
+// single-screen preference, not worth its own shared module).
+const RESULTS_PER_PAGE_KEY = "aplyx.jobs.resultsPerPage";
+const DEFAULT_RESULTS_PER_PAGE = 25;
+const RESULTS_PER_PAGE_OPTIONS = [10, 25, 50, 100, 200];
+
+function loadResultsPerPage(): number {
+  const raw = Number(localStorage.getItem(RESULTS_PER_PAGE_KEY));
+  return RESULTS_PER_PAGE_OPTIONS.includes(raw) ? raw : DEFAULT_RESULTS_PER_PAGE;
+}
+
 const SOURCE_LABEL: Record<JobSource, string> = {
   ashbyhq: "Ashby",
   lever: "Lever",
@@ -91,8 +106,13 @@ export function JobsScreen() {
   const [message, setMessage] = useState<{ text: string; error?: boolean } | undefined>(undefined);
   const [preferredLocations, setPreferredLocations] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("preferred");
-  const [preferredOnly, setPreferredOnly] = useState(false);
+  // Toggle taken offline (see the comment near its removed button below) —
+  // always false, never set, kept as a real variable rather than a bare
+  // `false` literal so displayedJobs' filter branch is a one-line revert.
+  const [preferredOnly] = useState(false);
   const [searchPhrase, setSearchPhrase] = useState(0);
+  const [resultsPerPage, setResultsPerPage] = useState<number>(loadResultsPerPage);
+  const [page, setPage] = useState(0);
 
   // Resolved once per screen session so repeated actions (search/fit/save)
   // don't re-await findRoot() — the bridge already caches at the module
@@ -146,6 +166,21 @@ export function JobsScreen() {
         return sortByPreferredThenPosted(base, preferredLocations);
     }
   }, [jobs, sortMode, preferredOnly, preferredLocations]);
+
+  useEffect(() => {
+    localStorage.setItem(RESULTS_PER_PAGE_KEY, String(resultsPerPage));
+  }, [resultsPerPage]);
+
+  // Back to page 1 whenever the underlying result set changes (new
+  // search, sort change) or the page size itself changes — otherwise a
+  // narrower re-search or a bigger page size could strand the view on a
+  // now out-of-range page.
+  useEffect(() => {
+    setPage(0);
+  }, [displayedJobs, resultsPerPage]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedJobs.length / resultsPerPage));
+  const pageJobs = displayedJobs.slice(page * resultsPerPage, (page + 1) * resultsPerPage);
 
   const selectedJob = displayedJobs.find((j) => j.url === selected);
   const selectedFit = selectedJob ? fits[selectedJob.url] : undefined;
@@ -310,19 +345,34 @@ export function JobsScreen() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            className={preferredOnly ? "source-toggle on" : "source-toggle"}
-            onClick={() => setPreferredOnly((v) => !v)}
-            disabled={preferredLocations.length === 0}
-            title={
-              preferredLocations.length === 0
-                ? "Add preferred locations in Settings to use this filter"
-                : "Show only postings in a preferred location"
-            }
+          {/* "Preferred locations only" toggle taken offline for now (operator
+              request, 2026-07-23) — it was cutting real results out of an
+              already-thin result set while search diversity/volume issues
+              were being worked through. preferredOnly stays wired below
+              (still always false, its default) so re-enabling this is just
+              restoring the button. */}
+          <label className="field-label" htmlFor="jobs-per-page" style={{ fontWeight: 500 }}>
+            Results per page
+          </label>
+          <select
+            id="jobs-per-page"
+            value={resultsPerPage}
+            onChange={(e) => setResultsPerPage(Number(e.target.value))}
+            style={{
+              border: "1px solid var(--border-strong)",
+              borderRadius: "var(--radius-md)",
+              padding: "var(--space-2) var(--space-3)",
+              background: "var(--surface)",
+              color: "var(--text)",
+              fontSize: "var(--text-sm)",
+            }}
           >
-            Preferred locations only
-          </button>
+            {RESULTS_PER_PAGE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -341,34 +391,54 @@ export function JobsScreen() {
                   : "Type a title query and press Search to browse the live boards."}
             </div>
           ) : (
-            <div className="data-list">
-              {displayedJobs.map((job) => {
-                const jobFit = fits[job.url];
-                return (
-                  <button
-                    key={job.url}
-                    type="button"
-                    className={job.url === selected ? "data-row selected" : "data-row"}
-                    onClick={() => setSelected(job.url)}
-                    onDoubleClick={() => void open(job)}
-                  >
-                    <div className="data-row-main">
-                      <span className="data-row-title">
-                        {job.company} — {job.title}
-                      </span>
-                      <span className="data-row-sub">
-                        {SOURCE_LABEL[job.source]} · {job.location || "location not listed"}
-                      </span>
-                    </div>
-                    {jobFit ? (
-                      <span className={`status-badge ${fitBadgeClass(jobFit.fit_status)}`}>{jobFit.fit_score}</span>
-                    ) : (
-                      <span className="data-row-meta">{formatPosted(job.posted_at)}</span>
-                    )}
+            <>
+              <div className="data-list">
+                {pageJobs.map((job) => {
+                  const jobFit = fits[job.url];
+                  return (
+                    <button
+                      key={job.url}
+                      type="button"
+                      className={job.url === selected ? "data-row selected" : "data-row"}
+                      onClick={() => setSelected(job.url)}
+                      onDoubleClick={() => void open(job)}
+                    >
+                      <div className="data-row-main">
+                        <span className="data-row-title">
+                          {job.company} — {job.title}
+                        </span>
+                        <span className="data-row-sub">
+                          {SOURCE_LABEL[job.source]} · {job.location || "location not listed"}
+                        </span>
+                      </div>
+                      {jobFit ? (
+                        <span className={`status-badge ${fitBadgeClass(jobFit.fit_status)}`}>{jobFit.fit_score}</span>
+                      ) : (
+                        <span className="data-row-meta">{formatPosted(job.posted_at)}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {totalPages > 1 ? (
+                <div className="data-toolbar" style={{ justifyContent: "space-between" }}>
+                  <button type="button" className="btn btn-sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                    ← Previous
                   </button>
-                );
-              })}
-            </div>
+                  <span style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
+                    Page {page + 1} of {totalPages} · {displayedJobs.length} results
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={page >= totalPages - 1}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next →
+                  </button>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
 

@@ -58,15 +58,45 @@ function withDeadline(
   ]);
 }
 // User-configurable via Settings > Environment > "Jobs per page"
-// (APLYX_JOBS_PER_PAGE) — how many results one manual search keeps.
+// (APLYX_JOBS_PER_PAGE) — how many results one manual search keeps
+// (matched-and-sorted total, not a UI page — client-side pagination in
+// the TUI's SearchScreen and the desktop app's JobsScreen slices this
+// same returned set into pages, default 25/page, entirely separately;
+// see each screen's own page-size constant). Raised 75 -> 300 (max) and
+// 50 -> 100 (default) 2026-07-23 alongside adding that pagination —
+// keeping more of an already-fetched-and-matched batch costs nothing
+// extra (no additional network/fetch work, just less truncation before
+// returning), and a 25-per-page UI needs more than 75 total to be worth
+// paginating through at all.
 export const MIN_PAGE_SIZE = 10;
-export const MAX_PAGE_SIZE = 75;
-export const DEFAULT_PAGE_SIZE = 50;
+export const MAX_PAGE_SIZE = 300;
+export const DEFAULT_PAGE_SIZE = 100;
+
+// The actual UI pagination size (results shown per page, both the TUI's
+// SearchScreen and the desktop app's JobsScreen — see each's own
+// resultsPerPage/RESULTS_PER_PAGE state). Purely a display concern, never
+// passed to searchJobs() — kept here anyway, alongside the above, so
+// every "how many jobs" tunable lives in one place and the TUI's
+// SettingsScreen can import it the same way it already imports
+// MIN/MAX/DEFAULT_PAGE_SIZE.
+export const MIN_RESULTS_PER_PAGE = 5;
+export const MAX_RESULTS_PER_PAGE = MAX_PAGE_SIZE;
+export const DEFAULT_RESULTS_PER_PAGE = 25;
 
 function resolvePageSize(root: string): number {
   const raw = Number.parseInt(effectiveEnv(root, ["APLYX_JOBS_PER_PAGE", "FLUX_JOBS_PER_PAGE"], String(DEFAULT_PAGE_SIZE)).value, 10);
   if (!Number.isFinite(raw)) return DEFAULT_PAGE_SIZE;
   return Math.max(MIN_PAGE_SIZE, Math.min(MAX_PAGE_SIZE, raw));
+}
+
+/** The TUI's own reader for its Settings > Environment > "Results per
+ *  page" field (APLYX_RESULTS_PER_PAGE) — the desktop app doesn't call
+ *  this, it persists the same concept via localStorage instead (see
+ *  desktop/src/routes/shell/JobsScreen.tsx). */
+export function resolveResultsPerPage(root: string): number {
+  const raw = Number.parseInt(effectiveEnv(root, ["APLYX_RESULTS_PER_PAGE"], String(DEFAULT_RESULTS_PER_PAGE)).value, 10);
+  if (!Number.isFinite(raw)) return DEFAULT_RESULTS_PER_PAGE;
+  return Math.max(MIN_RESULTS_PER_PAGE, Math.min(MAX_RESULTS_PER_PAGE, raw));
 }
 
 export interface SourceResult {

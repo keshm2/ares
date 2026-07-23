@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { statusGlyph, theme, harnessGradient, pageSizeTier, HARNESS_WAVE_TICK_MS, HARNESS_WAVE_STEP, type HarnessId } from "../theme.js";
-import { DEFAULT_PAGE_SIZE, MIN_PAGE_SIZE, MAX_PAGE_SIZE } from "../jobs.js";
+import { DEFAULT_PAGE_SIZE, MIN_PAGE_SIZE, MAX_PAGE_SIZE, DEFAULT_RESULTS_PER_PAGE } from "../jobs.js";
 import {
   effectiveEnv,
   readDiscordEnabled,
@@ -222,7 +222,8 @@ const SECTIONS: Section[] = [
     fields: [
       { kind: "env", key: "APLYX_LOG_DIR", legacyKeys: ["FLUX_LOG_DIR"], label: "Log directory", explain: "Where run/session logs and the heartbeat are stored. Relative paths resolve inside the project. (Agent fetch-scratch stays in the project's logs/tmp.)", fallback: "logs" },
       { kind: "env", key: "APLYX_SESSION_CAP", legacyKeys: ["FLUX_SESSION_CAP", "ARES_SESSION_CAP"], label: "Session cap", explain: "Default applications-per-run cap, 1-25. Runs may lower it; 25 is the hard ceiling.", fallback: "25" },
-      { kind: "env", key: "APLYX_JOBS_PER_PAGE", legacyKeys: ["FLUX_JOBS_PER_PAGE"], label: "Jobs per page", explain: "How many results the manual Jobs search keeps per search, 10-75. Higher means more boards/pages hit per query — the picker warns as it gets expensive.", fallback: String(DEFAULT_PAGE_SIZE) },
+      { kind: "env", key: "APLYX_JOBS_PER_PAGE", legacyKeys: ["FLUX_JOBS_PER_PAGE"], label: "Max search results", explain: `How many total results the manual Jobs search keeps per search, ${MIN_PAGE_SIZE}-${MAX_PAGE_SIZE}. Separate from "Results per page" below, which just controls how many of these are shown on screen at once.`, fallback: String(DEFAULT_PAGE_SIZE) },
+      { kind: "env", key: "APLYX_RESULTS_PER_PAGE", label: "Results per page", explain: `How many results the Jobs screen shows per page — ↑/PgUp and ↓/PgDn move within a page, [ and ] move between pages. Default ${DEFAULT_RESULTS_PER_PAGE}.`, fallback: String(DEFAULT_RESULTS_PER_PAGE) },
       { kind: "env", key: "APLYX_KEEP_SESSION_LOGS", legacyKeys: ["FLUX_KEEP_SESSION_LOGS", "ARES_KEEP_SESSION_LOGS"], label: "Keep logs", explain: "How many session logs to keep before the oldest are pruned.", fallback: "30" },
       { kind: "env", key: "APLYX_LOCK_MAX_AGE_MIN", legacyKeys: ["FLUX_LOCK_MAX_AGE_MIN", "ARES_LOCK_MAX_AGE_MIN"], label: "Lock max age", explain: "Minutes before a hung run's lock is force-reclaimed by the next scheduled tick.", fallback: "60" },
       {

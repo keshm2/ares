@@ -4,6 +4,7 @@ import { openUrl } from "@aplyx/core/helpers.js";
 import {
   checkJobFit,
   errorMessage,
+  resolveResultsPerPage,
   saveJobForReview,
   searchJobs,
   type FitResult,
@@ -128,6 +129,18 @@ export function SearchScreen({
   const [editing, setEditing] = useState(false);
   const [action, setAction] = useState<Action>("idle");
   const [jobs, setJobs] = useState<SearchJob[]>([]);
+  // Discrete pages (default 25/page, Settings > Environment > "Results
+  // per page") over the already-fetched, already-sorted `jobs` array —
+  // no re-fetch per page. Re-read when the tab becomes active again so
+  // a change made on the Settings tab takes effect on return here,
+  // without needing a full re-search. Distinct from `visible`/`offset`
+  // below, which is the terminal-height-based scroll *within* one page
+  // (a 25-item page can still be taller than the terminal).
+  const [resultsPerPage, setResultsPerPage] = useState(() => resolveResultsPerPage(root));
+  const [currentPage, setCurrentPage] = useState(0);
+  useEffect(() => {
+    if (active) setResultsPerPage(resolveResultsPerPage(root));
+  }, [active, root]);
   const [sources, setSources] = useState<Partial<Record<JobSource, SourceResult>>>({});
   const [enabledSources, setEnabledSources] = useState<Record<JobSource, boolean>>({
     ashbyhq: true,
@@ -161,6 +174,8 @@ export function SearchScreen({
   // inline selection details below the list.
   const pane = paneLayout(columns);
   const visible = Math.max(3, Math.min(30, contentRows - (pane.show ? 4 : 6)));
+  const totalPages = Math.max(1, Math.ceil(jobs.length / resultsPerPage));
+  const pagedJobs = jobs.slice(currentPage * resultsPerPage, (currentPage + 1) * resultsPerPage);
   // Fixed width per source toggle, each independently truncated — a long
   // failure detail (e.g. "2/8 failed: some-slug, another-slug") must never
   // overflow into the next source's cell or force the row onto a second
@@ -182,14 +197,30 @@ export function SearchScreen({
   }, [capturesInput, onInputActiveChange]);
 
   useEffect(() => {
-    const next = Math.max(0, Math.min(jobs.length - 1, cursor));
+    const next = Math.max(0, Math.min(pagedJobs.length - 1, cursor));
     if (next !== cursor) setCursor(next);
-    const maxOffset = Math.max(0, jobs.length - visible);
+    const maxOffset = Math.max(0, pagedJobs.length - visible);
     if (offset > maxOffset) setOffset(maxOffset);
-  }, [cursor, jobs.length, offset, visible]);
+  }, [cursor, pagedJobs.length, offset, visible]);
+
+  // Back to page 1 whenever the total page count shrinks below the
+  // current page (a smaller "Results per page" mid-session, or a new
+  // search with fewer pages of results) — never strand the view on a
+  // now out-of-range page.
+  useEffect(() => {
+    if (currentPage > totalPages - 1) setCurrentPage(Math.max(0, totalPages - 1));
+  }, [currentPage, totalPages]);
+
+  const changePage = (delta: number) => {
+    const next = Math.max(0, Math.min(totalPages - 1, currentPage + delta));
+    if (next === currentPage) return;
+    setCurrentPage(next);
+    setCursor(0);
+    setOffset(0);
+  };
 
   const move = (delta: number) => {
-    const next = Math.max(0, Math.min(jobs.length - 1, cursor + delta));
+    const next = Math.max(0, Math.min(pagedJobs.length - 1, cursor + delta));
     setCursor(next);
     setOffset((current) => {
       if (next < current) return next;
@@ -209,6 +240,7 @@ export function SearchScreen({
       setSources(result.sources);
       setCursor(0);
       setOffset(0);
+      setCurrentPage(0);
       setMessage(
         result.jobs.length === 0
           ? "No matching titles found. Press / to refine the query."
@@ -302,9 +334,14 @@ export function SearchScreen({
       // PageDown/PageUp reliably.
       if (key.pageDown || input === "n") return move(visible);
       if (key.pageUp || input === "p") return move(-visible);
+      // Discrete pages (resultsPerPage items each) — distinct from n/p
+      // above, which scroll within one page by however many rows fit on
+      // screen. A page can still be taller than the terminal.
+      if (input === "]") return changePage(1);
+      if (input === "[") return changePage(-1);
       const isAction = key.return || input === "o" || input === "f" || input === "s";
       if (!isAction) return;
-      const selected = jobs[cursor];
+      const selected = pagedJobs[cursor];
       if (!selected) {
         // Feedback instead of a silently dead key.
         setMessage(
@@ -328,9 +365,9 @@ export function SearchScreen({
     { isActive: active && Boolean(process.stdin.isTTY) },
   );
 
-  const selected = jobs[cursor];
+  const selected = pagedJobs[cursor];
   const selectedFit = selected ? fits[selected.url] : undefined;
-  const page = jobs.slice(offset, offset + visible);
+  const viewportRows = pagedJobs.slice(offset, offset + visible);
 
   // Fixed column grid for the results table — computed from whatever
   // width the list actually gets (less than `columns` when the detail
@@ -401,7 +438,7 @@ export function SearchScreen({
             <Col width={1} hit={false}>{""}</Col>
             <Col width={FIT_W} hit={false} dim>Fit</Col>
           </Box>
-          {page.map((job, index) => {
+          {viewportRows.map((job, index) => {
             const absolute = offset + index;
             const fitResult = fits[job.url];
             const hit = absolute === cursor;
@@ -472,6 +509,13 @@ export function SearchScreen({
           ) : null}
         </Box>
       ) : null}
+      {totalPages > 1 ? (
+        <Box>
+          <Text dimColor>
+            page {currentPage + 1}/{totalPages} · {jobs.length} results · [/] change page
+          </Text>
+        </Box>
+      ) : null}
       <Box>
         {action === "searching" ? (
           <Text color={theme.accent}>
@@ -495,5 +539,5 @@ function SourceBadge({ result, loading }: { result?: SourceResult; loading: bool
   return <Text color={theme.good}>{statusGlyph.applied} {result.count}</Text>;
 }
 
-export const SEARCH_HINTS = "/ query · t sources · ↑↓ move · n/p page · enter/o open · f fit · s save";
+export const SEARCH_HINTS = "/ query · t sources · ↑↓ move · n/p scroll · [/] page · enter/o open · f fit · s save";
 export const SEARCH_EDIT_HINTS = "type · ←→ move · backspace erase · enter search · esc done";
