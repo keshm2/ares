@@ -77,7 +77,7 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="aplyx-fade-rise" style={{ maxWidth: "34rem", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+    <div style={{ maxWidth: "34rem", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
       <h1 style={{ fontSize: "var(--text-3xl)" }}>Settings</h1>
 
       <section>

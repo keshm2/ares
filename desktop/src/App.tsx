@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./lib/AuthContext";
 import { EntryScreen } from "./routes/EntryScreen";
 import { Logo } from "./components/Logo";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Route-level code splitting: a fresh launch only ever needs EntryScreen
 // first, but every other route (both onboarding wizards, the entire app
@@ -31,15 +32,17 @@ function App() {
   return (
     <AuthProvider>
       <HashRouter>
-        <Suspense fallback={<RouteLoading />}>
-          <Routes>
-            <Route path="/" element={<EntryScreen />} />
-            <Route path="/auth" element={<AuthScreen />} />
-            <Route path="/onboarding/local" element={<LocalWizard />} />
-            <Route path="/onboarding/hosted" element={<HostedWizard />} />
-            <Route path="/app/*" element={<AppShell />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<RouteLoading />}>
+            <Routes>
+              <Route path="/" element={<EntryScreen />} />
+              <Route path="/auth" element={<AuthScreen />} />
+              <Route path="/onboarding/local" element={<LocalWizard />} />
+              <Route path="/onboarding/hosted" element={<HostedWizard />} />
+              <Route path="/app/*" element={<AppShell />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </HashRouter>
     </AuthProvider>
   );

@@ -7,6 +7,61 @@ but trimmed to fit a small in-repo doc.
 > Per-`docs/RELEASE.md` is the canonical, deep-dive release
 > document for each tagged build. This file is the index.
 
+## [0.9.8a] — 2026-07-23
+
+npm package: `@keshm/aplyx` version `0.9.8-alpha.0`. Full notes:
+[`RELEASE.md`](./RELEASE.md).
+
+### Added
+
+- **Shared job-postings cache.** A Supabase `job_cache` table (~47
+  curated companies, public read) refreshed hourly via a new GitHub
+  Actions workflow backs job search for both UIs instead of hitting
+  every ATS live on each query — per-company-capped Postgres RPC so
+  one company can't starve a query's result budget. Auth/account
+  storage lives on a separate Supabase project from the cache.
+- **Pagination (both UIs).** Jobs search results default to 25 per
+  page, user-configurable — dropdown on desktop (persisted), `[`/`]`
+  keys plus a new `APLYX_RESULTS_PER_PAGE` Settings field on the TUI.
+- **Desktop: Home "Recent activity" feed** — applied jobs and pending
+  review items merged into one reverse-chronological list on the
+  dashboard.
+- **Desktop: Profile settings page.** Every onboarding field (all 8
+  pages) is now editable from Settings → Profile without re-running
+  setup.
+- **Desktop: top-level error boundary** — a render error anywhere no
+  longer unmounts the whole app with no recovery.
+
+### Fixed
+
+- **Amazon dominated search results**, other sources rarely appeared —
+  a shared per-source deadline let one slow source starve the others;
+  deadlines are now decoupled per source.
+- **Results were silently truncated below the configured page size.**
+- **A cache pre-filter bug excluded valid prefix matches**, causing
+  near-identical queries (e.g. "software engineering intern" vs.
+  "software engineer intern") to return very different result counts.
+- **Search never covered the shared cache's full company list** — only
+  the user's personal targets were searched, silently missing every
+  shared-cache-only company (e.g. SpaceX). This was the single biggest
+  fix in this release.
+- Cache silently dropped personally-configured companies not present
+  in the shared list; narrow queries (e.g. "intern") returned
+  near-zero results due to an overly tight per-company cap.
+- Desktop: redundant double-animation on route changes, an
+  `onAnimationEnd` bug that could end a route transition early on a
+  bubbled child event, and un-animated pop-in on a route's first visit
+  while its chunk downloaded.
+- Desktop: a missing-field crash in the new Recent-activity feed
+  (older `review_queue.json` entries predate a field rename) that
+  looked like the app hanging after "Run locally."
+
+### Changed
+
+- Desktop: the "preferred locations only" filter is temporarily
+  offline pending a redesign now that pagination has landed — search
+  still covers the whole US either way.
+
 ## [0.9.75a] — 2026-07-22
 
 npm package: `@keshm/aplyx` version `0.9.75-alpha.0`.

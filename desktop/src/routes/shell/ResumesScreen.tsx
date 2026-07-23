@@ -73,7 +73,7 @@ export function ResumesScreen() {
   };
 
   return (
-    <div className="aplyx-fade-rise" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
       <div>
         <h1 style={{ fontSize: "var(--text-3xl)", marginBottom: "var(--space-2)" }}>Resumes</h1>
         <div className="data-toolbar">

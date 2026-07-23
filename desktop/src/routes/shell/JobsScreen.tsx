@@ -272,7 +272,7 @@ export function JobsScreen() {
   };
 
   return (
-    <div className="aplyx-fade-rise" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         <h1 style={{ fontSize: "var(--text-3xl)" }}>Jobs</h1>
         <div className="data-toolbar">
