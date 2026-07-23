@@ -105,17 +105,19 @@ function jobCacheRow(source: JobSource, slug: string, query: string, job: Search
 // look indistinguishable from hung. Chunking keeps each request small
 // and bounded, and gives per-chunk progress instead of one long silence.
 //
-// Dropped further, 200 -> 50, after the operator's Supabase project
-// reported disk I/O nearing its usage limit (free tier: 0.5 CPU/1GB —
-// this checkout's earlier migrations, the original manual refresh, and
-// four retried CI attempts this session all added up). A 522
+// Dropped 200 -> 50 after the previous Supabase project reported disk
+// I/O nearing its usage limit (free tier: 0.5 CPU/1GB — cumulative
+// migrations, the original manual refresh, and repeated retried CI
+// attempts all added up there); dropped again, 50 -> 25, as an extra
+// safety margin on the fresh replacement project, even though a brand
+// new project shouldn't carry that same accumulated I/O history. A 522
 // "connection timed out" at the Cloudflare layer, on requests as cheap
-// as a single-row SELECT, fits I/O-starved Postgres becoming
-// unresponsive to new connections better than a payload-size problem —
-// smaller chunks alone don't fix that (same total bytes written either
-// way); UPSERT_INTER_CHUNK_DELAY_MS below is what actually matters,
-// spreading writes out over time instead of shrinking them.
-const UPSERT_CHUNK_SIZE = 50;
+// as a single-row SELECT, fit I/O-starved Postgres becoming unresponsive
+// to new connections better than a payload-size problem — smaller
+// chunks alone don't fix that (same total bytes written either way);
+// UPSERT_INTER_CHUNK_DELAY_MS below is what actually matters, spreading
+// writes out over time instead of shrinking them.
+const UPSERT_CHUNK_SIZE = 25;
 // Applied between every chunk, not just on retry — the point is
 // spreading write pressure out over time so Postgres gets room to
 // flush/checkpoint between transactions, not just making individual
