@@ -57,20 +57,51 @@ function withDeadline(
     }),
   ]);
 }
-// User-configurable via Settings > Environment > "Jobs per page"
+// User-configurable via Settings > Environment > "Max search results"
 // (APLYX_JOBS_PER_PAGE) — how many results one manual search keeps
 // (matched-and-sorted total, not a UI page — client-side pagination in
 // the TUI's SearchScreen and the desktop app's JobsScreen slices this
 // same returned set into pages, default 25/page, entirely separately;
-// see each screen's own page-size constant). Raised 75 -> 300 (max) and
-// 50 -> 100 (default) 2026-07-23 alongside adding that pagination —
-// keeping more of an already-fetched-and-matched batch costs nothing
-// extra (no additional network/fetch work, just less truncation before
-// returning), and a 25-per-page UI needs more than 75 total to be worth
-// paginating through at all.
+// see each screen's own page-size constant).
+//
+// Raised twice on 2026-07-23: 75 -> 300/50 -> 100 when pagination was
+// added, then 300 -> 2000/100 -> 500 after confirming live that 100 was
+// STILL silently dropping most of what pagination was built to surface
+// — a plain "engineer" search had 1,123 real matched postings
+// (380 ashbyhq + 63 lever + 527 greenhouse + 9 smartrecruiters + 91
+// amazon + 53 oracle, all counted from the full `matched` array before
+// this slice), but the old 100 cap meant pagination only ever had 100
+// of those to page through, no matter how many pages it offered. This
+// value is what actually determines whether "everything" is shown —
+// UI pagination just makes a bigger number here navigable instead of
+// an unscrollable wall of results, it was never the thing limiting the
+// total in the first place. Keeping more costs nothing extra for
+// Ashby/Lever/Greenhouse/SmartRecruiters/cache (no additional network
+// work, just less truncation of an already-fetched-and-matched array)
+// — it DOES mean a bigger live query for Amazon/Oracle/Workday, which
+// take this same number as their own fetch limit (see fetchAmazon/
+// fetchOracle/fetchWorkday below), bounded by each source's own
+// SOURCE_DEADLINE_MS regardless. 2000 is a safety ceiling against
+// truly pathological cases (a one-word query against many configured
+// companies), not a value real usage should often reach.
 export const MIN_PAGE_SIZE = 10;
-export const MAX_PAGE_SIZE = 300;
-export const DEFAULT_PAGE_SIZE = 100;
+export const MAX_PAGE_SIZE = 2000;
+export const DEFAULT_PAGE_SIZE = 500;
+
+// Deliberately NOT the same number as pageSize above, despite both being
+// "how many jobs" limits — found live, right after the DEFAULT_PAGE_SIZE
+// bump: fetchAmazon/fetchOracle/fetchWorkday take pageSize as their own
+// `--limit` argument to the live Python fetch, and asking Amazon/Oracle
+// for 500 within the same fixed SOURCE_DEADLINE_MS (2.2s) regularly blew
+// the deadline and turned a working source into "timed out, 0 results" —
+// a regression, not an improvement. pageSize governs how much of an
+// already-fetched-and-matched batch searchJobs() keeps (free to raise —
+// see its own comment); this governs how much these three specifically
+// ask their live API for up front (not free — bounded by real network/
+// processing time within one fixed deadline). 75 matches the old
+// MAX_PAGE_SIZE ceiling these three were already proven to work
+// reliably under.
+const LIVE_SOURCE_FETCH_LIMIT = 75;
 
 // The actual UI pagination size (results shown per page, both the TUI's
 // SearchScreen and the desktop app's JobsScreen — see each's own
@@ -541,9 +572,9 @@ export async function searchJobs(
     maybeCached(root, "lever", leverSlugs, "Lever", query, (slugs) => fetchLever(slugs)),
     maybeCached(root, "greenhouse", greenhouseSlugs, "Greenhouse", query, (slugs) => fetchGreenhouse(slugs)),
     maybeCached(root, "smartrecruiters", smartrecruitersSlugs, "SmartRecruiters", query, (slugs) => fetchSmartRecruiters(slugs, query)),
-    isOn("amazon") ? withDeadline(fetchAmazon(root, query, pageSize), "Amazon") : Promise.resolve({ jobs: [], source: DISABLED_SOURCE }),
-    isOn("oracle") ? withDeadline(fetchOracle(root, query, pageSize), "Oracle") : Promise.resolve({ jobs: [], source: DISABLED_SOURCE }),
-    isOn("workday") ? withDeadline(fetchWorkday(root, query, pageSize), "Workday") : Promise.resolve({ jobs: [], source: DISABLED_SOURCE }),
+    isOn("amazon") ? withDeadline(fetchAmazon(root, query, LIVE_SOURCE_FETCH_LIMIT), "Amazon") : Promise.resolve({ jobs: [], source: DISABLED_SOURCE }),
+    isOn("oracle") ? withDeadline(fetchOracle(root, query, LIVE_SOURCE_FETCH_LIMIT), "Oracle") : Promise.resolve({ jobs: [], source: DISABLED_SOURCE }),
+    isOn("workday") ? withDeadline(fetchWorkday(root, query, LIVE_SOURCE_FETCH_LIMIT), "Workday") : Promise.resolve({ jobs: [], source: DISABLED_SOURCE }),
   ]);
   const seen = new Set<string>();
   const deduped = [...ashby.jobs, ...lever.jobs, ...greenhouse.jobs, ...smartrecruiters.jobs, ...amazon.jobs, ...oracle.jobs, ...workday.jobs].filter((job) => {
