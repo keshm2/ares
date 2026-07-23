@@ -178,35 +178,42 @@ const CACHE_SOURCE_KEY: Partial<Record<JobSource, string>> = {
 };
 
 /**
- * Which of a user's own configured company slugs (config/targets.json,
- * per-user, not this file) are actually covered by the shared cache
- * (config/job_cache_targets.json, committed, the same 47-ish companies
- * for every install). These are two independent lists — a personal
- * install's targets are never the same set as the shared cache's, so
- * the overlap is often partial.
+ * The full shared-cache company list for a source (config/
+ * job_cache_targets.json, committed, the same ~47 companies for every
+ * install) — independent of a user's own config/targets.json, which is
+ * a completely separate, per-install list.
  *
- * This function exists to fix a real bug found live: readJobCache()
- * doing one combined lookup across a source's full slug list treated
- * ANY non-empty result as a full cache hit, silently never live-fetching
- * whichever of the user's companies simply weren't in the shared cache
- * at all (confirmed live: as low as 0% overlap on some sources) — every
- * search was quietly missing most of a user's own configured companies.
- * Callers (jobs.ts's maybeCached) use this to split a source's slugs
- * into a cache-eligible subset and a live-only subset that always gets
- * live-fetched regardless of the cache outcome.
+ * This is the SEARCH SCOPE fix, distinct from (and found after) the
+ * earlier coverage-safety fix: it's not enough to just make sure a
+ * user's own configured companies never get silently dropped when
+ * they're absent from the shared cache — the shared cache's OTHER
+ * companies (the ones a user never personally configured, like SpaceX
+ * for most installs) were never being searched AT ALL, cache or no
+ * cache, because searchJobs() only ever iterated a source's *personal*
+ * slug list. The whole reason job_cache_targets.json is a curated,
+ * broader company list in the first place — "so users have a lot of
+ * options to apply to" — never actually took effect; the cache was
+ * only ever speeding up and correctly covering a user's own existing
+ * (often narrow) list, never expanding what got searched. Confirmed
+ * live: SpaceX (only in the shared list, not any tested personal one)
+ * never appeared in results for any query, no matter how broad.
  *
- * Never throws — a missing/unreadable file just means nothing is
- * cache-eligible, which safely forces every company to live-fetch
- * rather than silently dropping any of them.
+ * Callers (jobs.ts's maybeCached) union this with a source's personal
+ * slug list — the shared list is always searched via cache; whichever
+ * of the user's own companies aren't already part of it get live-fetched
+ * on top, so nothing from either list is ever dropped.
+ *
+ * Never throws — a missing/unreadable file just means the shared list is
+ * empty, which safely falls back to exactly the old personal-list-only
+ * behavior rather than breaking search.
  */
-export async function cacheEligibleSlugs(root: string, source: JobSource, requested: string[]): Promise<Set<string>> {
+export async function sharedCacheSlugs(root: string, source: JobSource): Promise<Set<string>> {
   const key = CACHE_SOURCE_KEY[source];
-  if (!key || requested.length === 0) return new Set();
+  if (!key) return new Set();
   try {
     const raw = await fs.readFile(path.join(root, "config", "job_cache_targets.json"), "utf8");
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const cachedSlugs = new Set((parsed[key] as string[] | undefined) ?? []);
-    return new Set(requested.filter((slug) => cachedSlugs.has(slug)));
+    return new Set((parsed[key] as string[] | undefined) ?? []);
   } catch {
     return new Set();
   }

@@ -6,7 +6,7 @@ import { py } from "./platform.js";
 import { effectiveEnv, readTargetsArrayList } from "./settings.js";
 import { sortByPreferredThenPosted, titleMatchesQuery } from "./jobsSort.js";
 import type { JobSource, SearchJob } from "./jobsSort.js";
-import { readJobCache, cacheEligibleSlugs } from "./jobCache.js";
+import { readJobCache, sharedCacheSlugs } from "./jobCache.js";
 
 export * from "./jobsSort.js";
 
@@ -494,22 +494,31 @@ const DISABLED_SOURCE: SourceResult = { state: "skipped", count: 0, detail: "dis
  *  file's header) skip the cache check entirely rather than pay a lookup
  *  that can never hit.
  *
- *  companySlugs is split into a cache-eligible subset (also in
- *  config/job_cache_targets.json, the shared cache's own company list)
- *  and a live-only subset (everything else the user personally
- *  configured). This split is load-bearing, not an optimization: a
- *  user's config/targets.json and the shared cache's company list are
- *  two entirely independent lists that usually only partially overlap
- *  (confirmed live: as low as 0% on some sources). readJobCache() doing
- *  one combined lookup across a source's whole slug list treated ANY
- *  non-empty result as a full cache hit — silently never live-fetching
- *  whichever of the user's own companies simply weren't among the
- *  shared cache's ~47, even though nothing about them was actually
- *  broken. Every search was quietly missing most of a user's own
- *  configured companies on partially-covered sources. The live-only
- *  subset always gets live-fetched regardless of the cache outcome; the
- *  cache-eligible subset falls back to a live fetch of itself too, same
- *  as before, if the cache read misses.
+ *  The actual search scope for a source is the UNION of companySlugs
+ *  (the user's own config/targets.json list) and the shared cache's
+ *  whole company list (config/job_cache_targets.json, ~47 companies,
+ *  the same for every install) — not either list alone. This is a
+ *  second, distinct fix from an earlier one: first, making sure a
+ *  user's own companies never get silently dropped when they're absent
+ *  from the shared cache; second (this one, found after the first was
+ *  already live), making sure the shared cache's OTHER companies
+ *  actually get searched at all. Before this, searchJobs() only ever
+ *  iterated a source's *personal* slug list — the shared cache could
+ *  only ever speed up and correctly cover a user's own existing list,
+ *  never actually expand what got searched, which defeats the entire
+ *  point of job_cache_targets.json being a curated, broader company
+ *  list in the first place. Confirmed live: SpaceX (only in the shared
+ *  list, not in any personal one tested) never appeared in results for
+ *  any query, no matter how broad, cache or no cache.
+ *
+ *  The shared list is always queried via cache; whichever of the
+ *  user's own companies aren't already part of it are the live-only
+ *  subset, always live-fetched regardless of the cache outcome. If the
+ *  cache read itself fails/misses entirely, this falls back to live-
+ *  fetching just companySlugs (the user's own list) rather than the
+ *  full shared set — live-fetching ~47 companies as a degraded-mode
+ *  fallback would be slow/heavy and defeats the point of the cache
+ *  being what makes that set fast in the first place.
  *
  *  withDeadline is applied here, around each live() call only — NOT
  *  around the whole function via the call site (as it briefly was) —
@@ -535,12 +544,13 @@ async function maybeCached(
   query: string,
   live: (slugs: string[]) => Promise<{ jobs: SearchJob[]; source: SourceResult }>,
 ): Promise<{ jobs: SearchJob[]; source: SourceResult }> {
-  const cacheEligible = [...(await cacheEligibleSlugs(root, source, companySlugs))];
-  const liveOnly = companySlugs.filter((slug) => !cacheEligible.includes(slug));
+  const shared = await sharedCacheSlugs(root, source);
+  const cacheTargets = [...shared];
+  const liveOnly = companySlugs.filter((slug) => !shared.has(slug));
 
   const titleWords = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const cached = cacheEligible.length > 0
-    ? await readJobCache(root, { source, companySlugs: cacheEligible, query: "", titleWords })
+  const cached = cacheTargets.length > 0
+    ? await readJobCache(root, { source, companySlugs: cacheTargets, query: "", titleWords })
     : undefined;
 
   // If the cache-eligible portion missed, it needs a live fetch of
